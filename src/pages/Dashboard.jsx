@@ -8,9 +8,9 @@ function BookmarkIcon() {
 }
 
 const COMING_SOON = [
-  "Magnetic Fields", "Medical Physics", "Telecommunications",
-  "Ideal Gases", "Waves", "Superposition", "Mechanics", "Circular Motion"
-];
+"Magnetic Fields", "Medical Physics", "Telecommunications",
+"Ideal Gases", "Waves", "Superposition", "Mechanics", "Circular Motion"];
+
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -25,18 +25,18 @@ function TrendBadge({ trend }) {
   if (trend === "improving") return (
     <span className="flex items-center gap-1 text-xs font-medium text-primary">
       <ArrowUp className="w-3 h-3" /> Improving
-    </span>
-  );
+    </span>);
+
   if (trend === "steady") return (
     <span className="flex items-center gap-1 text-xs font-medium text-amber-400">
       <ArrowRight className="w-3 h-3" /> Steady
-    </span>
-  );
+    </span>);
+
   return (
     <span className="flex items-center gap-1 text-xs font-medium text-red-400">
       <ArrowDown className="w-3 h-3" /> Needs work
-    </span>
-  );
+    </span>);
+
 }
 
 function RecommendationBanner({ trend, navigate }) {
@@ -52,12 +52,12 @@ function RecommendationBanner({ trend, navigate }) {
       <p className="text-sm text-foreground/85 leading-relaxed">{text}</p>
       <button
         onClick={() => navigate("/gravitational/question")}
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:brightness-110 transition-all"
-      >
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:brightness-110 transition-all">
+        
         Start session → 
       </button>
-    </div>
-  );
+    </div>);
+
 }
 
 export default function Dashboard() {
@@ -84,7 +84,7 @@ export default function Dashboard() {
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <span className="text-base font-bold tracking-wide text-foreground">ALA Hub</span>
+          <span className="text-base font-bold tracking-wide text-foreground">Cambridge Hub</span>
           <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
             <span className="text-xs font-bold text-primary">R</span>
           </div>
@@ -101,16 +101,16 @@ export default function Dashboard() {
           <RecommendationBanner trend={gf ? gf.trend : null} navigate={navigate} />
 
           {/* Review Bank */}
-          {reviewBank.length > 0 && (
-            <div className="space-y-2">
+          {reviewBank.length > 0 &&
+          <div className="space-y-2">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Review Bank</p>
                 <p className="text-xs text-muted-foreground/60">Questions waiting to be mastered.</p>
               </div>
               <div
-                className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
-                onClick={() => navigate("/review")}
-              >
+              className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
+              onClick={() => navigate("/review")}>
+              
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <BookmarkIcon />
                   <div className="min-w-0">
@@ -123,14 +123,14 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <button
-                  onClick={(e) => { e.stopPropagation(); navigate("/review"); }}
-                  className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all"
-                >
+                onClick={(e) => {e.stopPropagation();navigate("/review");}}
+                className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all">
+                
                   Review now →
                 </button>
               </div>
             </div>
-          )}
+          }
 
           {/* Topics section */}
           <div className="space-y-1">
@@ -141,13 +141,13 @@ export default function Dashboard() {
           {/* Active topic — Gravitational Fields */}
           <div
             onClick={() => navigate("/gravitational/question")}
-            className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all"
-          >
+            className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all">
+            
             <div className="flex items-start justify-between">
               <div className="space-y-2 flex-1">
                 <p className="font-semibold text-foreground text-sm">Gravitational Fields</p>
-                {gf ? (
-                  <>
+                {gf ?
+                <>
                     <TrendBadge trend={gf.trend} />
                     <div className="flex items-center gap-4 pt-1">
                       <span className="text-[11px] text-muted-foreground">Last attempt: {gf.lastLabel}</span>
@@ -156,10 +156,10 @@ export default function Dashboard() {
                         {gf.streak} day streak
                       </span>
                     </div>
-                  </>
-                ) : (
-                  <span className="text-xs text-primary/70 font-medium">Ready to start</span>
-                )}
+                  </> :
+
+                <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                }
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
             </div>
@@ -168,13 +168,13 @@ export default function Dashboard() {
           {/* Active topic — Nuclear Physics */}
           <div
             onClick={() => navigate("/nuclear/question")}
-            className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all"
-          >
+            className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all">
+            
             <div className="flex items-start justify-between">
               <div className="space-y-2 flex-1">
                 <p className="font-semibold text-foreground text-sm">Nuclear Physics</p>
-                {np ? (
-                  <>
+                {np ?
+                <>
                     <TrendBadge trend={np.trend} />
                     <div className="flex items-center gap-4 pt-1">
                       <span className="text-[11px] text-muted-foreground">Last attempt: {np.lastLabel}</span>
@@ -183,26 +183,26 @@ export default function Dashboard() {
                         {np.streak} day streak
                       </span>
                     </div>
-                  </>
-                ) : (
-                  <span className="text-xs text-primary/70 font-medium">Ready to start</span>
-                )}
+                  </> :
+
+                <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                }
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
             </div>
           </div>
 
-          {[{label:"Thermal Physics",key:"tp",data:tp,route:"/thermal/question"},{label:"Oscillations",key:"osc",data:osc,route:"/oscillations/question"},{label:"Electric Fields",key:"ef",data:ef,route:"/electric/question"},{label:"Capacitance",key:"cap",data:cap,route:"/capacitance/question"},{label:"Electromagnetic Induction",key:"emi",data:emi,route:"/eminduction/question"},{label:"Quantum Physics",key:"qp",data:qp,route:"/quantum/question"},{label:"Astrophysics",key:"astro",data:astro,route:"/astrophysics/question"}].map(({label,data,route}) => (
-            <div
-              key={label}
-              onClick={() => navigate(route)}
-              className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all"
-            >
+          {[{ label: "Thermal Physics", key: "tp", data: tp, route: "/thermal/question" }, { label: "Oscillations", key: "osc", data: osc, route: "/oscillations/question" }, { label: "Electric Fields", key: "ef", data: ef, route: "/electric/question" }, { label: "Capacitance", key: "cap", data: cap, route: "/capacitance/question" }, { label: "Electromagnetic Induction", key: "emi", data: emi, route: "/eminduction/question" }, { label: "Quantum Physics", key: "qp", data: qp, route: "/quantum/question" }, { label: "Astrophysics", key: "astro", data: astro, route: "/astrophysics/question" }].map(({ label, data, route }) =>
+          <div
+            key={label}
+            onClick={() => navigate(route)}
+            className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all">
+            
               <div className="flex items-start justify-between">
                 <div className="space-y-2 flex-1">
                   <p className="font-semibold text-foreground text-sm">{label}</p>
-                  {data ? (
-                    <>
+                  {data ?
+                <>
                       <TrendBadge trend={data.trend} />
                       <div className="flex items-center gap-4 pt-1">
                         <span className="text-[11px] text-muted-foreground">Last attempt: {data.lastLabel}</span>
@@ -211,37 +211,37 @@ export default function Dashboard() {
                           {data.streak} day streak
                         </span>
                       </div>
-                    </>
-                  ) : (
-                    <span className="text-xs text-primary/70 font-medium">Ready to start</span>
-                  )}
+                    </> :
+
+                <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                }
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
               </div>
             </div>
-          ))}
+          )}
 
           {/* Reset button for dev testing */}
           <div className="flex justify-center pt-4 pb-2">
             <button
               onClick={handleReset}
-              className="text-[10px] text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors"
-            >
+              className="text-[10px] text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors">
+              
               Reset data
             </button>
           </div>
 
           {/* Coming soon topics */}
           <div className="space-y-1.5">
-            {COMING_SOON.map(topic => (
-              <div
-                key={topic}
-                className="px-4 py-3 flex items-center justify-between opacity-35"
-              >
+            {COMING_SOON.map((topic) =>
+            <div
+              key={topic}
+              className="px-4 py-3 flex items-center justify-between opacity-35">
+              
                 <p className="text-sm text-muted-foreground/70">{topic}</p>
                 <span className="text-[10px] text-muted-foreground/50">Coming soon</span>
               </div>
-            ))}
+            )}
           </div>
 
         </div>
@@ -255,19 +255,19 @@ export default function Dashboard() {
         </button>
         <button
           className="flex flex-col items-center gap-1"
-          onClick={() => alert("History coming soon")}
-        >
+          onClick={() => alert("History coming soon")}>
+          
           <Clock className="w-5 h-5 text-muted-foreground/50" />
           <span className="text-[10px] font-medium text-muted-foreground/50">History</span>
         </button>
         <button
           className="flex flex-col items-center gap-1"
-          onClick={() => alert("Profile coming soon")}
-        >
+          onClick={() => alert("Profile coming soon")}>
+          
           <User className="w-5 h-5 text-muted-foreground/50" />
           <span className="text-[10px] font-medium text-muted-foreground/50">Profile</span>
         </button>
       </div>
-    </div>
-  );
+    </div>);
+
 }

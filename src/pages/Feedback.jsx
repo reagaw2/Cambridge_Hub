@@ -88,7 +88,20 @@ const QUESTION_META = {
     question_text: "Define the activity of a sample.",
     mark_scheme: "B1: number of nuclear disintegrations per unit time.",
     total_marks: 1
-  }
+  },
+  "w25_44_Q1a":   { question_id: "w25_44_Q1a",   total_marks: 2 },
+  "w25_44_Q2ai":  { question_id: "w25_44_Q2ai",  total_marks: 3 },
+  "w25_44_Q3a":   { question_id: "w25_44_Q3a",   total_marks: 2 },
+  "w25_44_Q4a":   { question_id: "w25_44_Q4a",   total_marks: 1 },
+  "w25_44_Q4biv": { question_id: "w25_44_Q4biv", total_marks: 3 },
+  "w25_44_Q5a":   { question_id: "w25_44_Q5a",   total_marks: 3 },
+  "w25_44_Q6ai":  { question_id: "w25_44_Q6ai",  total_marks: 1 },
+  "w25_44_Q6aii": { question_id: "w25_44_Q6aii", total_marks: 1 },
+  "w25_44_Q7a":   { question_id: "w25_44_Q7a",   total_marks: 2 },
+  "w25_44_Q9a":   { question_id: "w25_44_Q9a",   total_marks: 2 },
+  "w25_44_Q10a":  { question_id: "w25_44_Q10a",  total_marks: 2 },
+  "w25_44_Q10b":  { question_id: "w25_44_Q10b",  total_marks: 2 },
+  "w25_44_Q10c":  { question_id: "w25_44_Q10c",  total_marks: 3 }
 };
 
 export default function Feedback() {
@@ -103,7 +116,7 @@ export default function Feedback() {
   const resolvedTopicKey = topicKey ?? "gravitational_fields";
   const resolvedBack = backRoute ?? "/question";
 
-  const maxMarks = isQ3 ? 1 : 2;
+  const maxMarks = (questionId && QUESTION_META[questionId]?.total_marks) ?? (isQ3 ? 1 : 2);
   const marksEarned = feedback?.marks_earned ?? 0;
   const fullMarks = marksEarned >= maxMarks;
 

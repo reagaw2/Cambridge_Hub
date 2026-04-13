@@ -4,12 +4,14 @@ import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback, answer } = state || {};
+  const { feedback } = state || {};
 
   if (!feedback) {
     navigate("/");
     return null;
   }
+
+  const marks = [feedback.mark_1, feedback.mark_2].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -32,7 +34,7 @@ export default function Feedback() {
           {/* Mark breakdown */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Mark Breakdown</h3>
-            {[feedback.mark_1, feedback.mark_2].map((mark, i) => (
+            {marks.map((mark, i) => (
               <div key={i} className="flex gap-3">
                 {mark.earned
                   ? <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />

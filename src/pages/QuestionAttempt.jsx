@@ -36,8 +36,24 @@ Analyse the student's answer against the mark scheme. Respond in the following J
         type: "object",
         properties: {
           marks_earned: { type: "number" },
-          mark_1: { type: "object" },
-          mark_2: { type: "object" },
+          mark_1: {
+            type: "object",
+            properties: {
+              earned: { type: "boolean" },
+              keyword: { type: "string" },
+              found: { type: "boolean" },
+              feedback: { type: "string" }
+            }
+          },
+          mark_2: {
+            type: "object",
+            properties: {
+              earned: { type: "boolean" },
+              keyword: { type: "string" },
+              found: { type: "boolean" },
+              feedback: { type: "string" }
+            }
+          },
           cambridge_insight: { type: "string" },
           next_step: { type: "string" }
         }

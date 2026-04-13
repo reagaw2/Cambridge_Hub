@@ -89,19 +89,97 @@ const QUESTION_META = {
     mark_scheme: "B1: number of nuclear disintegrations per unit time.",
     total_marks: 1
   },
-  "w25_44_Q1a":   { question_id: "w25_44_Q1a",   total_marks: 2 },
-  "w25_44_Q2ai":  { question_id: "w25_44_Q2ai",  total_marks: 3 },
-  "w25_44_Q3a":   { question_id: "w25_44_Q3a",   total_marks: 2 },
-  "w25_44_Q4a":   { question_id: "w25_44_Q4a",   total_marks: 1 },
-  "w25_44_Q4biv": { question_id: "w25_44_Q4biv", total_marks: 3 },
-  "w25_44_Q5a":   { question_id: "w25_44_Q5a",   total_marks: 3 },
-  "w25_44_Q6ai":  { question_id: "w25_44_Q6ai",  total_marks: 1 },
-  "w25_44_Q6aii": { question_id: "w25_44_Q6aii", total_marks: 1 },
-  "w25_44_Q7a":   { question_id: "w25_44_Q7a",   total_marks: 2 },
-  "w25_44_Q9a":   { question_id: "w25_44_Q9a",   total_marks: 2 },
-  "w25_44_Q10a":  { question_id: "w25_44_Q10a",  total_marks: 2 },
-  "w25_44_Q10b":  { question_id: "w25_44_Q10b",  total_marks: 2 },
-  "w25_44_Q10c":  { question_id: "w25_44_Q10c",  total_marks: 3 }
+  "w25_44_Q1a": {
+    question_id: "w25_44_Q1a",
+    topic: "Gravitational Fields",
+    question_text: "State Newton's law of gravitation.",
+    mark_scheme: "B1: proportional to product of masses. B1: inversely proportional to square of separation.",
+    total_marks: 2
+  },
+  "w25_44_Q2ai": {
+    question_id: "w25_44_Q2ai",
+    topic: "Thermal Physics",
+    question_text: "The equation of state for an ideal gas is pV = NkT. State the meaning of each of the symbols p, V, N, k and T.",
+    mark_scheme: "B1: p = pressure, V = volume, k = Boltzmann constant. B1: N = number of molecules. B1: T = thermodynamic temperature.",
+    total_marks: 3
+  },
+  "w25_44_Q3a": {
+    question_id: "w25_44_Q3a",
+    topic: "Thermal Physics",
+    question_text: "With reference to molecular kinetic energy and molecular potential energy, explain what is meant by the internal energy of an ideal gas.",
+    mark_scheme: "B1: total kinetic energy associated with random motion of molecules. B1: potential energy of molecules is zero for an ideal gas.",
+    total_marks: 2
+  },
+  "w25_44_Q4a": {
+    question_id: "w25_44_Q4a",
+    topic: "Oscillations",
+    question_text: "State what is meant by the frequency of the oscillations of an oscillating object.",
+    mark_scheme: "B1: number of oscillations per unit time.",
+    total_marks: 1
+  },
+  "w25_44_Q4biv": {
+    question_id: "w25_44_Q4biv",
+    topic: "Oscillations",
+    question_text: "Describe the interchange between kinetic energy and potential energy during the oscillations.",
+    mark_scheme: "B1: kinetic energy maximum at zero displacement. B1: potential energy zero at zero displacement. B1: kinetic energy plus potential energy is constant.",
+    total_marks: 3
+  },
+  "w25_44_Q5a": {
+    question_id: "w25_44_Q5a",
+    topic: "Electric Fields",
+    question_text: "Explain why the electric potential near an isolated proton is positive.",
+    mark_scheme: "B1: potential defined as zero at infinity. B1: proton has positive charge and repels another positive charge. B1: work done moving positive charges together.",
+    total_marks: 3
+  },
+  "w25_44_Q6ai": {
+    question_id: "w25_44_Q6ai",
+    topic: "Capacitance",
+    question_text: "State what is meant by rectification.",
+    mark_scheme: "B1: conversion of alternating current to direct current.",
+    total_marks: 1
+  },
+  "w25_44_Q6aii": {
+    question_id: "w25_44_Q6aii",
+    topic: "Capacitance",
+    question_text: "State the name of the type of rectification produced by a bridge rectifier circuit.",
+    mark_scheme: "B1: full-wave rectification.",
+    total_marks: 1
+  },
+  "w25_44_Q7a": {
+    question_id: "w25_44_Q7a",
+    topic: "Electromagnetic Induction",
+    question_text: "State Lenz's law of electromagnetic induction.",
+    mark_scheme: "M1: direction of induced e.m.f. A1: is such as to produce effects that oppose the change that caused it.",
+    total_marks: 2
+  },
+  "w25_44_Q9a": {
+    question_id: "w25_44_Q9a",
+    topic: "Quantum Physics",
+    question_text: "State what is meant by the photoelectric effect.",
+    mark_scheme: "M1: emission of electrons from a metal surface. A1: when electromagnetic radiation is incident on the surface.",
+    total_marks: 2
+  },
+  "w25_44_Q10a": {
+    question_id: "w25_44_Q10a",
+    topic: "Astrophysics",
+    question_text: "State what is meant by redshift.",
+    mark_scheme: "B1: recession of galaxy causes emitted light to shift. B1: increase in observed wavelength or decrease in observed frequency.",
+    total_marks: 2
+  },
+  "w25_44_Q10b": {
+    question_id: "w25_44_Q10b",
+    topic: "Astrophysics",
+    question_text: "Explain how observations of redshift lead to the idea that the universe is expanding.",
+    mark_scheme: "B1: distant galaxies show redshift so galaxies are moving apart. B1: galaxies moving apart means universe is expanding.",
+    total_marks: 2
+  },
+  "w25_44_Q10c": {
+    question_id: "w25_44_Q10c",
+    topic: "Astrophysics",
+    question_text: "Explain how Hubble's law leads to the Big Bang theory of the origin of the universe.",
+    mark_scheme: "B1: speed of recession proportional to distance. B1+B1: any two of — more distant galaxies represent further back in time; all matter was once very close together; all matter was once moving apart very fast.",
+    total_marks: 3
+  }
 };
 
 export default function Feedback() {
@@ -145,7 +223,7 @@ export default function Feedback() {
 
   if (!feedback) return null;
 
-  const marks = [feedback.mark_1, feedback.mark_2].filter(Boolean);
+  const marks = [feedback.mark_1, feedback.mark_2, feedback.mark_3].filter(Boolean);
 
   function handleNext() {
     // If coming from review session, go back to review

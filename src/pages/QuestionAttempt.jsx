@@ -13,13 +13,7 @@ export default function QuestionAttempt() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Reset question-flow tracking when starting a fresh Q1 session (not scores/streak)
-  useState(() => {
-    sessionStorage.setItem("full_marks_count", "0");
-    sessionStorage.setItem("consecutive_full_marks", "0");
-    sessionStorage.setItem("previous_score", "-1");
-    console.log("[ALA Hub] Session reset — starting Q1");
-  });
+
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -72,7 +66,18 @@ Analyse the student's answer against the mark scheme. Respond in the following J
       setError("Something went wrong. Please try again.");
       return;
     }
-    navigate("/feedback", { state: { feedback: feedback.response ?? feedback, answer } });
+    navigate("/feedback", {
+      state: {
+        feedback: feedback.response ?? feedback,
+        answer,
+        topicKey: "gravitational_fields",
+        questionId: "q1",
+        nextFullRoute: "/similar-question",
+        nextRetryRoute: "/question",
+        backRoute: "/gravitational/question",
+        paperRef: "9702/44 · May/Jun 2025",
+      }
+    });
   };
 
   return (

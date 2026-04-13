@@ -6,13 +6,16 @@ import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
 
 const QUESTION = {
-  label: "Question 8(a)",
-  topic: "Nuclear Physics",
-  text: "State what is meant by a tracer.",
-  marks: "[2 marks]",
+  label: "Question 2(a)(i)",
+  topic: "Thermal Physics",
+  text: "The equation of state for an ideal gas is pV = NkT. State the meaning of each of the symbols p, V, N, k and T.",
+  marks: "[3 marks]",
 };
+const PAPER_REF = "9702/44 · Oct/Nov 2025";
+const TOPIC_KEY = "thermal_physics";
+const QUESTION_ID = "w25_44_Q2ai";
 
-export default function NuclearQuestionAttempt() {
+export default function ThermalQuestionAttempt() {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -29,16 +32,18 @@ export default function NuclearQuestionAttempt() {
     setError(null);
     const feedback = await base44.integrations.Core.InvokeLLM({
       prompt: `You are a Cambridge A Level Physics examiner. A student has answered the following question:
-Question: State what is meant by a tracer.
+Question: The equation of state for an ideal gas is pV = NkT. State the meaning of each of the symbols p, V, N, k and T.
 Mark scheme:
-- B1 mark 1: a radioactive substance introduced into the body
-- B1 mark 2: substance absorbed by the tissues being studied
+- B1 mark 1: p = pressure of gas, V = volume of gas, and k = Boltzmann constant — all three must be present for this mark
+- B1 mark 2: N = number of molecules in the gas
+- B1 mark 3: T = thermodynamic temperature of gas — the word thermodynamic must be present or clearly implied
 Student's answer: ${answer}
 Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
 {
-  "marks_earned": [number out of 2],
-  "mark_1": { "earned": true or false, "keyword": "radioactive substance introduced into the body", "found": true or false, "feedback": "one sentence explanation" },
-  "mark_2": { "earned": true or false, "keyword": "absorbed by tissues being studied", "found": true or false, "feedback": "one sentence explanation" },
+  "marks_earned": [number out of 3],
+  "mark_1": { "earned": true or false, "keyword": "p = pressure, V = volume, k = Boltzmann constant", "found": true or false, "feedback": "one sentence explanation" },
+  "mark_2": { "earned": true or false, "keyword": "N = number of molecules", "found": true or false, "feedback": "one sentence explanation" },
+  "mark_3": { "earned": true or false, "keyword": "T = thermodynamic temperature", "found": true or false, "feedback": "one sentence explanation" },
   "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone",
   "next_step": "one sentence telling the student exactly what to focus on in their next attempt"
 }`,
@@ -49,6 +54,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
           marks_earned: { type: "number" },
           mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
           mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
+          mark_3: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
           cambridge_insight: { type: "string" },
           next_step: { type: "string" }
         }
@@ -60,12 +66,12 @@ Analyse the student's answer against the mark scheme. Respond in the following J
       state: {
         feedback: feedback.response ?? feedback,
         answer,
-        topicKey: "nuclear_physics",
-        questionId: "w25_44_Q8a",
-        nextFullRoute: "/nuclear/similar-question",
-        nextRetryRoute: "/nuclear/question",
+        topicKey: TOPIC_KEY,
+        questionId: QUESTION_ID,
+        nextFullRoute: "/thermal/similar-question",
+        nextRetryRoute: "/thermal/question",
         backRoute: "/",
-        paperRef: "9702/44 · Oct/Nov 2025"
+        paperRef: PAPER_REF,
       }
     });
   };
@@ -78,18 +84,14 @@ Analyse the student's answer against the mark scheme. Respond in the following J
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            9702/44 · Oct/Nov 2025
-          </span>
+          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{PAPER_REF}</span>
         </div>
         <div className="flex-1 flex flex-col gap-4 p-4">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">{QUESTION.label}</span>
             <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">{QUESTION.topic}</span>
             <p className="text-[15px] leading-relaxed text-foreground/90">{QUESTION.text}</p>
-            <div className="flex justify-end">
-              <span className="font-mono text-xs text-muted-foreground">{QUESTION.marks}</span>
-            </div>
+            <div className="flex justify-end"><span className="font-mono text-xs text-muted-foreground">{QUESTION.marks}</span></div>
           </div>
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />

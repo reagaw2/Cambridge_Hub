@@ -72,6 +72,12 @@ Analyse both inputs and respond in the following JSON format only, no extra text
         answer,
         isQ3: true,
         student_prediction: prediction,
+        topicKey: "gravitational_fields",
+        questionId: "q3",
+        nextFullRoute: "/",
+        nextRetryRoute: "/familiarity-check",
+        backRoute: "/question",
+        paperRef: "9702/44 · May/Jun 2025",
       }
     });
   };

@@ -6,13 +6,16 @@ import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
 
 const QUESTION = {
-  label: "Question 8(a)",
-  topic: "Nuclear Physics",
-  text: "State what is meant by a tracer.",
+  label: "Question 9(a)",
+  topic: "Quantum Physics",
+  text: "State what is meant by the photoelectric effect.",
   marks: "[2 marks]",
 };
+const PAPER_REF = "9702/44 · Oct/Nov 2025";
+const TOPIC_KEY = "quantum_physics";
+const QUESTION_ID = "w25_44_Q9a";
 
-export default function NuclearQuestionAttempt() {
+export default function QuantumQuestionAttempt() {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -29,16 +32,16 @@ export default function NuclearQuestionAttempt() {
     setError(null);
     const feedback = await base44.integrations.Core.InvokeLLM({
       prompt: `You are a Cambridge A Level Physics examiner. A student has answered the following question:
-Question: State what is meant by a tracer.
+Question: State what is meant by the photoelectric effect.
 Mark scheme:
-- B1 mark 1: a radioactive substance introduced into the body
-- B1 mark 2: substance absorbed by the tissues being studied
+- M1 mark 1: emission of electrons from a metal surface — this is a mandatory mark, the A1 mark below cannot be awarded without it
+- A1 mark 2: when electromagnetic radiation is incident on the surface
 Student's answer: ${answer}
-Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+Analyse the student's answer against the mark scheme. Note that mark 1 is an M1 mandatory mark — if the student does not mention emission of electrons from a metal surface then mark 2 cannot be awarded even if the rest of the answer is correct. Respond in the following JSON format only, no extra text:
 {
   "marks_earned": [number out of 2],
-  "mark_1": { "earned": true or false, "keyword": "radioactive substance introduced into the body", "found": true or false, "feedback": "one sentence explanation" },
-  "mark_2": { "earned": true or false, "keyword": "absorbed by tissues being studied", "found": true or false, "feedback": "one sentence explanation" },
+  "mark_1": { "earned": true or false, "keyword": "emission of electrons from a metal surface", "found": true or false, "feedback": "one sentence explanation" },
+  "mark_2": { "earned": true or false, "keyword": "when electromagnetic radiation is incident on the surface", "found": true or false, "feedback": "one sentence explanation — note this mark cannot be awarded if mark 1 was not earned" },
   "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone",
   "next_step": "one sentence telling the student exactly what to focus on in their next attempt"
 }`,
@@ -60,12 +63,12 @@ Analyse the student's answer against the mark scheme. Respond in the following J
       state: {
         feedback: feedback.response ?? feedback,
         answer,
-        topicKey: "nuclear_physics",
-        questionId: "w25_44_Q8a",
-        nextFullRoute: "/nuclear/similar-question",
-        nextRetryRoute: "/nuclear/question",
+        topicKey: TOPIC_KEY,
+        questionId: QUESTION_ID,
+        nextFullRoute: "/",
+        nextRetryRoute: "/quantum/question",
         backRoute: "/",
-        paperRef: "9702/44 · Oct/Nov 2025"
+        paperRef: PAPER_REF,
       }
     });
   };
@@ -78,18 +81,14 @@ Analyse the student's answer against the mark scheme. Respond in the following J
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            9702/44 · Oct/Nov 2025
-          </span>
+          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{PAPER_REF}</span>
         </div>
         <div className="flex-1 flex flex-col gap-4 p-4">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">{QUESTION.label}</span>
             <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">{QUESTION.topic}</span>
             <p className="text-[15px] leading-relaxed text-foreground/90">{QUESTION.text}</p>
-            <div className="flex justify-end">
-              <span className="font-mono text-xs text-muted-foreground">{QUESTION.marks}</span>
-            </div>
+            <div className="flex justify-end"><span className="font-mono text-xs text-muted-foreground">{QUESTION.marks}</span></div>
           </div>
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />

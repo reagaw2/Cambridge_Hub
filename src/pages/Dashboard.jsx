@@ -8,9 +8,7 @@ function BookmarkIcon() {
 }
 
 const COMING_SOON = [
-  "Thermal Physics", "Oscillations", "Electric Fields", "Capacitance",
-  "Magnetic Fields", "Electromagnetic Induction", "Quantum Physics",
-  "Nuclear Physics", "Medical Physics", "Telecommunications",
+  "Magnetic Fields", "Medical Physics", "Telecommunications",
   "Ideal Gases", "Waves", "Superposition", "Mechanics", "Circular Motion"
 ];
 
@@ -53,7 +51,7 @@ function RecommendationBanner({ trend, navigate }) {
       <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Today's Focus</p>
       <p className="text-sm text-foreground/85 leading-relaxed">{text}</p>
       <button
-        onClick={() => navigate("/question")}
+        onClick={() => navigate("/gravitational/question")}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:brightness-110 transition-all"
       >
         Start session → 
@@ -66,6 +64,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const gf = getTopicData("gravitational_fields");
   const np = getTopicData("nuclear_physics");
+  const tp = getTopicData("thermal_physics");
+  const osc = getTopicData("oscillations");
+  const ef = getTopicData("electric_fields");
+  const cap = getTopicData("capacitance");
+  const emi = getTopicData("electromagnetic_induction");
+  const qp = getTopicData("quantum_physics");
+  const astro = getTopicData("astrophysics");
   const reviewBank = getReviewBank();
 
   function handleReset() {
@@ -135,7 +140,7 @@ export default function Dashboard() {
 
           {/* Active topic — Gravitational Fields */}
           <div
-            onClick={() => navigate("/question")}
+            onClick={() => navigate("/gravitational/question")}
             className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all"
           >
             <div className="flex items-start justify-between">
@@ -186,6 +191,35 @@ export default function Dashboard() {
               <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
             </div>
           </div>
+
+          {[{label:"Thermal Physics",key:"tp",data:tp,route:"/thermal/question"},{label:"Oscillations",key:"osc",data:osc,route:"/oscillations/question"},{label:"Electric Fields",key:"ef",data:ef,route:"/electric/question"},{label:"Capacitance",key:"cap",data:cap,route:"/capacitance/question"},{label:"Electromagnetic Induction",key:"emi",data:emi,route:"/eminduction/question"},{label:"Quantum Physics",key:"qp",data:qp,route:"/quantum/question"},{label:"Astrophysics",key:"astro",data:astro,route:"/astrophysics/question"}].map(({label,data,route}) => (
+            <div
+              key={label}
+              onClick={() => navigate(route)}
+              className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all"
+            >
+              <div className="flex items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <p className="font-semibold text-foreground text-sm">{label}</p>
+                  {data ? (
+                    <>
+                      <TrendBadge trend={data.trend} />
+                      <div className="flex items-center gap-4 pt-1">
+                        <span className="text-[11px] text-muted-foreground">Last attempt: {data.lastLabel}</span>
+                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Flame className="w-3 h-3 text-orange-400/80" />
+                          {data.streak} day streak
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                  )}
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
+              </div>
+            </div>
+          ))}
 
           {/* Reset button for dev testing */}
           <div className="flex justify-center pt-4 pb-2">

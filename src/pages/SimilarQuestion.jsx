@@ -52,7 +52,17 @@ Analyse the student's answer against the mark scheme. Respond in the following J
     setLoading(false);
     if (!feedback) { setError("Something went wrong. Please try again."); return; }
     navigate("/feedback", {
-      state: { feedback: feedback.response ?? feedback, answer, isQ2: true }
+      state: {
+        feedback: feedback.response ?? feedback,
+        answer,
+        isQ2: true,
+        topicKey: "gravitational_fields",
+        questionId: "q2",
+        nextFullRoute: "/familiarity-check",
+        nextRetryRoute: "/similar-question",
+        backRoute: "/question",
+        paperRef: "9702/44 · May/Jun 2025",
+      }
     });
   };
 

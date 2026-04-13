@@ -13,6 +13,48 @@ const DEFAULT_DATA = {
       last_attempted: null,
       streak: 0,
       last_streak_date: null
+    },
+    thermal_physics: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
+    },
+    oscillations: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
+    },
+    electric_fields: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
+    },
+    capacitance: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
+    },
+    electromagnetic_induction: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
+    },
+    quantum_physics: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
+    },
+    astrophysics: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
     }
   },
   review_bank: [],

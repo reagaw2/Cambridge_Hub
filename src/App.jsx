@@ -17,6 +17,19 @@ import NuclearQuestionAttempt from './pages/nuclear/QuestionAttempt';
 import NuclearSimilarQuestion from './pages/nuclear/SimilarQuestion';
 import NuclearFamiliarityCheck from './pages/nuclear/FamiliarityCheck';
 import ReviewAffirmation from './pages/ReviewAffirmation';
+import GravitationalQuestionAttempt from './pages/gravitational/QuestionAttempt';
+import ThermalQuestionAttempt from './pages/thermal/QuestionAttempt';
+import ThermalSimilarQuestion from './pages/thermal/SimilarQuestion';
+import OscillationsQuestionAttempt from './pages/oscillations/QuestionAttempt';
+import OscillationsSimilarQuestion from './pages/oscillations/SimilarQuestion';
+import ElectricQuestionAttempt from './pages/electric/QuestionAttempt';
+import CapacitanceQuestionAttempt from './pages/capacitance/QuestionAttempt';
+import CapacitanceSimilarQuestion from './pages/capacitance/SimilarQuestion';
+import EMInductionQuestionAttempt from './pages/eminduction/QuestionAttempt';
+import QuantumQuestionAttempt from './pages/quantum/QuestionAttempt';
+import AstroQuestionAttempt from './pages/astrophysics/QuestionAttempt';
+import AstroSimilarQuestion from './pages/astrophysics/SimilarQuestion';
+import AstroFamiliarityCheck from './pages/astrophysics/FamiliarityCheck';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -55,6 +68,19 @@ const AuthenticatedApp = () => {
       <Route path="/nuclear/similar-question" element={<NuclearSimilarQuestion />} />
       <Route path="/nuclear/familiarity-check" element={<NuclearFamiliarityCheck />} />
       <Route path="/review-affirmation" element={<ReviewAffirmation />} />
+      <Route path="/gravitational/question" element={<GravitationalQuestionAttempt />} />
+      <Route path="/thermal/question" element={<ThermalQuestionAttempt />} />
+      <Route path="/thermal/similar-question" element={<ThermalSimilarQuestion />} />
+      <Route path="/oscillations/question" element={<OscillationsQuestionAttempt />} />
+      <Route path="/oscillations/similar-question" element={<OscillationsSimilarQuestion />} />
+      <Route path="/electric/question" element={<ElectricQuestionAttempt />} />
+      <Route path="/capacitance/question" element={<CapacitanceQuestionAttempt />} />
+      <Route path="/capacitance/similar-question" element={<CapacitanceSimilarQuestion />} />
+      <Route path="/eminduction/question" element={<EMInductionQuestionAttempt />} />
+      <Route path="/quantum/question" element={<QuantumQuestionAttempt />} />
+      <Route path="/astrophysics/question" element={<AstroQuestionAttempt />} />
+      <Route path="/astrophysics/similar-question" element={<AstroSimilarQuestion />} />
+      <Route path="/astrophysics/familiarity-check" element={<AstroFamiliarityCheck />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

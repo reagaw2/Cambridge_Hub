@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, XCircle, Flame } from "lucide-react";
-import { recordAttempt } from "../lib/topicStore";
+import { recordAttempt, addToReviewBank } from "../lib/topicStore";
 
 function RingProgress({ value, max }) {
   const size = 80;
@@ -45,10 +45,35 @@ function detectSituation(feedback, isQ3, maxMarks) {
   return null;
 }
 
+// Question metadata map — used to add questions to the review bank
+const QUESTION_META = {
+  "q1": {
+    question_id: "q1",
+    topic: "Gravitational Fields",
+    question_text: "Describe the gravitational field in the region close to the surface of a planet.",
+    mark_scheme: "B1: radial field. B1: directed towards centre of planet.",
+    total_marks: 2
+  },
+  "q2": {
+    question_id: "q2",
+    topic: "Gravitational Fields",
+    question_text: "Explain why the gravitational field strength g can be considered constant close to the surface of a planet.",
+    mark_scheme: "B1: changes in height are much smaller than radius of planet. B1: so (radius + height)² ≈ radius².",
+    total_marks: 2
+  },
+  "q3": {
+    question_id: "q3",
+    topic: "Gravitational Fields",
+    question_text: "A student states that the gravitational field strength at the surface of a planet is 9.81 N kg⁻¹. State what is meant by gravitational field strength.",
+    mark_scheme: "B1: force per unit mass.",
+    total_marks: 1
+  }
+};
+
 export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback, isQ2, isQ3, student_prediction } = state || {};
+  const { feedback, isQ2, isQ3, student_prediction, isReview } = state || {};
 
   const maxMarks = isQ3 ? 1 : 2;
   const marksEarned = feedback?.marks_earned ?? 0;
@@ -60,7 +85,19 @@ export default function Feedback() {
     if (!feedback) { navigate("/"); return; }
     if (!recorded.current) {
       recorded.current = true;
-      recordAttempt("gravitational_fields", marksEarned);
+      if (!isReview) {
+        recordAttempt("gravitational_fields", marksEarned);
+        // Add to review bank if not full marks on first attempt
+        if (!fullMarks) {
+          const qKey = isQ3 ? "q3" : isQ2 ? "q2" : "q1";
+          const meta = QUESTION_META[qKey];
+          addToReviewBank({
+            ...meta,
+            first_attempt_score: marksEarned,
+            first_attempt_feedback: feedback.cambridge_insight ?? ""
+          });
+        }
+      }
     }
   }, []);
 
@@ -69,6 +106,12 @@ export default function Feedback() {
   const marks = [feedback.mark_1, feedback.mark_2].filter(Boolean);
 
   function handleNext() {
+    // If coming from review session and didn't improve, go back to review
+    if (isReview) {
+      navigate("/review");
+      return;
+    }
+
     sessionStorage.setItem("previous_score", String(marksEarned));
 
     if (fullMarks) {
@@ -97,7 +140,7 @@ export default function Feedback() {
     }
   }
 
-  const buttonLabel = fullMarks ? "Try a similar question →" : "Try Again";
+  const buttonLabel = isReview ? (fullMarks ? "Next review question →" : "Try again") : (fullMarks ? "Try a similar question →" : "Try Again");
 
   return (
     <div className="min-h-screen bg-background flex justify-center">

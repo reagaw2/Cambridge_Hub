@@ -12,6 +12,8 @@ import SimilarQuestion from './pages/SimilarQuestion';
 import FamiliarityCheck from './pages/FamiliarityCheck';
 import QuestionAttempt from './pages/QuestionAttempt';
 import Feedback from './pages/Feedback';
+import ReviewSession from './pages/ReviewSession';
+import ReviewAffirmation from './pages/ReviewAffirmation';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -45,6 +47,8 @@ const AuthenticatedApp = () => {
       <Route path="/reflection" element={<Reflection />} />
       <Route path="/similar-question" element={<SimilarQuestion />} />
       <Route path="/familiarity-check" element={<FamiliarityCheck />} />
+      <Route path="/review" element={<ReviewSession />} />
+      <Route path="/review-affirmation" element={<ReviewAffirmation />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

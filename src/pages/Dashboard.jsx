@@ -1,7 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { getTopicData, resetData } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, Home, Clock, User, ChevronRight } from "lucide-react";
+import { getTopicData, resetData, getReviewBank } from "../lib/topicStore";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, Home, Clock, User, ChevronRight, Bookmark } from "lucide-react";
+
+function BookmarkIcon() {
+  return <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />;
+}
 
 const COMING_SOON = [
   "Thermal Physics", "Oscillations", "Electric Fields", "Capacitance",
@@ -61,6 +65,7 @@ function RecommendationBanner({ trend, navigate }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const gf = getTopicData("gravitational_fields");
+  const reviewBank = getReviewBank();
 
   function handleReset() {
     resetData();
@@ -88,6 +93,38 @@ export default function Dashboard() {
 
           {/* Recommendation banner */}
           <RecommendationBanner trend={gf ? gf.trend : null} navigate={navigate} />
+
+          {/* Review Bank */}
+          {reviewBank.length > 0 && (
+            <div className="space-y-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Review Bank</p>
+                <p className="text-xs text-muted-foreground/60">Questions waiting to be mastered.</p>
+              </div>
+              <div
+                className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
+                onClick={() => navigate("/review")}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <BookmarkIcon />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {reviewBank.length} question{reviewBank.length !== 1 ? "s" : ""} need another attempt
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                      {reviewBank[0].topic} · Added {reviewBank[0].date_added === new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) ? "today" : reviewBank[0].date_added}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate("/review"); }}
+                  className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all"
+                >
+                  Review now →
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Topics section */}
           <div className="space-y-1">

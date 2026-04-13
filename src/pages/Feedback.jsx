@@ -116,7 +116,11 @@ export default function Feedback() {
   const resolvedTopicKey = topicKey ?? "gravitational_fields";
   const resolvedBack = backRoute ?? "/question";
 
-  const maxMarks = (questionId && QUESTION_META[questionId]?.total_marks) ?? (isQ3 ? 1 : 2);
+  // Derive maxMarks strictly from QUESTION_META when questionId is present
+  const metaEntry = questionId ? QUESTION_META[questionId] : null;
+  const maxMarks = metaEntry ? metaEntry.total_marks : (isQ3 ? 1 : 2);
+
+  console.log("[Feedback] questionId:", questionId, "| maxMarks:", maxMarks, "| metaEntry:", metaEntry);
   const marksEarned = feedback?.marks_earned ?? 0;
   const fullMarks = marksEarned >= maxMarks;
 

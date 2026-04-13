@@ -5,6 +5,7 @@ export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const { feedback } = state || {};
+  console.log("Feedback data:", feedback);
 
   if (!feedback) {
     navigate("/");

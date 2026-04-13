@@ -103,12 +103,16 @@ export default function Feedback() {
             <p className="text-sm text-primary leading-relaxed font-medium">{feedback.next_step}</p>
           </div>
 
-          {/* Try Again */}
+          {/* Try Again / Similar Question */}
           <button
-            onClick={() => feedback.marks_earned < 2 ? navigate("/reflection", { state }) : navigate("/")}
+            onClick={() => {
+              if (feedback.marks_earned < 2) navigate("/reflection", { state });
+              else if (state?.isSimilar) navigate("/familiarity-check", { state });
+              else navigate("/similar-question");
+            }}
             className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
           >
-            Try Again
+            {feedback.marks_earned < 2 ? "Try Again" : "Try a similar question →"}
           </button>
 
           {/* Streak indicator */}

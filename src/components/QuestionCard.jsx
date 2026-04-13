@@ -1,28 +1,22 @@
-export default function QuestionCard() {
+export default function QuestionCard({
+  label = "Question 1(b)(i)",
+  topic = "Gravitational Fields",
+  text = "Describe the gravitational field in the region close to the surface of a planet.",
+  marks = "[2 marks]"
+}) {
   return (
     <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-      {/* Question label */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">
-          Question 1(b)(i)
+          {label}
         </span>
       </div>
-
-      {/* Topic tag */}
       <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-        Gravitational Fields
+        {topic}
       </span>
-
-      {/* Question text */}
-      <p className="text-[15px] leading-relaxed text-foreground/90">
-        Describe the gravitational field in the region close to the surface of a planet.
-      </p>
-
-      {/* Marks indicator */}
+      <p className="text-[15px] leading-relaxed text-foreground/90">{text}</p>
       <div className="flex justify-end">
-        <span className="font-mono text-xs text-muted-foreground">
-          [2 marks]
-        </span>
+        <span className="font-mono text-xs text-muted-foreground">{marks}</span>
       </div>
     </div>
   );

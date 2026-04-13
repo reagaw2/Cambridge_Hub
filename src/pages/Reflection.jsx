@@ -20,12 +20,13 @@ export default function Reflection() {
   const [step, setStep] = useState(STEP.FIRST);
 
   useEffect(() => {
+    const dest = state?.isSimilar ? "/similar-question" : "/";
     if (step === STEP.CELEBRATE) {
-      const t = setTimeout(() => navigate("/"), 2000);
+      const t = setTimeout(() => navigate(dest), 2000);
       return () => clearTimeout(t);
     }
     if (step === STEP.LEAVING) {
-      const t = setTimeout(() => navigate("/"), 1000);
+      const t = setTimeout(() => navigate(dest), 1000);
       return () => clearTimeout(t);
     }
   }, [step, navigate]);

@@ -3,7 +3,7 @@ import TopBar from "../components/TopBar";
 import QuestionCard from "../components/QuestionCard";
 import AnswerInput from "../components/AnswerInput";
 import SubmitButton from "../components/SubmitButton";
-import StreakIndicator from "../components/StreakIndicator";
+
 
 export default function QuestionAttempt() {
   const [answer, setAnswer] = useState("");
@@ -21,7 +21,6 @@ export default function QuestionAttempt() {
           <QuestionCard />
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0} onClick={handleSubmit} />
-          <StreakIndicator />
         </div>
       </div>
     </div>

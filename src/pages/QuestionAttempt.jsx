@@ -64,7 +64,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
       setError("Something went wrong. Please try again.");
       return;
     }
-    navigate("/feedback", { state: { feedback, answer } });
+    navigate("/feedback", { state: { feedback: feedback.response ?? feedback, answer } });
   };
 
   return (

@@ -120,7 +120,10 @@ Analyse the student's answer against the mark scheme. Respond in the following J
             <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/70">Previous attempt</p>
             <p className="text-xs text-foreground/60 leading-relaxed">
               <span className="text-amber-400/80 font-medium">{current.first_attempt_score}/{current.total_marks} marks</span>
-              {current.first_attempt_feedback ? ` · ${current.first_attempt_feedback}` : ""}
+              {" · "}
+              {current.first_attempt_score === 0
+                ? "You did not get this last time. Trust what you have learned since then."
+                : "You were close last time. One more piece and this is yours."}
             </p>
           </div>
 

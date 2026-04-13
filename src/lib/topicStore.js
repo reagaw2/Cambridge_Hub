@@ -96,7 +96,7 @@ export function addToReviewBank({ question_id, topic, question_text, mark_scheme
   // avoid duplicates
   if (data.review_bank.find(q => q.question_id === question_id)) { save(data); return; }
 
-  const priority = first_attempt_score === 0 ? 1 : first_attempt_score === 1 ? 2 : 3;
+  const priority = first_attempt_score === 0 ? 1 : 2;
 
   data.review_bank.push({
     question_id,

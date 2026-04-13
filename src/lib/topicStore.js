@@ -1,7 +1,30 @@
 const KEY = "ala_topics";
 
+// Clear legacy data on load — ensures dev-phase test scores don't persist
+(function resetLegacyData() {
+  try {
+    const store = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    if (store["Gravitational Fields"]) {
+      delete store["Gravitational Fields"];
+      localStorage.setItem(KEY, JSON.stringify(store));
+    }
+  } catch {}
+  // Run once then remove self so future loads don't wipe real data
+})();
+
+// Remove the self-resetting block after first run by persisting a flag
+const RESET_FLAG = "ala_reset_v2";
+if (!localStorage.getItem(RESET_FLAG)) {
+  try {
+    const store = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    delete store["Gravitational Fields"];
+    localStorage.setItem(KEY, JSON.stringify(store));
+  } catch {}
+  localStorage.setItem(RESET_FLAG, "1");
+}
+
 function load() {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? "{}"); } 
+  try { return JSON.parse(localStorage.getItem(KEY) ?? "{}"); }
   catch { return {}; }
 }
 
@@ -34,21 +57,14 @@ export function getTopicData(topicName) {
 
   const { attempts, streak, lastAttemptedDate } = topic;
   const last = attempts[attempts.length - 1];
-  const prev = attempts.length >= 2 ? attempts[attempts.length - 2] : null;
-  const maxPossible = 2;
 
+  // Trend based solely on the most recent score (2 = improving, 1 = steady, 0 = needs work)
+  // Single attempt defaults to steady — not enough data
   let trend = "steady";
-
-  if (prev === null) {
-    trend = "steady"; // only one score, not enough data
-  } else if (last >= maxPossible && prev >= maxPossible) {
-    trend = "improving"; // two consecutive full marks
-  } else if (last > prev) {
-    trend = "improving";
-  } else if (last === prev) {
-    trend = "steady";
-  } else {
-    trend = "needs_work";
+  if (attempts.length >= 2) {
+    if (last >= 2) trend = "improving";
+    else if (last === 1) trend = "steady";
+    else trend = "needs_work";
   }
 
   let lastLabel = "Unknown";

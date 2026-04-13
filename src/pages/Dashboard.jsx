@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { getTopicData } from "../lib/topicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, Home, Clock, User, ChevronRight } from "lucide-react";
 
 const COMING_SOON = [
@@ -16,36 +17,7 @@ function getGreeting() {
   return "Good evening, Reagan. One more session before you rest.";
 }
 
-function getGFData() {
-  const scores = JSON.parse(sessionStorage.getItem("gf_scores") ?? "[]");
-  const streak = parseInt(sessionStorage.getItem("gf_streak") ?? "0", 10);
-  const lastDate = sessionStorage.getItem("gf_last_attempt_date");
 
-  if (scores.length === 0) {
-    return { attempted: false, trend: null, streak: 0, lastDate: null };
-  }
-
-  const first = scores[0];
-  const last = scores[scores.length - 1];
-  let trend = "steady";
-  if (last > first) trend = "improving";
-  else if (last < first) trend = "needs_work";
-
-  let lastLabel = null;
-  if (lastDate) {
-    const today = new Date().toDateString();
-    const yesterday = new Date(Date.now() - 86400000).toDateString();
-    const d = new Date(lastDate).toDateString();
-    if (d === today) lastLabel = "today";
-    else if (d === yesterday) lastLabel = "yesterday";
-    else {
-      const diff = Math.round((Date.now() - new Date(lastDate)) / 86400000);
-      lastLabel = `${diff} days ago`;
-    }
-  }
-
-  return { attempted: true, trend, streak, lastDate: lastLabel };
-}
 
 function TrendBadge({ trend }) {
   if (trend === "improving") return (
@@ -67,12 +39,10 @@ function TrendBadge({ trend }) {
 
 function RecommendationBanner({ trend, navigate }) {
   let text;
-  if (!trend || trend === "needs_work") {
-    text = "We recommend starting with Gravitational Fields today — it is a common exam topic and your data shows room to grow.";
-  } else if (trend === "improving") {
+  if (trend === "improving") {
     text = "You are making progress on Gravitational Fields. Push further today — consistency is what Cambridge rewards.";
   } else {
-    text = "Gravitational Fields is looking solid. Consider revisiting it briefly then moving to a new topic.";
+    text = "We recommend starting with Gravitational Fields today — it is a common exam topic and your data shows room to grow.";
   }
   return (
     <div className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-5 space-y-3">
@@ -90,11 +60,10 @@ function RecommendationBanner({ trend, navigate }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [gf, setGf] = useState(getGFData);
+  const [gf, setGf] = useState(() => getTopicData("Gravitational Fields"));
 
-  // Re-read session data each time the dashboard mounts (e.g. navigating back)
   useEffect(() => {
-    setGf(getGFData());
+    setGf(getTopicData("Gravitational Fields"));
   }, []);
 
   return (
@@ -117,7 +86,7 @@ export default function Dashboard() {
           </p>
 
           {/* Recommendation banner */}
-          <RecommendationBanner trend={gf.attempted ? gf.trend : null} navigate={navigate} />
+          <RecommendationBanner trend={gf ? gf.trend : null} navigate={navigate} />
 
           {/* Topics section */}
           <div className="space-y-1">
@@ -133,13 +102,11 @@ export default function Dashboard() {
             <div className="flex items-start justify-between">
               <div className="space-y-2 flex-1">
                 <p className="font-semibold text-foreground text-sm">Gravitational Fields</p>
-                {gf.attempted ? (
+                {gf ? (
                   <>
                     <TrendBadge trend={gf.trend} />
                     <div className="flex items-center gap-4 pt-1">
-                      {gf.lastDate && (
-                        <span className="text-[11px] text-muted-foreground">Last attempt: {gf.lastDate}</span>
-                      )}
+                      <span className="text-[11px] text-muted-foreground">Last attempt: {gf.lastLabel}</span>
                       <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                         <Flame className="w-3 h-3 text-orange-400/80" />
                         {gf.streak} day streak

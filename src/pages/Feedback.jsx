@@ -105,7 +105,7 @@ export default function Feedback() {
 
           {/* Try Again */}
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/reflection", { state: state })}
             className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
           >
             Try Again

@@ -13,8 +13,15 @@ export default function QuestionAttempt() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  const handleSubmit = async () => {
+  // Reset all session tracking when starting a fresh Q1 session
+  useState(() => {
     sessionStorage.setItem("full_marks_count", "0");
+    sessionStorage.setItem("consecutive_full_marks", "0");
+    sessionStorage.setItem("previous_score", "-1");
+    console.log("[ALA Hub] Session reset — starting Q1");
+  });
+
+  const handleSubmit = async () => {
     setLoading(true);
     setError(null);
     const feedback = await base44.integrations.Core.InvokeLLM({

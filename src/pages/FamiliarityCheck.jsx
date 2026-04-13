@@ -16,7 +16,10 @@ const QUESTION = {
 export default function FamiliarityCheck() {
   const navigate = useNavigate();
   const { state } = useLocation();
-  const [stage, setStage] = useState("prediction");
+  // Show prediction stage only when full_marks_count === 2 (second full-marks, going to Q3)
+  const fmc = parseInt(sessionStorage.getItem("full_marks_count") ?? "0", 10);
+  console.log("[ALA Hub] FamiliarityCheck — full_marks_count:", fmc);
+  const [stage, setStage] = useState(fmc >= 2 ? "prediction" : "answer");
   const [prediction, setPrediction] = useState("");
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);

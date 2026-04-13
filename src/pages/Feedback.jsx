@@ -7,18 +7,13 @@ function RingProgress({ value, max }) {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const filled = (value / max) * circ;
-
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--border))" strokeWidth={stroke} />
-        <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none"
-          stroke="hsl(var(--primary))" strokeWidth={stroke}
-          strokeDasharray={`${filled} ${circ}`}
-          strokeLinecap="round"
-          style={{ transition: "stroke-dasharray 0.6s ease" }}
-        />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="hsl(var(--border))" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="hsl(var(--primary))" strokeWidth={stroke}
+          strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 0.6s ease" }} />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="font-mono text-2xl font-bold text-primary">{value}</span>
@@ -27,40 +22,85 @@ function RingProgress({ value, max }) {
   );
 }
 
+// Determine which affirmation situation applies, if any
+function detectSituation(feedback, isQ3, maxMarks) {
+  const marksEarned = feedback.marks_earned ?? 0;
+  const fullMarks = marksEarned >= maxMarks;
+  if (!fullMarks) return null;
+
+  const previousScore = parseInt(sessionStorage.getItem("previous_score") ?? "-1", 10);
+  const consecutiveFull = parseInt(sessionStorage.getItem("consecutive_full_marks") ?? "0", 10);
+
+  // Situation 1 — comeback: previously scored 0, now full marks
+  if (previousScore === 0) return "comeback";
+
+  // Situation 2 — accurate prediction on Q3
+  if (isQ3) {
+    const predictionFeedback = (feedback.prediction_feedback ?? "").toLowerCase();
+    const positiveWords = ["accurate", "correct", "right", "spot on", "exactly", "identified", "knew", "well done", "impressive", "strong"];
+    const isAccurate = positiveWords.some(w => predictionFeedback.includes(w));
+    if (isAccurate) return "prediction";
+  }
+
+  // Situation 3 — 3 consecutive full marks (count updated before this check)
+  if (consecutiveFull >= 3) return "mastery";
+
+  return null;
+}
+
 export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const { feedback, isQ2, isQ3, student_prediction } = state || {};
 
-  if (!feedback) {
-    navigate("/");
-    return null;
-  }
+  if (!feedback) { navigate("/"); return null; }
 
   const maxMarks = isQ3 ? 1 : 2;
   const marks = [feedback.mark_1, feedback.mark_2].filter(Boolean);
-  const fullMarks = feedback.marks_earned >= maxMarks;
-
-  // Determine full_marks_count from sessionStorage
-  const fullMarksCount = parseInt(sessionStorage.getItem("full_marks_count") || "0", 10);
+  const marksEarned = feedback.marks_earned ?? 0;
+  const fullMarks = marksEarned >= maxMarks;
 
   function handleNext() {
-    if (!fullMarks) {
-      // Try again — same question
+    // Store current score as previous_score for next attempt on same question
+    sessionStorage.setItem("previous_score", String(marksEarned));
+
+    if (fullMarks) {
+      // Increment full_marks_count and consecutive_full_marks
+      const fmc = parseInt(sessionStorage.getItem("full_marks_count") ?? "0", 10) + 1;
+      const cfm = parseInt(sessionStorage.getItem("consecutive_full_marks") ?? "0", 10) + 1;
+      sessionStorage.setItem("full_marks_count", String(fmc));
+      sessionStorage.setItem("consecutive_full_marks", String(cfm));
+      console.log("[ALA Hub] full_marks_count updated to:", fmc, "| consecutive_full_marks:", cfm);
+
+      const situation = detectSituation(feedback, isQ3, maxMarks);
+
+      // Determine next destination
+      let nextDest;
+      if (isQ3) {
+        nextDest = "/";
+      } else if (fmc === 1) {
+        nextDest = "/similar-question";
+      } else {
+        nextDest = "/familiarity-check";
+      }
+
+      if (situation) {
+        navigate("/reflection", {
+          state: {
+            situation,
+            nextDest,
+            feedbackState: state,
+          }
+        });
+      } else {
+        navigate(nextDest);
+      }
+    } else {
+      // Wrong — reset consecutive streak, navigate back to same question
+      sessionStorage.setItem("consecutive_full_marks", "0");
       if (isQ3) navigate("/familiarity-check", { state });
       else if (isQ2) navigate("/similar-question");
       else navigate("/");
-    } else {
-      // Full marks — advance
-      const newCount = fullMarksCount + 1;
-      sessionStorage.setItem("full_marks_count", String(newCount));
-      if (newCount === 1) {
-        // First 2/2 — go to Q2
-        navigate("/similar-question");
-      } else {
-        // Second 2/2 (or more) — go to Q3 with familiarity check
-        navigate("/familiarity-check");
-      }
     }
   }
 
@@ -84,10 +124,10 @@ export default function Feedback() {
 
           {/* Marks earned */}
           <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-5">
-            <RingProgress value={feedback.marks_earned ?? 0} max={maxMarks} />
+            <RingProgress value={marksEarned} max={maxMarks} />
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-1">Marks earned</p>
-              <p className="font-mono text-sm text-foreground/60">{feedback.marks_earned} out of {maxMarks}</p>
+              <p className="font-mono text-sm text-foreground/60">{marksEarned} out of {maxMarks}</p>
             </div>
           </div>
 
@@ -101,9 +141,7 @@ export default function Feedback() {
                     ? <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                     : <XCircle className="w-4 h-4 text-red-400/70 shrink-0" />
                   }
-                  <span className="font-mono text-xs text-muted-foreground">
-                    B1 — "{mark.keyword}"
-                  </span>
+                  <span className="font-mono text-xs text-muted-foreground">B1 — "{mark.keyword}"</span>
                 </div>
                 <p className="text-sm text-foreground/80 leading-relaxed">{mark.feedback}</p>
               </div>

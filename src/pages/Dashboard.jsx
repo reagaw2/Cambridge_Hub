@@ -65,6 +65,7 @@ function RecommendationBanner({ trend, navigate }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const gf = getTopicData("gravitational_fields");
+  const np = getTopicData("nuclear_physics");
   const reviewBank = getReviewBank();
 
   function handleReset() {
@@ -148,6 +149,33 @@ export default function Dashboard() {
                       <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                         <Flame className="w-3 h-3 text-orange-400/80" />
                         {gf.streak} day streak
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                )}
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
+            </div>
+          </div>
+
+          {/* Active topic — Nuclear Physics */}
+          <div
+            onClick={() => navigate("/nuclear/question")}
+            className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all"
+          >
+            <div className="flex items-start justify-between">
+              <div className="space-y-2 flex-1">
+                <p className="font-semibold text-foreground text-sm">Nuclear Physics</p>
+                {np ? (
+                  <>
+                    <TrendBadge trend={np.trend} />
+                    <div className="flex items-center gap-4 pt-1">
+                      <span className="text-[11px] text-muted-foreground">Last attempt: {np.lastLabel}</span>
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Flame className="w-3 h-3 text-orange-400/80" />
+                        {np.streak} day streak
                       </span>
                     </div>
                   </>

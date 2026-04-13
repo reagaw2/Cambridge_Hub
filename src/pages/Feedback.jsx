@@ -67,13 +67,41 @@ const QUESTION_META = {
     question_text: "A student states that the gravitational field strength at the surface of a planet is 9.81 N kg⁻¹. State what is meant by gravitational field strength.",
     mark_scheme: "B1: force per unit mass.",
     total_marks: 1
+  },
+  "w25_44_Q8a": {
+    question_id: "w25_44_Q8a",
+    topic: "Nuclear Physics",
+    question_text: "State what is meant by a tracer.",
+    mark_scheme: "B1: radioactive substance introduced into the body. B1: absorbed by tissues being studied.",
+    total_marks: 2
+  },
+  "w25_44_Q8bii": {
+    question_id: "w25_44_Q8bii",
+    topic: "Nuclear Physics",
+    question_text: "In the decay equation of oxygen-15, a particle Z is produced alongside the daughter nucleus and a positron. State the name of particle Z.",
+    mark_scheme: "B1: electron neutrino.",
+    total_marks: 1
+  },
+  "w25_44_Q8ci": {
+    question_id: "w25_44_Q8ci",
+    topic: "Nuclear Physics",
+    question_text: "Define the activity of a sample.",
+    mark_scheme: "B1: number of nuclear disintegrations per unit time.",
+    total_marks: 1
   }
 };
 
 export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback, isQ2, isQ3, student_prediction, isReview } = state || {};
+  const {
+    feedback, isQ2, isQ3, student_prediction, isReview,
+    topicKey, questionId, nextFullRoute, nextRetryRoute, backRoute, paperRef
+  } = state || {};
+
+  // Fall back to gravitational fields defaults for backwards compat
+  const resolvedTopicKey = topicKey ?? "gravitational_fields";
+  const resolvedBack = backRoute ?? "/question";
 
   const maxMarks = isQ3 ? 1 : 2;
   const marksEarned = feedback?.marks_earned ?? 0;
@@ -86,13 +114,10 @@ export default function Feedback() {
     if (!recorded.current) {
       recorded.current = true;
       if (!isReview) {
-        recordAttempt("gravitational_fields", marksEarned);
-        // Add to review bank if not full marks on first attempt
-        if (!fullMarks) {
-          const qKey = isQ3 ? "q3" : isQ2 ? "q2" : "q1";
-          const meta = QUESTION_META[qKey];
+        recordAttempt(resolvedTopicKey, marksEarned);
+        if (!fullMarks && questionId && QUESTION_META[questionId]) {
           addToReviewBank({
-            ...meta,
+            ...QUESTION_META[questionId],
             first_attempt_score: marksEarned,
             first_attempt_feedback: feedback.cambridge_insight ?? ""
           });
@@ -106,7 +131,7 @@ export default function Feedback() {
   const marks = [feedback.mark_1, feedback.mark_2].filter(Boolean);
 
   function handleNext() {
-    // If coming from review session and didn't improve, go back to review
+    // If coming from review session, go back to review
     if (isReview) {
       navigate("/review");
       return;
@@ -122,10 +147,8 @@ export default function Feedback() {
 
       const situation = detectSituation(feedback, isQ3, maxMarks);
 
-      let nextDest;
-      if (isQ3) nextDest = "/";
-      else if (fmc === 1) nextDest = "/similar-question";
-      else nextDest = "/familiarity-check";
+      // Use passed nextFullRoute, or fall back to old GF logic
+      const nextDest = nextFullRoute ?? (isQ3 ? "/" : fmc === 1 ? "/similar-question" : "/familiarity-check");
 
       if (situation) {
         navigate("/reflection", { state: { situation, nextDest, feedbackState: state } });
@@ -134,9 +157,8 @@ export default function Feedback() {
       }
     } else {
       sessionStorage.setItem("consecutive_full_marks", "0");
-      if (isQ3) navigate("/familiarity-check", { state });
-      else if (isQ2) navigate("/similar-question");
-      else navigate("/");
+      const retryDest = nextRetryRoute ?? (isQ3 ? resolvedBack : isQ2 ? "/similar-question" : "/");
+      navigate(retryDest);
     }
   }
 
@@ -147,12 +169,12 @@ export default function Feedback() {
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate("/question")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <button onClick={() => navigate(resolvedBack)} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
           <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            9702/44 · May/Jun 2025
+            {paperRef ?? "9702/44 · May/Jun 2025"}
           </span>
         </div>
 
@@ -212,7 +234,7 @@ export default function Feedback() {
 
           <div className="flex items-center justify-center gap-1.5">
             <Flame className="w-3.5 h-3.5 text-orange-400/70" />
-            <span className="font-mono text-[11px] text-muted-foreground/50">Day 3 streak — Gravitational Fields</span>
+            <span className="font-mono text-[11px] text-muted-foreground/50">Answer contributes to your streak</span>
           </div>
 
         </div>

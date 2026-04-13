@@ -7,6 +7,12 @@ const DEFAULT_DATA = {
       last_attempted: null,
       streak: 0,
       last_streak_date: null
+    },
+    nuclear_physics: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
     }
   },
   review_bank: [],

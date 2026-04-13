@@ -13,11 +13,6 @@ const QUESTION = {
   marks: "[2 marks]",
 };
 
-const MARK_SCHEME = {
-  mark_1: { keyword: "changes in height ≪ radius of planet", description: "Changes in height are very much smaller than the radius of the planet — or equivalent" },
-  mark_2: { keyword: "(radius + height)² ≈ radius²", description: "So (radius + height) squared is approximately equal to radius squared — meaning the distance from the centre barely changes" },
-};
-
 export default function SimilarQuestion() {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,14 +26,14 @@ export default function SimilarQuestion() {
       prompt: `You are a Cambridge A Level Physics examiner. A student has answered the following question:
 Question: "${QUESTION.text}"
 Mark scheme:
-- B1 (1 mark): ${MARK_SCHEME.mark_1.description}
-- B1 (1 mark): ${MARK_SCHEME.mark_2.description}
+- B1 (1 mark): Changes in height are very much smaller than the radius of the planet — or equivalent
+- B1 (1 mark): So (radius + height) squared is approximately equal to radius squared — meaning the distance from the centre barely changes
 Student's answer: ${answer}
 Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
 {
   "marks_earned": [number out of 2],
-  "mark_1": { "earned": true or false, "keyword": "${MARK_SCHEME.mark_1.keyword}", "found": true or false, "feedback": "one sentence explanation" },
-  "mark_2": { "earned": true or false, "keyword": "${MARK_SCHEME.mark_2.keyword}", "found": true or false, "feedback": "one sentence explanation" },
+  "mark_1": { "earned": true or false, "keyword": "changes in height ≪ radius of planet", "found": true or false, "feedback": "one sentence explanation" },
+  "mark_2": { "earned": true or false, "keyword": "(radius + height)² ≈ radius²", "found": true or false, "feedback": "one sentence explanation" },
   "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone",
   "next_step": "one sentence telling the student exactly what to focus on in their next attempt"
 }`,
@@ -57,7 +52,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
     setLoading(false);
     if (!feedback) { setError("Something went wrong. Please try again."); return; }
     navigate("/feedback", {
-      state: { feedback: feedback.response ?? feedback, answer, isSimilar: true, markScheme: MARK_SCHEME }
+      state: { feedback: feedback.response ?? feedback, answer, isQ2: true }
     });
   };
 

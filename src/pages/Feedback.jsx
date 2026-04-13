@@ -30,21 +30,46 @@ function RingProgress({ value, max }) {
 export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback } = state || {};
-  console.log("Feedback data:", feedback);
+  const { feedback, isQ2, isQ3, student_prediction } = state || {};
 
   if (!feedback) {
     navigate("/");
     return null;
   }
 
+  const maxMarks = isQ3 ? 1 : 2;
   const marks = [feedback.mark_1, feedback.mark_2].filter(Boolean);
+  const fullMarks = feedback.marks_earned >= maxMarks;
+
+  // Determine full_marks_count from sessionStorage
+  const fullMarksCount = parseInt(sessionStorage.getItem("full_marks_count") || "0", 10);
+
+  function handleNext() {
+    if (!fullMarks) {
+      // Try again — same question
+      if (isQ3) navigate("/familiarity-check", { state });
+      else if (isQ2) navigate("/similar-question");
+      else navigate("/");
+    } else {
+      // Full marks — advance
+      const newCount = fullMarksCount + 1;
+      sessionStorage.setItem("full_marks_count", String(newCount));
+      if (newCount === 1) {
+        // First 2/2 — go to Q2
+        navigate("/similar-question");
+      } else {
+        // Second 2/2 (or more) — go to Q3 with familiarity check
+        navigate("/familiarity-check");
+      }
+    }
+  }
+
+  const buttonLabel = fullMarks ? "Try a similar question →" : "Try Again";
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar — matches QuestionAttempt exactly */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate("/")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -59,10 +84,10 @@ export default function Feedback() {
 
           {/* Marks earned */}
           <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-5">
-            <RingProgress value={feedback.marks_earned ?? 0} max={2} />
+            <RingProgress value={feedback.marks_earned ?? 0} max={maxMarks} />
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-1">Marks earned</p>
-              <p className="font-mono text-sm text-foreground/60">{feedback.marks_earned} out of 2</p>
+              <p className="font-mono text-sm text-foreground/60">{feedback.marks_earned} out of {maxMarks}</p>
             </div>
           </div>
 
@@ -70,10 +95,7 @@ export default function Feedback() {
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Mark Breakdown</h3>
             {marks.map((mark, i) => (
-              <div
-                key={i}
-                className={`pl-4 border-l-2 ${mark.earned ? "border-primary" : "border-red-400/60"}`}
-              >
+              <div key={i} className={`pl-4 border-l-2 ${mark.earned ? "border-primary" : "border-red-400/60"}`}>
                 <div className="flex items-center gap-2 mb-1">
                   {mark.earned
                     ? <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
@@ -97,25 +119,28 @@ export default function Feedback() {
             <p className="text-sm text-foreground/80 leading-relaxed">{feedback.cambridge_insight}</p>
           </div>
 
-          {/* Next step — banner style */}
+          {/* Your prediction — Q3 only */}
+          {isQ3 && student_prediction && (
+            <div className="bg-card border border-l-4 border-border border-l-green-500/60 rounded-xl p-5 space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your Prediction</h3>
+              <p className="text-sm text-foreground/50 italic leading-relaxed">"{student_prediction}"</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{feedback.prediction_feedback}</p>
+            </div>
+          )}
+
+          {/* Next step */}
           <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 space-y-1">
             <p className="text-xs font-semibold uppercase tracking-widest text-primary/70">Next Step</p>
             <p className="text-sm text-primary leading-relaxed font-medium">{feedback.next_step}</p>
           </div>
 
-          {/* Try Again / Similar Question */}
           <button
-            onClick={() => {
-              if (feedback.marks_earned < 2) navigate("/reflection", { state });
-              else if (state?.isSimilar) navigate("/familiarity-check", { state });
-              else navigate("/similar-question");
-            }}
+            onClick={handleNext}
             className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
           >
-            {feedback.marks_earned < 2 ? "Try Again" : "Try a similar question →"}
+            {buttonLabel}
           </button>
 
-          {/* Streak indicator */}
           <div className="flex items-center justify-center gap-1.5">
             <Flame className="w-3.5 h-3.5 text-orange-400/70" />
             <span className="font-mono text-[11px] text-muted-foreground/50">Day 3 streak — Gravitational Fields</span>

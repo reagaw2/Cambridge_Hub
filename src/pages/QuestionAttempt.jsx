@@ -14,6 +14,7 @@ export default function QuestionAttempt() {
   const navigate = useNavigate();
 
   const handleSubmit = async () => {
+    sessionStorage.setItem("full_marks_count", "0");
     setLoading(true);
     setError(null);
     const feedback = await base44.integrations.Core.InvokeLLM({

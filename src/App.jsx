@@ -9,7 +9,6 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Reflection from './pages/Reflection';
 import SimilarQuestion from './pages/SimilarQuestion';
 import FamiliarityCheck from './pages/FamiliarityCheck';
-import FamiliarityResult from './pages/FamiliarityResult';
 import QuestionAttempt from './pages/QuestionAttempt';
 import Feedback from './pages/Feedback';
 
@@ -44,7 +43,6 @@ const AuthenticatedApp = () => {
       <Route path="/reflection" element={<Reflection />} />
       <Route path="/similar-question" element={<SimilarQuestion />} />
       <Route path="/familiarity-check" element={<FamiliarityCheck />} />
-      <Route path="/familiarity-result" element={<FamiliarityResult />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

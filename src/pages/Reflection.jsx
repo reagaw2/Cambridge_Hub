@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 const SITUATION_TEXT = {
   comeback: "Before this session, you got this wrong. Just now, you got it right. That gap is exactly what Cambridge rewards.",
@@ -9,7 +10,8 @@ const SITUATION_TEXT = {
 
 export default function Reflection() {
   const navigate = useNavigate();
-  const { state } = useLocation();
+  const location = useLocation();
+  const { state } = location;
   const { situation, nextDest, feedbackState } = state || {};
 
   const [step, setStep] = useState("prompt");
@@ -35,7 +37,13 @@ export default function Reflection() {
   }, [step, navigate, nextDest]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-8 text-center">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-8 text-center relative">
+      <button
+        onClick={() => navigate("/feedback", { state: feedbackState })}
+        className="absolute top-4 left-4 p-1.5 rounded-lg hover:bg-secondary transition-colors"
+      >
+        <ArrowLeft className="w-5 h-5 text-foreground" />
+      </button>
 
       {step === "prompt" && (
         <div className="flex flex-col items-center gap-10 w-full max-w-sm">

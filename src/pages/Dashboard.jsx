@@ -60,7 +60,7 @@ function RecommendationBanner({ trend, navigate }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [gf, setGf] = useState(() => getTopicData("Gravitational Fields"));
+  const [gf, setGf] = useState(null);
 
   useEffect(() => {
     setGf(getTopicData("Gravitational Fields"));

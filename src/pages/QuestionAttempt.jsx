@@ -78,7 +78,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
-        <TopBar />
+        <TopBar onBack={() => navigate("/")} />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
           <QuestionCard />

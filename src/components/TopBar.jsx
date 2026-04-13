@@ -1,10 +1,10 @@
 import { ArrowLeft, Flame } from "lucide-react";
 
-export default function TopBar() {
+export default function TopBar({ onBack }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
       <div className="flex items-center gap-2.5">
-        <button className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
+        <button onClick={onBack} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
         <div className="flex items-center gap-1 px-1.5 py-0.5 rounded">

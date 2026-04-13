@@ -13,7 +13,7 @@ export default function QuestionAttempt() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Reset all session tracking when starting a fresh Q1 session
+  // Reset question-flow tracking when starting a fresh Q1 session (not scores/streak)
   useState(() => {
     sessionStorage.setItem("full_marks_count", "0");
     sessionStorage.setItem("consecutive_full_marks", "0");

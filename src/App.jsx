@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 // Add page imports here
+import Dashboard from './pages/Dashboard';
 import Reflection from './pages/Reflection';
 import SimilarQuestion from './pages/SimilarQuestion';
 import FamiliarityCheck from './pages/FamiliarityCheck';
@@ -38,7 +39,8 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      <Route path="/" element={<QuestionAttempt />} />
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/question" element={<QuestionAttempt />} />
       <Route path="/feedback" element={<Feedback />} />
       <Route path="/reflection" element={<Reflection />} />
       <Route path="/similar-question" element={<SimilarQuestion />} />

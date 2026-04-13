@@ -64,6 +64,23 @@ export default function Feedback() {
     // Store current score as previous_score for next attempt on same question
     sessionStorage.setItem("previous_score", String(marksEarned));
 
+    // Record score for trend tracking
+    const scores = JSON.parse(sessionStorage.getItem("gf_scores") ?? "[]");
+    scores.push(marksEarned);
+    sessionStorage.setItem("gf_scores", JSON.stringify(scores));
+
+    // Update streak
+    const today = new Date().toDateString();
+    const lastAttempt = sessionStorage.getItem("gf_last_attempt_date");
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    let streak = parseInt(sessionStorage.getItem("gf_streak") ?? "0", 10);
+    if (lastAttempt !== today) {
+      streak = lastAttempt === yesterday ? streak + 1 : 1;
+      sessionStorage.setItem("gf_streak", String(streak));
+    }
+    sessionStorage.setItem("gf_last_attempt_date", today);
+    console.log("[ALA Hub] gf_scores:", scores, "| streak:", streak);
+
     if (fullMarks) {
       // Increment full_marks_count and consecutive_full_marks
       const fmc = parseInt(sessionStorage.getItem("full_marks_count") ?? "0", 10) + 1;

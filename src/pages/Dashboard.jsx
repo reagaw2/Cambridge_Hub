@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, Home, Clock, User, ChevronRight } from "lucide-react";
 
 const COMING_SOON = [
@@ -89,7 +90,12 @@ function RecommendationBanner({ trend, navigate }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const gf = getGFData();
+  const [gf, setGf] = useState(getGFData);
+
+  // Re-read session data each time the dashboard mounts (e.g. navigating back)
+  useEffect(() => {
+    setGf(getGFData());
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex justify-center pb-24">
@@ -149,16 +155,14 @@ export default function Dashboard() {
           </div>
 
           {/* Coming soon topics */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {COMING_SOON.map(topic => (
               <div
                 key={topic}
-                className="bg-card border border-border/50 rounded-xl p-4 flex items-center justify-between opacity-50"
+                className="px-4 py-3 flex items-center justify-between opacity-35"
               >
-                <p className="text-sm text-muted-foreground font-medium">{topic}</p>
-                <span className="text-[11px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
-                  Coming soon
-                </span>
+                <p className="text-sm text-muted-foreground/70">{topic}</p>
+                <span className="text-[10px] text-muted-foreground/50">Coming soon</span>
               </div>
             ))}
           </div>

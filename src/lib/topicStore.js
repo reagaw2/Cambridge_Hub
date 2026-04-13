@@ -35,30 +35,21 @@ export function getTopicData(topicName) {
   const { attempts, streak, lastAttemptedDate } = topic;
   const last = attempts[attempts.length - 1];
   const prev = attempts.length >= 2 ? attempts[attempts.length - 2] : null;
-  const recent = attempts.slice(-3);
-  const maxPossible = 2; // marks out of 2
-  const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const maxPossible = 2;
 
   let trend = "steady";
 
-  // Step 3 — two consecutive full marks = Improving
-  if (last >= maxPossible && prev !== null && prev >= maxPossible) {
+  if (prev === null) {
+    trend = "steady"; // only one score, not enough data
+  } else if (last >= maxPossible && prev >= maxPossible) {
+    trend = "improving"; // two consecutive full marks
+  } else if (last > prev) {
     trend = "improving";
-  }
-  // Step 1 — last three non-decreasing = Improving
-  else if (recent.length >= 2 && recent.every((s, i) => i === 0 || s >= recent[i - 1])) {
-    trend = "improving";
-  }
-  // Step 2 — Needs work only when all three conditions met
-  else if (
-    attempts.length >= 2 &&
-    recentAvg < maxPossible * 0.5 &&
-    (prev === null || last <= prev)
-  ) {
+  } else if (last === prev) {
+    trend = "steady";
+  } else {
     trend = "needs_work";
   }
-  // Step 4 — never Needs work on a full mark
-  if (last >= maxPossible && trend === "needs_work") trend = "steady";
 
   let lastLabel = "Unknown";
   if (lastAttemptedDate) {

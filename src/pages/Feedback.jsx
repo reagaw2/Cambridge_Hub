@@ -167,8 +167,9 @@ export default function Feedback() {
       // Use passed nextFullRoute, or fall back to old GF logic
       const nextDest = nextFullRoute ?? (isQ3 ? "/" : fmc === 1 ? "/similar-question" : "/familiarity-check");
 
+      const topicDisplayName = metaEntry?.topic ?? resolvedTopicKey.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
       if (situation) {
-        navigate("/reflection", { state: { situation, nextDest, feedbackState: state } });
+        navigate("/reflection", { state: { situation, nextDest, feedbackState: state, topicName: topicDisplayName } });
       } else {
         navigate(nextDest);
       }

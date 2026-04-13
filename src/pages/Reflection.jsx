@@ -2,21 +2,24 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
-const SITUATION_TEXT = {
-  comeback: "Before this session, you got this wrong. Just now, you got it right. That gap is exactly what Cambridge rewards.",
-  prediction: "You predicted what Cambridge wanted before you even answered. That is Cambridge thinking. That is the skill.",
-  mastery: "Three consecutive full marks on Gravitational Fields. You are not just answering questions. You are learning to think like an examiner.",
-};
+function getSituationText(topicName) {
+  return {
+    comeback: "Before this session, you got this wrong. Just now, you got it right. That gap is exactly what Cambridge rewards.",
+    prediction: "You predicted what Cambridge wanted before you even answered. That is Cambridge thinking. That is the skill.",
+    mastery: `Three consecutive full marks on ${topicName}. You are not just answering questions. You are learning to think like an examiner.`,
+  };
+}
 
 export default function Reflection() {
   const navigate = useNavigate();
   const location = useLocation();
   const { state } = location;
-  const { situation, nextDest, feedbackState } = state || {};
+  const { situation, nextDest, feedbackState, topicName } = state || {};
 
   const [step, setStep] = useState("prompt");
   const [message, setMessage] = useState(null);
 
+  const SITUATION_TEXT = getSituationText(topicName ?? "this topic");
   const situationText = SITUATION_TEXT[situation] ?? SITUATION_TEXT.comeback;
 
   function handleYes() {

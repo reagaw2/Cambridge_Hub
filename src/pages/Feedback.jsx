@@ -80,7 +80,7 @@ export default function Feedback() {
                     : <XCircle className="w-4 h-4 text-red-400/70 shrink-0" />
                   }
                   <span className="font-mono text-xs text-muted-foreground">
-                    B{i + 1} — "{mark.keyword}"
+                    B1 — "{mark.keyword}"
                   </span>
                 </div>
                 <p className="text-sm text-foreground/80 leading-relaxed">{mark.feedback}</p>

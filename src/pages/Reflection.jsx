@@ -1,16 +1,22 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-const STEP = {
-  FIRST: "first",
-  SECOND: "second",
-  CELEBRATE: "celebrate",
-  UNSURE: "unsure",
-};
+const STEP = { FIRST: "first", SECOND: "second", CELEBRATE: "celebrate", UNSURE: "unsure", LEAVING: "leaving" };
+
+function buildQuestion(feedback) {
+  const missed = [feedback?.mark_1, feedback?.mark_2].find(m => m && !m.earned);
+  if (!missed) return "Before this session, did you know what Cambridge is looking for here?";
+  const kw = missed.keyword?.toLowerCase() ?? "";
+  if (kw.includes("radial")) return "Before this session, did you know that Cambridge requires the word 'radial' specifically?";
+  if (kw.includes("centre") || kw.includes("center") || kw.includes("direction") || kw.includes("towards"))
+    return "Before this session, did you know Cambridge requires you to state the direction of the field?";
+  return `Before this session, did you know Cambridge requires you to mention '${missed.keyword}'?`;
+}
 
 export default function Reflection() {
   const navigate = useNavigate();
   const { state } = useLocation();
+  const feedback = state?.feedback;
   const [step, setStep] = useState(STEP.FIRST);
 
   useEffect(() => {
@@ -18,27 +24,27 @@ export default function Reflection() {
       const t = setTimeout(() => navigate("/"), 2000);
       return () => clearTimeout(t);
     }
+    if (step === STEP.LEAVING) {
+      const t = setTimeout(() => navigate("/"), 1000);
+      return () => clearTimeout(t);
+    }
   }, [step, navigate]);
+
+  const question = buildQuestion(feedback);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-8 text-center">
 
       {step === STEP.FIRST && (
-        <div className="flex flex-col items-center gap-10 animate-fade-in">
-          <p className="text-xl font-semibold text-foreground leading-relaxed max-w-xs">
-            Before this question, did you know why Cambridge requires the word 'radial' here?
-          </p>
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            <button
-              onClick={() => setStep(STEP.SECOND)}
-              className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all"
-            >
+        <div className="flex flex-col items-center gap-10 w-full max-w-xs">
+          <p className="text-xl font-semibold text-foreground leading-relaxed">{question}</p>
+          <div className="flex flex-col gap-3 w-full">
+            <button onClick={() => setStep(STEP.SECOND)}
+              className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all">
               No, I didn't know
             </button>
-            <button
-              onClick={() => { setTimeout(() => navigate("/"), 1000); setStep(null); }}
-              className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all"
-            >
+            <button onClick={() => setStep(STEP.LEAVING)}
+              className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all">
               Yes, I already knew
             </button>
           </div>
@@ -46,21 +52,15 @@ export default function Reflection() {
       )}
 
       {step === STEP.SECOND && (
-        <div className="flex flex-col items-center gap-10 animate-fade-in">
-          <p className="text-xl font-semibold text-foreground leading-relaxed max-w-xs">
-            Do you understand it now?
-          </p>
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            <button
-              onClick={() => setStep(STEP.CELEBRATE)}
-              className="w-full py-4 rounded-2xl bg-primary/15 text-primary font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all"
-            >
+        <div className="flex flex-col items-center gap-10 w-full max-w-xs">
+          <p className="text-xl font-semibold text-foreground leading-relaxed">Do you understand it now?</p>
+          <div className="flex flex-col gap-3 w-full">
+            <button onClick={() => setStep(STEP.CELEBRATE)}
+              className="w-full py-4 rounded-2xl bg-primary/15 text-primary font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all">
               Yes, I get it now
             </button>
-            <button
-              onClick={() => setStep(STEP.UNSURE)}
-              className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all"
-            >
+            <button onClick={() => setStep(STEP.UNSURE)}
+              className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all">
               Still not sure
             </button>
           </div>
@@ -68,28 +68,24 @@ export default function Reflection() {
       )}
 
       {step === STEP.CELEBRATE && (
-        <div className="flex flex-col items-center gap-4 animate-fade-in">
-          <p className="text-lg font-semibold text-primary leading-relaxed max-w-xs">
-            That's the growth. Cambridge can't take that from you.
-          </p>
-        </div>
+        <p className="text-lg font-semibold text-primary leading-relaxed max-w-xs">
+          That's the growth. Cambridge can't take that from you.
+        </p>
       )}
 
       {step === STEP.UNSURE && (
-        <div className="flex flex-col items-center gap-10 animate-fade-in">
-          <p className="text-base text-foreground/80 leading-relaxed max-w-xs">
+        <div className="flex flex-col items-center gap-10 w-full max-w-xs">
+          <p className="text-base text-foreground/80 leading-relaxed">
             No problem. Read the Cambridge insight again, then try once more.
           </p>
-          <button
-            onClick={() => navigate("/feedback", { state })}
-            className="w-full max-w-xs py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all"
-          >
+          <button onClick={() => navigate("/feedback", { state })}
+            className="w-full py-4 rounded-2xl bg-secondary text-secondary-foreground/70 font-medium text-sm hover:brightness-110 active:scale-[0.98] transition-all">
             Go back to feedback
           </button>
         </div>
       )}
 
-      {step === null && (
+      {step === STEP.LEAVING && (
         <p className="text-sm text-muted-foreground font-mono">Returning…</p>
       )}
 

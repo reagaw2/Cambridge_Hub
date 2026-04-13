@@ -1,83 +1,89 @@
-const KEY = "ala_topics";
+const STORAGE_KEY = "ala_hub_data";
 
-// Clear legacy data on load — ensures dev-phase test scores don't persist
-(function resetLegacyData() {
-  try {
-    const store = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-    if (store["Gravitational Fields"]) {
-      delete store["Gravitational Fields"];
-      localStorage.setItem(KEY, JSON.stringify(store));
+const DEFAULT_DATA = {
+  topics: {
+    gravitational_fields: {
+      attempts: [],
+      last_attempted: null,
+      streak: 0,
+      last_streak_date: null
     }
-  } catch {}
-  // Run once then remove self so future loads don't wipe real data
-})();
-
-// Remove the self-resetting block after first run by persisting a flag
-const RESET_FLAG = "ala_reset_v2";
-if (!localStorage.getItem(RESET_FLAG)) {
-  try {
-    const store = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-    delete store["Gravitational Fields"];
-    localStorage.setItem(KEY, JSON.stringify(store));
-  } catch {}
-  localStorage.setItem(RESET_FLAG, "1");
-}
+  }
+};
 
 function load() {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? "{}"); }
-  catch { return {}; }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_DATA));
+    return JSON.parse(raw);
+  } catch {
+    return JSON.parse(JSON.stringify(DEFAULT_DATA));
+  }
 }
 
 function save(data) {
-  localStorage.setItem(KEY, JSON.stringify(data));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-export function recordAttempt(topicName, score) {
-  const store = load();
-  const topic = store[topicName] ?? { attempts: [], streak: 0, lastAttemptedDate: null };
+function toDateString(date) {
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+export function recordAttempt(topicKey, score) {
+  const data = load();
+  if (!data.topics[topicKey]) {
+    data.topics[topicKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
+  }
+
+  const topic = data.topics[topicKey];
+  const today = toDateString(new Date());
+  const yesterday = toDateString(new Date(Date.now() - 86400000));
 
   topic.attempts.push(score);
+  topic.last_attempted = today;
 
-  const today = new Date().toDateString();
-  const yesterday = new Date(Date.now() - 86400000).toDateString();
-
-  if (topic.lastAttemptedDate !== today) {
-    topic.streak = topic.lastAttemptedDate === yesterday ? topic.streak + 1 : 1;
+  if (topic.last_streak_date === today) {
+    // already recorded today, don't increment
+  } else if (topic.last_streak_date === yesterday) {
+    topic.streak = (topic.streak || 0) + 1;
+  } else {
+    topic.streak = 1;
   }
-  topic.lastAttemptedDate = today;
 
-  store[topicName] = topic;
-  save(store);
+  topic.last_streak_date = today;
+
+  save(data);
 }
 
-export function getTopicData(topicName) {
-  const store = load();
-  const topic = store[topicName];
-  if (!topic || topic.attempts.length === 0) return null;
+export function getTopicData(topicKey) {
+  const data = load();
+  const topic = data.topics[topicKey];
+  if (!topic) return null;
 
-  const { attempts, streak, lastAttemptedDate } = topic;
-  const last = attempts[attempts.length - 1];
+  const { attempts, last_attempted, streak } = topic;
 
-  // Trend based solely on the most recent score (2 = improving, 1 = steady, 0 = needs work)
-  // Single attempt defaults to steady — not enough data
+  // Trend calculation
   let trend = "steady";
   if (attempts.length >= 2) {
+    const last = attempts[attempts.length - 1];
     if (last >= 2) trend = "improving";
     else if (last === 1) trend = "steady";
     else trend = "needs_work";
   }
 
-  let lastLabel = "Unknown";
-  if (lastAttemptedDate) {
-    const today = new Date().toDateString();
-    const yesterday = new Date(Date.now() - 86400000).toDateString();
-    if (lastAttemptedDate === today) lastLabel = "Today";
-    else if (lastAttemptedDate === yesterday) lastLabel = "Yesterday";
-    else {
-      const diff = Math.round((Date.now() - new Date(lastAttemptedDate)) / 86400000);
-      lastLabel = `${diff} days ago`;
-    }
+  // Last attempted label
+  let lastLabel = null;
+  if (last_attempted) {
+    const today = toDateString(new Date());
+    const yesterday = toDateString(new Date(Date.now() - 86400000));
+    if (last_attempted === today) lastLabel = "Today";
+    else if (last_attempted === yesterday) lastLabel = "Yesterday";
+    else lastLabel = last_attempted;
   }
 
-  return { trend, streak, lastLabel, attempts };
+  return { trend, streak: streak || 0, lastLabel, attempts };
+}
+
+export function resetData() {
+  localStorage.removeItem(STORAGE_KEY);
 }

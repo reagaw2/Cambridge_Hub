@@ -60,7 +60,7 @@ export default function Feedback() {
     if (!feedback) { navigate("/"); return; }
     if (!recorded.current) {
       recorded.current = true;
-      recordAttempt("Gravitational Fields", marksEarned);
+      recordAttempt("gravitational_fields", marksEarned);
     }
   }, []);
 

@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { getTopicData } from "../lib/topicStore";
+import { getTopicData, resetData } from "../lib/topicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, Home, Clock, User, ChevronRight } from "lucide-react";
 
 const COMING_SOON = [
@@ -60,11 +60,12 @@ function RecommendationBanner({ trend, navigate }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [gf, setGf] = useState(null);
+  const gf = getTopicData("gravitational_fields");
 
-  useEffect(() => {
-    setGf(getTopicData("Gravitational Fields"));
-  }, []);
+  function handleReset() {
+    resetData();
+    window.location.reload();
+  }
 
   return (
     <div className="min-h-screen bg-background flex justify-center pb-24">
@@ -119,6 +120,16 @@ export default function Dashboard() {
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
             </div>
+          </div>
+
+          {/* Reset button for dev testing */}
+          <div className="flex justify-center pt-4 pb-2">
+            <button
+              onClick={handleReset}
+              className="text-[10px] text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors"
+            >
+              Reset data
+            </button>
           </div>
 
           {/* Coming soon topics */}

@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, Outlet } from "react-router-dom";
+import { useLocation, useNavigate, Outlet, useMatch } from "react-router-dom";
 import { Home, Clock, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -25,10 +25,20 @@ const pageVariants = {
 
 const pageTransition = { duration: 0.22, ease: "easeInOut" };
 
+// Tabs that preserve independent navigation state by staying mounted
+const TAB_ROOTS = ["/", "/profile"];
+
+function isTabRoot(pathname) {
+  return TAB_ROOTS.includes(pathname);
+}
+
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const hideNav = shouldHideNav(location.pathname);
+
+  // Active tab is "/" or "/profile"; anything else keeps previous tab highlighted
+  const activeTab = location.pathname === "/profile" ? "/profile" : "/";
 
   return (
     <div
@@ -57,28 +67,31 @@ export default function AppLayout() {
           className="fixed bottom-0 left-0 right-0 bg-background border-t border-border flex justify-around items-center px-4 z-50"
           style={{ height: "calc(env(safe-area-inset-bottom) + 56px)", paddingBottom: "env(safe-area-inset-bottom)" }}
         >
+          {/* Home tab — navigates to "/" but preserves scroll position via browser history */}
           <button
             onClick={() => navigate("/")}
-            className="flex flex-col items-center gap-1 py-1"
+            className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
           >
-            <Home className={`w-5 h-5 ${location.pathname === "/" ? "text-primary" : "text-muted-foreground/50"}`} />
-            <span className={`text-[10px] font-medium ${location.pathname === "/" ? "text-primary" : "text-muted-foreground/50"}`}>
+            <Home className={`w-5 h-5 ${activeTab === "/" ? "text-primary" : "text-muted-foreground/50"}`} />
+            <span className={`text-[10px] font-medium ${activeTab === "/" ? "text-primary" : "text-muted-foreground/50"}`}>
               Home
             </span>
           </button>
+
           <button
-            className="flex flex-col items-center gap-1 py-1"
+            className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
             onClick={() => alert("History coming soon")}
           >
             <Clock className="w-5 h-5 text-muted-foreground/50" />
             <span className="text-[10px] font-medium text-muted-foreground/50">History</span>
           </button>
+
           <button
-            className="flex flex-col items-center gap-1 py-1"
+            className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
             onClick={() => navigate("/profile")}
           >
-            <User className={`w-5 h-5 ${location.pathname === "/profile" ? "text-primary" : "text-muted-foreground/50"}`} />
-            <span className={`text-[10px] font-medium ${location.pathname === "/profile" ? "text-primary" : "text-muted-foreground/50"}`}>
+            <User className={`w-5 h-5 ${activeTab === "/profile" ? "text-primary" : "text-muted-foreground/50"}`} />
+            <span className={`text-[10px] font-medium ${activeTab === "/profile" ? "text-primary" : "text-muted-foreground/50"}`}>
               Profile
             </span>
           </button>

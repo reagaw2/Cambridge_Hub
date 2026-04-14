@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getTopicData, resetData, getReviewBank } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw } from "lucide-react";
 
 function BookmarkIcon() {
   return <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />;
@@ -60,8 +60,48 @@ function RecommendationBanner({ trend, navigate }) {
 
 }
 
+// Pull-to-refresh threshold in pixels
+const PTR_THRESHOLD = 72;
+
+function usePullToRefresh(onRefresh) {
+  const [pullY, setPullY] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const startY = useRef(null);
+  const containerRef = useRef(null);
+
+  const onTouchStart = useCallback((e) => {
+    const el = containerRef.current;
+    if (el && el.scrollTop === 0) {
+      startY.current = e.touches[0].clientY;
+    }
+  }, []);
+
+  const onTouchMove = useCallback((e) => {
+    if (startY.current === null) return;
+    const delta = e.touches[0].clientY - startY.current;
+    if (delta > 0) {
+      setPullY(Math.min(delta * 0.5, PTR_THRESHOLD + 20));
+    }
+  }, []);
+
+  const onTouchEnd = useCallback(async () => {
+    if (pullY >= PTR_THRESHOLD) {
+      setRefreshing(true);
+      setPullY(PTR_THRESHOLD);
+      await onRefresh();
+      setRefreshing(false);
+    }
+    setPullY(0);
+    startY.current = null;
+  }, [pullY, onRefresh]);
+
+  return { containerRef, pullY, refreshing, onTouchStart, onTouchMove, onTouchEnd };
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [tick, setTick] = useState(0);
+
   const gf = getTopicData("gravitational_fields");
   const np = getTopicData("nuclear_physics");
   const tp = getTopicData("thermal_physics");
@@ -73,6 +113,15 @@ export default function Dashboard() {
   const astro = getTopicData("astrophysics");
   const reviewBank = getReviewBank();
 
+  const handleRefresh = useCallback(async () => {
+    // Small delay for feedback then re-render
+    await new Promise((r) => setTimeout(r, 600));
+    setTick((t) => t + 1);
+  }, []);
+
+  const { containerRef, pullY, refreshing, onTouchStart, onTouchMove, onTouchEnd } =
+    usePullToRefresh(handleRefresh);
+
   function handleReset() {
     resetData();
     window.location.reload();
@@ -80,7 +129,24 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
-      <div className="w-full max-w-[480px] flex flex-col">
+      <div
+        ref={containerRef}
+        className="w-full max-w-[480px] flex flex-col overflow-y-auto"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{ touchAction: pullY > 0 ? "none" : "auto" }}
+      >
+        {/* Pull-to-refresh indicator */}
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-200"
+          style={{ height: pullY > 0 || refreshing ? `${pullY}px` : 0 }}
+        >
+          <RefreshCw
+            className={`w-5 h-5 text-primary transition-transform ${refreshing ? "animate-spin" : ""}`}
+            style={{ transform: !refreshing ? `rotate(${(pullY / PTR_THRESHOLD) * 360}deg)` : undefined }}
+          />
+        </div>
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
@@ -246,8 +312,6 @@ export default function Dashboard() {
 
         </div>
       </div>
-
-
     </div>);
 
 }

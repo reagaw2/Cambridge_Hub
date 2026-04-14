@@ -1,33 +1,31 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getQuestionsForTopic, advanceMCQIndex } from "@/lib/mcqBank";
 import { recordAttempt } from "@/lib/topicStore";
+import { base44 } from "@/api/base44Client";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
-function OptionButton({ letter, text, selected, revealed, correct, onSelect }) {
-  let ring = "border-border";
-  if (revealed) {
-    if (letter === correct) ring = "border-primary bg-primary/10";
-    else if (letter === selected && letter !== correct) ring = "border-red-400/70 bg-red-400/10";
-  } else if (selected === letter) {
-    ring = "border-primary/60 bg-primary/8";
-  }
-
+function OptionButton({ letter, text, selected, onSelect }) {
+  const isSelected = selected === letter;
   return (
     <button
-      onClick={() => !revealed && onSelect(letter)}
-      className={`w-full flex items-start gap-3 p-4 rounded-xl border ${ring} transition-all text-left min-h-[56px]`}
+      onClick={() => onSelect(letter)}
+      className={`w-full flex items-start gap-3 p-4 rounded-xl border transition-all text-left min-h-[56px] ${
+        isSelected
+          ? "border-l-4 border-amber-400 bg-amber-400/8"
+          : "border-border hover:border-border/80"
+      }`}
     >
-      <span className="font-mono text-xs font-bold text-muted-foreground mt-0.5 shrink-0 w-4">{letter}</span>
+      <span
+        className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${
+          isSelected ? "text-amber-400" : "text-muted-foreground"
+        }`}
+      >
+        {letter}
+      </span>
       <span className="text-sm text-foreground/90 leading-relaxed flex-1">{text}</span>
-      {revealed && letter === correct && (
-        <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-      )}
-      {revealed && letter === selected && letter !== correct && (
-        <XCircle className="w-4 h-4 text-red-400/70 shrink-0 mt-0.5" />
-      )}
     </button>
   );
 }
@@ -40,9 +38,10 @@ export default function MCQSession() {
   const [questions, setQuestions] = useState([]);
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState(null);
-  const [revealed, setRevealed] = useState(false);
-  const [score, setScore] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [reasoning, setReasoning] = useState("");
+  const [isGuess, setIsGuess] = useState(false);
+  const [noSelectionError, setNoSelectionError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!topic) { navigate("/"); return; }
@@ -55,33 +54,100 @@ export default function MCQSession() {
 
   function handleSelect(letter) {
     setSelected(letter);
+    if (noSelectionError) setNoSelectionError(false);
   }
 
-  function handleConfirm() {
-    if (!selected) return;
-    setRevealed(true);
-    const correct = selected === question.correct;
-    if (correct) setScore((s) => s + 1);
-    setTotal((t) => t + 1);
+  function toggleGuess() {
+    setIsGuess((g) => !g);
   }
 
-  function handleNext() {
-    // Advance the stored index so next session continues from here
+  async function handleSubmit() {
+    if (!selected) {
+      setNoSelectionError(true);
+      return;
+    }
+
+    const isCorrect = selected === question.correct;
+    const attemptData = {
+      question_id: question.id,
+      topic: question.topic,
+      chosen_option: selected,
+      correct_option: question.correct,
+      correct: isCorrect,
+      flagged_as_guess: isGuess,
+      reasoning: isGuess ? null : (reasoning.trim() || null),
+    };
+
+    setLoading(true);
+
+    // Build the LLM prompt
+    const chosenText = question.options[selected];
+    const correctText = question.options[question.correct];
+    const optionsBlock = OPTION_KEYS.map((k) => `${k}: ${question.options[k]}`).join("\n");
+
+    const prompt = `You are a Cambridge A Level Physics examiner providing feedback on a multiple-choice question.
+
+Question: ${question.text}
+
+Options:
+${optionsBlock}
+
+Correct answer: ${question.correct} — ${correctText}
+Student chose: ${selected} — ${chosenText}
+Result: ${isCorrect ? "CORRECT" : "INCORRECT"}
+${attemptData.flagged_as_guess ? "Student flagged this as a guess (no reasoning provided)." : `Student's reasoning: "${attemptData.reasoning ?? "None provided"}"`}
+
+Respond ONLY in this JSON format, no extra text:
+{
+  "result": "${isCorrect ? "correct" : "incorrect"}",
+  "correct_option": "${question.correct}",
+  "correct_text": ${JSON.stringify(correctText)},
+  "critical_keyword": "the single most important physics keyword or concept that unlocks this question (2–6 words)",
+  "reasoning_feedback": "one to two sentences commenting specifically on the student's reasoning or guess behaviour — if they flagged as a guess, encourage them to start building intuition; if they gave reasoning, assess how close their thinking was",
+  "answer_explanation": "two to three sentences explaining why the correct answer is right and why common wrong answers fail, using precise Cambridge language",
+  "next_step": "one sentence telling the student exactly what to review or practise next"
+}`;
+
+    const feedback = await base44.integrations.Core.InvokeLLM({
+      prompt,
+      model: "claude_sonnet_4_6",
+      response_json_schema: {
+        type: "object",
+        properties: {
+          result: { type: "string" },
+          correct_option: { type: "string" },
+          correct_text: { type: "string" },
+          critical_keyword: { type: "string" },
+          reasoning_feedback: { type: "string" },
+          answer_explanation: { type: "string" },
+          next_step: { type: "string" },
+        },
+      },
+    }).catch(() => null);
+
+    setLoading(false);
+
+    // Record attempt and advance index
     advanceMCQIndex(topic);
-    // Record attempt in topic store (1 = correct, 0 = wrong)
-    recordAttempt(topic, selected === question.correct ? 1 : 0);
-    setSelected(null);
-    setRevealed(false);
-    setIdx((i) => i + 1);
-  }
+    recordAttempt(topic, isCorrect ? 1 : 0);
 
-  const isCorrect = revealed && selected === question.correct;
+    navigate("/mcq-feedback", {
+      state: {
+        feedback: feedback?.response ?? feedback,
+        attemptData,
+        question,
+        idx,
+        totalQuestions: questions.length,
+        topic,
+      },
+    });
+  }
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Header */}
+        {/* 1. Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button
             onClick={() => navigate("/")}
@@ -89,30 +155,26 @@ export default function MCQSession() {
           >
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
-          <span className="text-base font-bold tracking-wide text-foreground">Multiple Choice</span>
+          <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
           <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {score}/{total} correct
+            {question.source}
           </span>
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* Topic pill */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-              {topic}
-            </span>
-            {/* Source tag */}
-            <span className="text-[10px] text-muted-foreground/50 bg-secondary/50 px-2 py-0.5 rounded-full font-mono">
-              {question.source}
+          {/* 2. Mode pill */}
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-amber-900 bg-amber-400/80 px-3 py-1 rounded-full">
+              Multiple Choice
             </span>
           </div>
 
-          {/* Question card */}
+          {/* 3. Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">
-                {question.id}
+              <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+                {question.topic}
               </span>
               <span className="text-[11px] text-muted-foreground font-mono">
                 Q{(idx % questions.length) + 1} of {questions.length}
@@ -121,7 +183,7 @@ export default function MCQSession() {
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
           </div>
 
-          {/* Options */}
+          {/* 4. Answer options */}
           <div className="flex flex-col gap-2.5">
             {OPTION_KEYS.map((key) => (
               <OptionButton
@@ -129,42 +191,57 @@ export default function MCQSession() {
                 letter={key}
                 text={question.options[key]}
                 selected={selected}
-                revealed={revealed}
-                correct={question.correct}
                 onSelect={handleSelect}
               />
             ))}
           </div>
 
-          {/* Confirm / Next */}
-          {!revealed ? (
-            <button
-              onClick={handleConfirm}
-              disabled={!selected}
-              className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Confirm Answer
-            </button>
-          ) : (
-            <div className="space-y-3">
-              {/* Result banner */}
-              <div className={`rounded-xl p-4 border ${isCorrect ? "bg-primary/10 border-primary/30" : "bg-red-400/10 border-red-400/30"}`}>
-                <p className={`text-sm font-semibold ${isCorrect ? "text-primary" : "text-red-400"}`}>
-                  {isCorrect ? "Correct!" : `Incorrect — the correct answer is ${question.correct}`}
-                </p>
-                {!isCorrect && (
-                  <p className="text-sm text-foreground/70 mt-1">{question.options[question.correct]}</p>
-                )}
-              </div>
-
-              <button
-                onClick={handleNext}
-                className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              >
-                Next Question <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+          {/* No selection error */}
+          {noSelectionError && (
+            <p className="text-sm text-red-400/80 text-center -mt-1">Select an answer first</p>
           )}
+
+          {/* 5 & 7. Reasoning section */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              Why did you choose this?
+            </p>
+            {isGuess ? (
+              <p className="text-xs text-muted-foreground/50 italic py-2">
+                Flagged as a guess — no reasoning required
+              </p>
+            ) : (
+              <textarea
+                value={reasoning}
+                onChange={(e) => setReasoning(e.target.value)}
+                placeholder="Brief reason — one or two sentences is enough"
+                rows={3}
+                className="w-full bg-card border border-border rounded-xl p-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
+              />
+            )}
+          </div>
+
+          {/* 6. Just a guess + Submit row */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleGuess}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                isGuess
+                  ? "bg-amber-400 text-amber-900"
+                  : "bg-secondary text-secondary-foreground hover:brightness-110"
+              }`}
+            >
+              🎲 Just a guess
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-2.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loading ? "Analysing..." : "Submit Answer"}
+            </button>
+          </div>
+
         </div>
       </div>
     </div>

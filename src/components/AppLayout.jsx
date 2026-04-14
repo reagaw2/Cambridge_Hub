@@ -12,6 +12,7 @@ const NO_NAV_PATTERNS = [
   /^\/review$/,
   /^\/review-affirmation$/,
   /^\/mcq$/,
+  /^\/mcq-feedback$/,
 ];
 
 function shouldHideNav(pathname) {

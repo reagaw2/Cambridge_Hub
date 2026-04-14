@@ -33,6 +33,7 @@ import AstroQuestionAttempt from './pages/astrophysics/QuestionAttempt';
 import AstroSimilarQuestion from './pages/astrophysics/SimilarQuestion';
 import AstroFamiliarityCheck from './pages/astrophysics/FamiliarityCheck';
 import MCQSession from './pages/MCQSession';
+import MCQFeedback from './pages/MCQFeedback';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -87,6 +88,7 @@ const AuthenticatedApp = () => {
         <Route path="/astrophysics/similar-question" element={<AstroSimilarQuestion />} />
         <Route path="/astrophysics/familiarity-check" element={<AstroFamiliarityCheck />} />
         <Route path="/mcq" element={<MCQSession />} />
+        <Route path="/mcq-feedback" element={<MCQFeedback />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

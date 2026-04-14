@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { getQuestionsForTopic, advanceMCQIndex } from "@/lib/mcqBank";
+import { getQuestionsForTopic, advanceMCQIndex, getQuestionsByIds } from "@/lib/mcqBank";
 import { recordAttempt } from "@/lib/topicStore";
 import { base44 } from "@/api/base44Client";
 
@@ -34,6 +34,8 @@ export default function MCQSession() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const topic = state?.topic;
+  const guessReviewMode = state?.guessReviewMode ?? false;
+  const guessReviewBank = state?.guessReviewBank ?? [];
 
   const [questions, setQuestions] = useState([]);
   const [idx, setIdx] = useState(0);
@@ -44,11 +46,17 @@ export default function MCQSession() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!topic) { navigate("/"); return; }
-    setQuestions(getQuestionsForTopic(topic));
-  }, [topic]);
+    if (guessReviewMode) {
+      const qs = getQuestionsByIds(guessReviewBank);
+      if (qs.length === 0) { navigate("/"); return; }
+      setQuestions(qs);
+    } else {
+      if (!topic) { navigate("/"); return; }
+      setQuestions(getQuestionsForTopic(topic));
+    }
+  }, [topic, guessReviewMode]);
 
-  if (!topic || questions.length === 0) return null;
+  if (questions.length === 0) return null;
 
   const question = questions[idx % questions.length];
 
@@ -126,8 +134,10 @@ Respond ONLY in this JSON format, no extra text:
     setLoading(false);
 
     // Record attempt and advance index
-    advanceMCQIndex(topic);
-    recordAttempt(topic, isCorrect ? 1 : 0);
+    if (!guessReviewMode) {
+      advanceMCQIndex(topic);
+    }
+    recordAttempt(question.topic, isCorrect ? 1 : 0);
 
     navigate("/mcq-feedback", {
       state: {
@@ -136,7 +146,9 @@ Respond ONLY in this JSON format, no extra text:
         question,
         idx,
         totalQuestions: questions.length,
-        topic,
+        topic: topic ?? question.topic,
+        guessReviewMode,
+        guessReviewBank,
       },
     });
   }

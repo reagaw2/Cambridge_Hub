@@ -66,9 +66,11 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return JSON.parse(JSON.stringify(DEFAULT_DATA));
     const data = JSON.parse(raw);
-    // ensure review_bank fields exist on older data
+    // ensure fields exist on older data
     if (!data.review_bank) data.review_bank = [];
     if (data.review_bank_clears == null) data.review_bank_clears = 0;
+    if (!data.mcq_attempts) data.mcq_attempts = [];
+    if (!data.guess_review_bank) data.guess_review_bank = [];
     return data;
   } catch {
     return JSON.parse(JSON.stringify(DEFAULT_DATA));
@@ -180,4 +182,64 @@ export function incrementReviewBankClears() {
 
 export function resetData() {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+// ── MCQ Attempts ───────────────────────────────────────────────────────────
+
+export function saveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
+  const data = load();
+  if (!data.mcq_attempts) data.mcq_attempts = [];
+  if (!data.guess_review_bank) data.guess_review_bank = [];
+
+  const attempt = {
+    question_id,
+    topic,
+    source,
+    chosen_option,
+    correct_option,
+    correct,
+    flagged_as_guess,
+    reasoning,
+    date: toDateString(new Date()),
+  };
+
+  data.mcq_attempts.push(attempt);
+
+  // Guess review bank logic
+  if (flagged_as_guess) {
+    // Add to guess review bank if not already present
+    if (!data.guess_review_bank.includes(question_id)) {
+      data.guess_review_bank.push(question_id);
+    }
+  } else if (correct && !flagged_as_guess) {
+    // Remove from guess review bank if now answered correctly without guessing
+    data.guess_review_bank = data.guess_review_bank.filter(id => id !== question_id);
+  }
+
+  save(data);
+
+  // Step 6 — console verification
+  console.log("MCQ attempt saved:", attempt);
+  console.log("Guess review bank:", data.guess_review_bank);
+  console.log(`MCQ stats for ${topic}:`, getMCQStatsForTopic(topic, data));
+}
+
+function getMCQStatsForTopic(topic, data) {
+  const attempts = (data.mcq_attempts || []).filter(a => a.topic === topic);
+  if (attempts.length === 0) return null;
+  const total_attempted = attempts.length;
+  const reasoned_correct = attempts.filter(a => a.correct && !a.flagged_as_guess).length;
+  const guessed = attempts.filter(a => a.flagged_as_guess).length;
+  const reasoned_correct_percentage = Math.round((reasoned_correct / total_attempted) * 100);
+  return { total_attempted, reasoned_correct, guessed, reasoned_correct_percentage };
+}
+
+export function getMCQStats(topic) {
+  const data = load();
+  return getMCQStatsForTopic(topic, data);
+}
+
+export function getGuessReviewBank() {
+  const data = load();
+  return data.guess_review_bank || [];
 }

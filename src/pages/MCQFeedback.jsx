@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { saveMCQAttempt, getGuessReviewBank } from "@/lib/topicStore";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
@@ -43,17 +45,45 @@ function ResultBanner({ correct, isGuess }) {
 export default function MCQFeedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback, attemptData, question, topic } = state || {};
+  const { feedback, attemptData, question, topic, guessReviewMode, guessReviewBank } = state || {};
+
+  const correct = attemptData?.correct;
+  const flagged_as_guess = attemptData?.flagged_as_guess;
+  const chosen_option = attemptData?.chosen_option;
+  const correct_option = attemptData?.correct_option;
+  const reasoning = attemptData?.reasoning;
+
+  // Save attempt to localStorage immediately on mount — must be before any early return
+  useEffect(() => {
+    if (!feedback || !attemptData || !question) return;
+    saveMCQAttempt({
+      question_id: question.id,
+      topic: question.topic,
+      source: question.source,
+      chosen_option: attemptData.chosen_option,
+      correct_option: attemptData.correct_option,
+      correct: attemptData.correct,
+      flagged_as_guess: attemptData.flagged_as_guess,
+      reasoning: attemptData.reasoning,
+    });
+  }, []);
 
   if (!feedback || !attemptData || !question) {
     navigate("/");
     return null;
   }
 
-  const { correct, flagged_as_guess, chosen_option, correct_option, reasoning } = attemptData;
-
   function handleNext() {
-    navigate("/mcq", { state: { topic } });
+    if (guessReviewMode) {
+      const updatedBank = getGuessReviewBank();
+      if (updatedBank.length === 0) {
+        navigate("/");
+      } else {
+        navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank: updatedBank } });
+      }
+    } else {
+      navigate("/mcq", { state: { topic } });
+    }
   }
 
   function handleSwitchToWritten() {

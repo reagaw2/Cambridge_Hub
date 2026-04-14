@@ -379,6 +379,13 @@ export function getQuestionsForTopic(topic) {
 }
 
 /**
+ * Returns questions matching an array of question ids.
+ */
+export function getQuestionsByIds(ids) {
+  return MCQ_QUESTIONS.filter((q) => ids.includes(q.id));
+}
+
+/**
  * Returns all unique MCQ topic names.
  */
 export function getMCQTopics() {

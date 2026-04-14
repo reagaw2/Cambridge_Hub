@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getTopicData, resetData, getReviewBank } from "../lib/topicStore";
+import { getTopicData, resetData, getReviewBank, getGuessReviewBank } from "../lib/topicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw } from "lucide-react";
 
 function BookmarkIcon() {
@@ -126,6 +126,7 @@ export default function Dashboard() {
   const qp = getTopicData("quantum_physics");
   const astro = getTopicData("astrophysics");
   const reviewBank = getReviewBank();
+  const guessReviewBank = getGuessReviewBank();
 
   const handleRefresh = useCallback(async () => {
     // Small delay for feedback then re-render
@@ -211,6 +212,34 @@ export default function Dashboard() {
               </div>
             </div>
           }
+
+          {/* Guess Review Bank */}
+          {guessReviewBank.length > 0 && (
+            <div className="space-y-2">
+              <div
+                className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
+                onClick={() => navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank } })}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-base shrink-0">🎲</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {guessReviewBank.length} MCQ question{guessReviewBank.length !== 1 ? "s" : ""} flagged as guesses
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Correct guesses are unverified — prove you know them
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank } }); }}
+                  className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all"
+                >
+                  Review now →
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Topics section */}
           <div className="space-y-1">

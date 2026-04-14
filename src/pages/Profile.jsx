@@ -2,19 +2,23 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Trash2, LogOut, AlertTriangle, Check } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { useDisplayName } from "@/lib/useDisplayName";
 import { resetData } from "@/lib/topicStore";
 import { base44 } from "@/api/base44Client";
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { avatarLetter } = useDisplayName();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [preferredName, setPreferredName] = useState(user?.preferred_name ?? "");
   const [nameSaved, setNameSaved] = useState(false);
 
   async function handleSavePreferredName() {
-    await base44.auth.updateMe({ preferred_name: preferredName.trim() });
+    const trimmed = preferredName.trim();
+    localStorage.setItem("cambridge_hub_preferred_name", trimmed);
+    await base44.auth.updateMe({ preferred_name: trimmed });
     setNameSaved(true);
     setTimeout(() => setNameSaved(false), 2000);
   }
@@ -43,7 +47,7 @@ export default function Profile() {
           <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0">
               <span className="text-lg font-bold text-primary">
-                {user?.full_name?.[0]?.toUpperCase() ?? "?"}
+                {avatarLetter}
               </span>
             </div>
             <div>

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { useDisplayName } from "@/lib/useDisplayName";
 import { initStore, getTopicData, resetData, getReviewBank, getGuessReviewBank } from "../lib/topicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw } from "lucide-react";
 
@@ -120,10 +121,7 @@ export default function Dashboard() {
   const [guessReviewBank, setGuessReviewBank] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const firstName = user?.full_name?.split(" ")[0] ?? null;
-  const localName = localStorage.getItem("cambridge_hub_preferred_name") || "";
-  const displayName = user?.preferred_name?.trim() || localName || firstName;
-  const avatarLetter = (displayName?.[0])?.toUpperCase() ?? "?";
+  const { displayName, avatarLetter } = useDisplayName();
 
   async function loadDashboardData() {
     setLoading(true);

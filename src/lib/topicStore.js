@@ -112,31 +112,92 @@ export function recordAttempt(topicKey, score) {
   save(data);
 }
 
+// Maps topicKey (snake_case) to the topic display name used in mcq_attempts
+const TOPIC_KEY_TO_DISPLAY = {
+  gravitational_fields: "Gravitational Fields",
+  nuclear_physics: "Nuclear Physics",
+  thermal_physics: "Thermal Physics",
+  oscillations: "Oscillations",
+  electric_fields: "Electric Fields",
+  capacitance: "Capacitance",
+  electromagnetic_induction: "Electromagnetic Induction",
+  quantum_physics: "Quantum Physics",
+  astrophysics: "Astrophysics",
+  // MCQ-only topics use their display name as the key too
+  "Physical Quantities & Units": "Physical Quantities & Units",
+  "Dynamics & Newton's Laws": "Dynamics & Newton's Laws",
+  "Momentum & Collisions": "Momentum & Collisions",
+  "Forces, Torques & Equilibrium": "Forces, Torques & Equilibrium",
+  "Work, Energy & Power": "Work, Energy & Power",
+  "Deformation of Solids": "Deformation of Solids",
+  "Waves": "Waves",
+  "Electricity": "Electricity",
+  "Nuclear Physics & Particle Physics": "Nuclear Physics & Particle Physics",
+};
+
 export function getTopicData(topicKey) {
   const data = load();
-  const topic = data.topics[topicKey];
-  if (!topic) return null;
-
+  const topic = data.topics[topicKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   const { attempts, last_attempted, streak } = topic;
 
+  // Get MCQ attempts for this topic
+  const displayName = TOPIC_KEY_TO_DISPLAY[topicKey] ?? topicKey;
+  const mcqAttempts = (data.mcq_attempts || []).filter(a => a.topic === displayName);
+
+  const hasWritten = attempts.length > 0;
+  const hasMCQ = mcqAttempts.length > 0;
+
+  if (!hasWritten && !hasMCQ) return null;
+
+  // --- Trend ---
   let trend = "steady";
-  if (attempts.length >= 2) {
+  if (hasWritten) {
     const last = attempts[attempts.length - 1];
     if (last >= 2) trend = "improving";
     else if (last === 1) trend = "steady";
     else trend = "needs_work";
+  } else {
+    // MCQ-only trend
+    const lastMCQ = mcqAttempts[mcqAttempts.length - 1];
+    if (lastMCQ.correct && !lastMCQ.flagged_as_guess) trend = "improving";
+    else if (lastMCQ.correct && lastMCQ.flagged_as_guess) trend = "steady";
+    else trend = "needs_work";
+  }
+
+  // --- Last attempted date (most recent of written or MCQ) ---
+  const today = toDateString(new Date());
+  const yesterday = toDateString(new Date(Date.now() - 86400000));
+
+  let latestDate = last_attempted;
+  if (hasMCQ) {
+    const lastMCQDate = mcqAttempts[mcqAttempts.length - 1].date;
+    if (!latestDate || lastMCQDate > latestDate) latestDate = lastMCQDate;
   }
 
   let lastLabel = null;
-  if (last_attempted) {
-    const today = toDateString(new Date());
-    const yesterday = toDateString(new Date(Date.now() - 86400000));
-    if (last_attempted === today) lastLabel = "Today";
-    else if (last_attempted === yesterday) lastLabel = "Yesterday";
-    else lastLabel = last_attempted;
+  if (latestDate) {
+    if (latestDate === today) lastLabel = "Today";
+    else if (latestDate === yesterday) lastLabel = "Yesterday";
+    else lastLabel = latestDate;
   }
 
-  return { trend, streak: streak || 0, lastLabel, attempts };
+  // --- Streak: use written streak if available, else count MCQ streak ---
+  let currentStreak = streak || 0;
+  if (!hasWritten && hasMCQ) {
+    // Count consecutive days with MCQ attempts ending today/yesterday
+    const days = [...new Set(mcqAttempts.map(a => a.date))].sort();
+    let s = 0;
+    let checkDate = today;
+    for (let i = days.length - 1; i >= 0; i--) {
+      if (days[i] === checkDate) {
+        s++;
+        checkDate = toDateString(new Date(new Date(checkDate.split("/").reverse().join("-")).getTime() - 86400000));
+      } else break;
+    }
+    currentStreak = s;
+  }
+
+  return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
 // ── Review Bank ────────────────────────────────────────────────────────────

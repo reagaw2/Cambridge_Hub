@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { getQuestionsForTopic, advanceMCQIndex, getQuestionsByIds } from "@/lib/mcqBank";
+import { getQuestionsForTopic, getQuestionsByIds } from "@/lib/mcqBank";
 import { recordAttempt } from "@/lib/topicStore";
 import { base44 } from "@/api/base44Client";
 
@@ -36,9 +36,10 @@ export default function MCQSession() {
   const topic = state?.topic;
   const guessReviewMode = state?.guessReviewMode ?? false;
   const guessReviewBank = state?.guessReviewBank ?? [];
+  // sessionIndex is the current question index passed via navigation state
+  const sessionIndex = state?.sessionIndex ?? 0;
 
   const [questions, setQuestions] = useState([]);
-  const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState(null);
   const [reasoning, setReasoning] = useState("");
   const [isGuess, setIsGuess] = useState(false);
@@ -58,7 +59,8 @@ export default function MCQSession() {
 
   if (questions.length === 0) return null;
 
-  const question = questions[idx % questions.length];
+  const idx = sessionIndex % questions.length;
+  const question = questions[idx];
 
   function handleSelect(letter) {
     setSelected(letter);
@@ -133,10 +135,6 @@ Respond ONLY in this JSON format, no extra text:
 
     setLoading(false);
 
-    // Record attempt and advance index
-    if (!guessReviewMode) {
-      advanceMCQIndex(topic);
-    }
     recordAttempt(question.topic, isCorrect ? 1 : 0);
 
     navigate("/mcq-feedback", {
@@ -144,7 +142,7 @@ Respond ONLY in this JSON format, no extra text:
         feedback: feedback?.response ?? feedback,
         attemptData,
         question,
-        idx,
+        nextSessionIndex: sessionIndex + 1,
         totalQuestions: questions.length,
         topic: topic ?? question.topic,
         guessReviewMode,

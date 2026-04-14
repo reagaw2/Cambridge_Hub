@@ -45,7 +45,7 @@ function ResultBanner({ correct, isGuess }) {
 export default function MCQFeedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback, attemptData, question, topic, guessReviewMode, guessReviewBank } = state || {};
+  const { feedback, attemptData, question, topic, guessReviewMode, guessReviewBank, nextSessionIndex } = state || {};
 
   const correct = attemptData?.correct;
   const flagged_as_guess = attemptData?.flagged_as_guess;
@@ -79,10 +79,10 @@ export default function MCQFeedback() {
       if (updatedBank.length === 0) {
         navigate("/");
       } else {
-        navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank: updatedBank } });
+        navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank: updatedBank, sessionIndex: nextSessionIndex ?? 1 } });
       }
     } else {
-      navigate("/mcq", { state: { topic } });
+      navigate("/mcq", { state: { topic, sessionIndex: nextSessionIndex ?? 1 } });
     }
   }
 

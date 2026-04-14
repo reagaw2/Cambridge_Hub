@@ -1,14 +1,23 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Trash2, LogOut, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Trash2, LogOut, AlertTriangle, Check } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { resetData } from "@/lib/topicStore";
+import { base44 } from "@/api/base44Client";
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
+  const [preferredName, setPreferredName] = useState(user?.preferred_name ?? "");
+  const [nameSaved, setNameSaved] = useState(false);
+
+  async function handleSavePreferredName() {
+    await base44.auth.updateMe({ preferred_name: preferredName.trim() });
+    setNameSaved(true);
+    setTimeout(() => setNameSaved(false), 2000);
+  }
 
   const handleDeleteAccount = async () => {
     // Clear all data and log out
@@ -40,6 +49,29 @@ export default function Profile() {
             <div>
               <p className="font-semibold text-foreground">{user?.full_name ?? "Student"}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{user?.email ?? ""}</p>
+            </div>
+          </div>
+
+          {/* Preferred name */}
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Preferred Name</p>
+            <p className="text-xs text-muted-foreground/60 leading-relaxed">
+              The name we use to address you. Leave empty to use your first name.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={preferredName}
+                onChange={(e) => { setPreferredName(e.target.value.slice(0, 20)); setNameSaved(false); }}
+                placeholder="What should we call you?"
+                maxLength={20}
+                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
+              />
+              <button
+                onClick={handleSavePreferredName}
+                className="px-4 py-2 rounded-lg bg-primary/15 text-primary text-sm font-semibold hover:brightness-110 transition-all flex items-center gap-1.5"
+              >
+                {nameSaved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save"}
+              </button>
             </div>
           </div>
 

@@ -121,7 +121,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const firstName = user?.full_name?.split(" ")[0] ?? null;
-  const avatarLetter = firstName?.[0]?.toUpperCase() ?? "?";
+  const displayName = (user?.preferred_name?.trim()) || firstName;
+  const avatarLetter = (user?.preferred_name?.trim()?.[0] ?? firstName?.[0])?.toUpperCase() ?? "?";
 
   async function loadDashboardData() {
     setLoading(true);
@@ -204,7 +205,7 @@ export default function Dashboard() {
 
           {/* Greeting */}
           <p className="text-2xl font-serif font-semibold text-foreground leading-snug">
-            {getGreeting(firstName)}
+            {getGreeting(displayName)}
           </p>
 
           {/* Recommendation banner */}

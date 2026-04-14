@@ -21,7 +21,9 @@ export function normaliseTopicKey(name) {
   return name
     .toLowerCase()
     .replace(/\s+/g, "_")           // spaces → underscores
-    .replace(/[^a-z0-9_]/g, "");    // strip non-alphanumeric except underscores
+    .replace(/[^a-z0-9_]/g, "")     // strip non-alphanumeric except underscores
+    .replace(/_+/g, "_")            // collapse consecutive underscores
+    .replace(/^_|_$/g, "");         // trim leading/trailing underscores
 }
 
 const DEFAULT_DATA = () => ({
@@ -427,6 +429,24 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
 
   await saveToDB(data);
   console.log(`[topicStore] saveMCQAttempt complete — topics object:`, JSON.stringify(data.topics));
+}
+
+/**
+ * Returns unique display names of topics that have MCQ attempts,
+ * excluding any that are already in the written topics list.
+ */
+export async function getMCQOnlyTopicNames(writtenKeys) {
+  const data = await loadFromDB();
+  const seen = new Set();
+  const topics = [];
+  for (const a of (data.mcq_attempts || [])) {
+    const normKey = normaliseTopicKey(a.topic);
+    if (!seen.has(normKey) && !writtenKeys.includes(normKey)) {
+      seen.add(normKey);
+      topics.push({ label: a.topic, key: normKey });
+    }
+  }
+  return topics;
 }
 
 export async function getMCQStats(topic) {

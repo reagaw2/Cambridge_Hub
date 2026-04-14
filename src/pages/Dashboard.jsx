@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
-import { getTopicData, resetData, getReviewBank, getGuessReviewBank } from "../lib/topicStore";
+import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames, normaliseTopicKey } from "../lib/topicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw } from "lucide-react";
 
 function BookmarkIcon() {
@@ -119,6 +119,7 @@ export default function Dashboard() {
   const location = useLocation();
   const { user, isLoadingProgress } = useAuth();
   const [topicData, setTopicData] = useState({});
+  const [mcqOnlyTopics, setMcqOnlyTopics] = useState([]);
   const [reviewBank, setReviewBank] = useState([]);
   const [guessReviewBank, setGuessReviewBank] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,15 +128,23 @@ export default function Dashboard() {
 
   async function loadDashboardData() {
     setLoading(true);
-    const [rb, grb, ...topicResults] = await Promise.all([
+    const writtenKeys = WRITTEN_TOPICS.map(t => t.key);
+    const [rb, grb, mcqTopics, ...topicResults] = await Promise.all([
       getReviewBank(),
       getGuessReviewBank(),
+      getMCQOnlyTopicNames(writtenKeys),
       ...WRITTEN_TOPICS.map(t => getTopicData(t.key)),
     ]);
     setReviewBank(rb);
     setGuessReviewBank(grb);
     const dataMap = {};
     WRITTEN_TOPICS.forEach((t, i) => { dataMap[t.key] = topicResults[i]; });
+
+    // Fetch data for MCQ-only topics that have attempts
+    const mcqResults = await Promise.all(mcqTopics.map(t => getTopicData(t.key)));
+    mcqTopics.forEach((t, i) => { dataMap[t.key] = mcqResults[i]; });
+    setMcqOnlyTopics(mcqTopics.filter((t, i) => mcqResults[i] !== null));
+
     setTopicData(dataMap);
     setLoading(false);
   }
@@ -304,6 +313,50 @@ export default function Dashboard() {
               </div>
             );
           })}
+
+          {/* MCQ-only topics with attempts */}
+          {mcqOnlyTopics.length > 0 && (
+            <>
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Multiple Choice Progress</p>
+                <p className="text-xs text-muted-foreground/60">Topics you have practised via MCQ.</p>
+              </div>
+              {mcqOnlyTopics.map(({ label, key }) => {
+                const data = topicData[key];
+                return (
+                  <div
+                    key={key}
+                    onClick={() => navigate("/mcq", { state: { topic: label } })}
+                    className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2 flex-1">
+                        <p className="font-semibold text-foreground text-sm">{label}</p>
+                        {data ? (
+                          <>
+                            <TrendBadge trend={data.trend} />
+                            <div className="flex items-center gap-4 pt-1">
+                              {data.lastLabel && (
+                                <span className="text-[11px] text-muted-foreground">Last attempt: {data.lastLabel}</span>
+                              )}
+                              {data.streak > 0 && (
+                                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                  <Flame className="w-3 h-3 text-orange-400/80" />
+                                  {data.streak} day streak
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                        )}
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
 
           {/* MCQ-only topics */}
           <div className="space-y-1">

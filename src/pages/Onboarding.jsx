@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function Onboarding() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [preferredName, setPreferredName] = useState("");
 
@@ -18,8 +16,8 @@ export default function Onboarding() {
     localStorage.setItem("cambridge_hub_preferred_name", name);
     localStorage.setItem("cambridge_hub_onboarding_completed", "true");
 
-    // Step 2 — navigate immediately, no waiting
-    navigate("/", { replace: true });
+    // Step 2 — hard redirect so App.jsx re-evaluates localStorage
+    window.location.href = "/";
 
     // Step 3 — background DB sync (fire and forget)
     base44.auth.updateMe({

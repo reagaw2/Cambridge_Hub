@@ -5,6 +5,8 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import AppLayout from '@/components/AppLayout';
+import Profile from './pages/Profile';
 // Add page imports here
 import Dashboard from './pages/Dashboard';
 import Reflection from './pages/Reflection';
@@ -57,31 +59,34 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/question" element={<QuestionAttempt />} />
-      <Route path="/feedback" element={<Feedback />} />
-      <Route path="/reflection" element={<Reflection />} />
-      <Route path="/similar-question" element={<SimilarQuestion />} />
-      <Route path="/familiarity-check" element={<FamiliarityCheck />} />
-      <Route path="/review" element={<ReviewSession />} />
-      <Route path="/nuclear/question" element={<NuclearQuestionAttempt />} />
-      <Route path="/nuclear/similar-question" element={<NuclearSimilarQuestion />} />
-      <Route path="/nuclear/familiarity-check" element={<NuclearFamiliarityCheck />} />
-      <Route path="/review-affirmation" element={<ReviewAffirmation />} />
-      <Route path="/gravitational/question" element={<GravitationalQuestionAttempt />} />
-      <Route path="/thermal/question" element={<ThermalQuestionAttempt />} />
-      <Route path="/thermal/similar-question" element={<ThermalSimilarQuestion />} />
-      <Route path="/oscillations/question" element={<OscillationsQuestionAttempt />} />
-      <Route path="/oscillations/similar-question" element={<OscillationsSimilarQuestion />} />
-      <Route path="/electric/question" element={<ElectricQuestionAttempt />} />
-      <Route path="/capacitance/question" element={<CapacitanceQuestionAttempt />} />
-      <Route path="/capacitance/similar-question" element={<CapacitanceSimilarQuestion />} />
-      <Route path="/eminduction/question" element={<EMInductionQuestionAttempt />} />
-      <Route path="/quantum/question" element={<QuantumQuestionAttempt />} />
-      <Route path="/astrophysics/question" element={<AstroQuestionAttempt />} />
-      <Route path="/astrophysics/similar-question" element={<AstroSimilarQuestion />} />
-      <Route path="/astrophysics/familiarity-check" element={<AstroFamiliarityCheck />} />
-      <Route path="*" element={<PageNotFound />} />
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/question" element={<QuestionAttempt />} />
+        <Route path="/feedback" element={<Feedback />} />
+        <Route path="/reflection" element={<Reflection />} />
+        <Route path="/similar-question" element={<SimilarQuestion />} />
+        <Route path="/familiarity-check" element={<FamiliarityCheck />} />
+        <Route path="/review" element={<ReviewSession />} />
+        <Route path="/nuclear/question" element={<NuclearQuestionAttempt />} />
+        <Route path="/nuclear/similar-question" element={<NuclearSimilarQuestion />} />
+        <Route path="/nuclear/familiarity-check" element={<NuclearFamiliarityCheck />} />
+        <Route path="/review-affirmation" element={<ReviewAffirmation />} />
+        <Route path="/gravitational/question" element={<GravitationalQuestionAttempt />} />
+        <Route path="/thermal/question" element={<ThermalQuestionAttempt />} />
+        <Route path="/thermal/similar-question" element={<ThermalSimilarQuestion />} />
+        <Route path="/oscillations/question" element={<OscillationsQuestionAttempt />} />
+        <Route path="/oscillations/similar-question" element={<OscillationsSimilarQuestion />} />
+        <Route path="/electric/question" element={<ElectricQuestionAttempt />} />
+        <Route path="/capacitance/question" element={<CapacitanceQuestionAttempt />} />
+        <Route path="/capacitance/similar-question" element={<CapacitanceSimilarQuestion />} />
+        <Route path="/eminduction/question" element={<EMInductionQuestionAttempt />} />
+        <Route path="/quantum/question" element={<QuantumQuestionAttempt />} />
+        <Route path="/astrophysics/question" element={<AstroQuestionAttempt />} />
+        <Route path="/astrophysics/similar-question" element={<AstroSimilarQuestion />} />
+        <Route path="/astrophysics/familiarity-check" element={<AstroFamiliarityCheck />} />
+        <Route path="*" element={<PageNotFound />} />
+      </Route>
     </Routes>
   );
 };

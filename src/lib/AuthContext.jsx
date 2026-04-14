@@ -3,6 +3,11 @@ import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
+// Sync dark mode with system preference
+function applyColorScheme(dark) {
+  document.documentElement.classList.toggle('dark', dark);
+}
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -15,6 +20,12 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkAppState();
+    // Sync with system color scheme
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    applyColorScheme(mq.matches);
+    const handler = (e) => applyColorScheme(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
 
   const checkAppState = async () => {

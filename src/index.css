@@ -83,10 +83,30 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Allow text selection in answer/input areas */
+  textarea, input, [contenteditable] {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  html {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    overscroll-behavior: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+    padding-top: env(safe-area-inset-top);
   }
 }

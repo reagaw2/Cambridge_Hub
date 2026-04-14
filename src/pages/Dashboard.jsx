@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getTopicData, resetData, getReviewBank } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, Home, Clock, User, ChevronRight, Bookmark } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark } from "lucide-react";
 
 function BookmarkIcon() {
   return <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />;
@@ -79,7 +79,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex justify-center pb-24">
+    <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col">
 
         {/* Top bar */}
@@ -247,27 +247,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border flex justify-around items-center px-4 py-3 z-50">
-        <button className="flex flex-col items-center gap-1">
-          <Home className="w-5 h-5 text-primary" />
-          <span className="text-[10px] font-medium text-primary">Home</span>
-        </button>
-        <button
-          className="flex flex-col items-center gap-1"
-          onClick={() => alert("History coming soon")}>
-          
-          <Clock className="w-5 h-5 text-muted-foreground/50" />
-          <span className="text-[10px] font-medium text-muted-foreground/50">History</span>
-        </button>
-        <button
-          className="flex flex-col items-center gap-1"
-          onClick={() => alert("Profile coming soon")}>
-          
-          <User className="w-5 h-5 text-muted-foreground/50" />
-          <span className="text-[10px] font-medium text-muted-foreground/50">Profile</span>
-        </button>
-      </div>
+
     </div>);
 
 }

@@ -117,7 +117,7 @@ const WRITTEN_TOPICS = [
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isLoadingProgress } = useAuth();
   const [topicData, setTopicData] = useState({});
   const [reviewBank, setReviewBank] = useState([]);
   const [guessReviewBank, setGuessReviewBank] = useState([]);
@@ -140,11 +140,13 @@ export default function Dashboard() {
     setLoading(false);
   }
 
-  // Reload whenever the dashboard route is visited (including returning from question pages)
+  // Wait for preload to complete, then load dashboard data
+  // Also reload whenever the user navigates back (location.key changes)
   useEffect(() => {
+    if (isLoadingProgress) return; // wait for preload
     loadDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email, location.key]);
+  }, [user?.email, location.key, isLoadingProgress]);
 
   const handleRefresh = useCallback(async () => {
     await new Promise((r) => setTimeout(r, 300));

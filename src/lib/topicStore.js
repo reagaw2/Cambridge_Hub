@@ -51,7 +51,17 @@ export async function preloadStore(userEmail) {
   // Force a fresh DB fetch (bypasses cache)
   _cache = null;
   _loadPromise = null;
-  await loadFromDB();
+  const result = await loadFromDB();
+  console.log("[topicStore] preloadStore complete for", userEmail, "— cache keys:", Object.keys(result.topics || {}));
+  return result;
+}
+
+/**
+ * Returns true once the store has been loaded for the given user.
+ * Used by the dashboard to avoid reading before preload completes.
+ */
+export function isStoreReady(userEmail) {
+  return _userEmail === userEmail && _cache !== null;
 }
 
 /** Legacy init — keeps existing call sites working, but doesn't force a fetch */
@@ -79,9 +89,13 @@ async function loadFromDB() {
   _loadPromise = (async () => {
     try {
       const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
+      console.log("[topicStore] raw DB records for", _userEmail, JSON.stringify(records));
       if (records && records.length > 0) {
         const record = records[0];
         _recordId = record.id;
+        console.log("[topicStore] topics from DB:", JSON.stringify(record.topics));
+        console.log("[topicStore] mcq_attempts count:", (record.mcq_attempts || []).length);
+        console.log("[topicStore] review_bank count:", (record.review_bank || []).length);
         _cache = {
           topics: record.topics || DEFAULT_DATA().topics,
           review_bank: record.review_bank || [],
@@ -90,6 +104,7 @@ async function loadFromDB() {
           guess_review_bank: record.guess_review_bank || [],
         };
       } else {
+        console.log("[topicStore] no record found for user, using defaults");
         _cache = DEFAULT_DATA();
       }
     } catch (e) {
@@ -175,6 +190,8 @@ export async function getTopicData(topicKey) {
 
   const displayName = TOPIC_KEY_TO_DISPLAY[topicKey] ?? topicKey;
   const mcqAttempts = (data.mcq_attempts || []).filter(a => a.topic === displayName);
+
+  console.log(`[topicStore] getTopicData(${topicKey}): attempts=${JSON.stringify(attempts)}, last_attempted=${last_attempted}, mcqAttempts=${mcqAttempts.length}`);
 
   const hasWritten = attempts.length > 0;
   const hasMCQ = mcqAttempts.length > 0;

@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/AuthContext";
 export function useDisplayName() {
   const { user } = useAuth();
   const firstName = user?.full_name?.split(" ")[0] ?? "";
-  const localName = localStorage.getItem("cambridge_hub_preferred_name") || "";
+  const localName = localStorage.getItem(`cambridge_hub_preferred_name_${user?.id ?? "anon"}`) || "";
   const displayName = user?.preferred_name?.trim() || localName || firstName || "Student";
   const avatarLetter = displayName[0].toUpperCase();
   return { displayName, avatarLetter };

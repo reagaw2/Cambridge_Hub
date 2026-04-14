@@ -12,9 +12,10 @@ export default function Onboarding() {
   function handleContinue() {
     const name = preferredName.trim();
 
-    // Step 1 — instant localStorage write
-    localStorage.setItem("cambridge_hub_preferred_name", name);
-    localStorage.setItem("cambridge_hub_onboarding_completed", "true");
+    // Step 1 — instant localStorage write (scoped per user)
+    const uid = user?.id ?? "anon";
+    localStorage.setItem(`cambridge_hub_preferred_name_${uid}`, name);
+    localStorage.setItem(`cambridge_hub_onboarding_completed_${uid}`, "true");
 
     // Step 2 — hard redirect so App.jsx re-evaluates localStorage
     window.location.href = "/";

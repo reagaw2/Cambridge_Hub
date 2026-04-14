@@ -74,8 +74,8 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // First-time onboarding — show once, before dashboard
-  const localOnboardingDone = localStorage.getItem("cambridge_hub_onboarding_completed") === "true";
+  // First-time onboarding — show once, before dashboard (scoped per user)
+  const localOnboardingDone = localStorage.getItem(`cambridge_hub_onboarding_completed_${user?.id}`) === "true";
   if (isAuthenticated && !user?.onboarding_completed && !localOnboardingDone) {
     return (
       <Routes>

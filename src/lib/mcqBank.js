@@ -392,29 +392,31 @@ export function getMCQTopics() {
   return [...new Set(MCQ_QUESTIONS.map((q) => q.topic))];
 }
 
-// LocalStorage key for tracking which question index to serve next per topic
-const MCQ_PROGRESS_KEY = "ala_hub_mcq_progress";
+// LocalStorage key for tracking which question index to serve next per topic — scoped by user
+function mcqProgressKey(userEmail) {
+  return `ala_hub_mcq_progress_${userEmail || "anon"}`;
+}
 
-function loadProgress() {
+function loadProgress(userEmail) {
   try {
-    return JSON.parse(localStorage.getItem(MCQ_PROGRESS_KEY) || "{}");
+    return JSON.parse(localStorage.getItem(mcqProgressKey(userEmail)) || "{}");
   } catch {
     return {};
   }
 }
 
-function saveProgress(progress) {
-  localStorage.setItem(MCQ_PROGRESS_KEY, JSON.stringify(progress));
+function saveProgress(userEmail, progress) {
+  localStorage.setItem(mcqProgressKey(userEmail), JSON.stringify(progress));
 }
 
 /**
  * Gets the next question for a topic (loops when exhausted).
  */
-export function getNextMCQQuestion(topic) {
+export function getNextMCQQuestion(topic, userEmail) {
   const questions = getQuestionsForTopic(topic);
   if (!questions.length) return null;
 
-  const progress = loadProgress();
+  const progress = loadProgress(userEmail);
   const idx = (progress[topic] ?? 0) % questions.length;
   return { question: questions[idx], idx, total: questions.length };
 }
@@ -422,11 +424,11 @@ export function getNextMCQQuestion(topic) {
 /**
  * Advances the index for a topic to the next question.
  */
-export function advanceMCQIndex(topic) {
+export function advanceMCQIndex(topic, userEmail) {
   const questions = getQuestionsForTopic(topic);
   if (!questions.length) return;
-  const progress = loadProgress();
+  const progress = loadProgress(userEmail);
   const current = progress[topic] ?? 0;
   progress[topic] = (current + 1) % questions.length;
-  saveProgress(progress);
+  saveProgress(userEmail, progress);
 }

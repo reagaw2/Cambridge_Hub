@@ -17,7 +17,7 @@ export default function Profile() {
 
   async function handleSavePreferredName() {
     const trimmed = preferredName.trim();
-    localStorage.setItem("cambridge_hub_preferred_name", trimmed);
+    localStorage.setItem(`cambridge_hub_preferred_name_${user?.id ?? "anon"}`, trimmed);
     await base44.auth.updateMe({ preferred_name: trimmed });
     setNameSaved(true);
     setTimeout(() => setNameSaved(false), 2000);

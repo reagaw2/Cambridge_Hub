@@ -20,9 +20,8 @@ export function toDateString(date) {
 export function normaliseTopicKey(name) {
   return name
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")   // strip non-alphanumeric (removes & / - etc.)
-    .trim()
-    .replace(/\s+/g, "_");          // spaces → underscores
+    .replace(/\s+/g, "_")           // spaces → underscores
+    .replace(/[^a-z0-9_]/g, "");    // strip non-alphanumeric except underscores
 }
 
 const DEFAULT_DATA = () => ({

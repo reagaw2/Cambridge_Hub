@@ -1,0 +1,45 @@
+{
+  "name": "StudentData",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of the student this data belongs to"
+    },
+    "topics": {
+      "type": "object",
+      "description": "Per-topic attempt data keyed by topic key",
+      "additionalProperties": true
+    },
+    "review_bank": {
+      "type": "array",
+      "description": "Questions awaiting review",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "review_bank_clears": {
+      "type": "number",
+      "default": 0
+    },
+    "mcq_attempts": {
+      "type": "array",
+      "description": "All MCQ attempt records",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "guess_review_bank": {
+      "type": "array",
+      "description": "Question IDs flagged as guesses",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

@@ -214,11 +214,12 @@ export default function Feedback() {
           addToReviewBank({
             ...QUESTION_META[questionId],
             first_attempt_score: marksEarned,
-            first_attempt_feedback: feedback.cambridge_insight ?? ""
+            first_attempt_feedback: feedback.cambridge_insight ?? "",
           });
         }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!feedback) return null;

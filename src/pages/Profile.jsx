@@ -10,9 +10,9 @@ export default function Profile() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
 
-  const handleDeleteAccount = () => {
-    // Clear all local data and log out
-    resetData();
+  const handleDeleteAccount = async () => {
+    // Clear all data and log out
+    await resetData();
     logout(true);
   };
 

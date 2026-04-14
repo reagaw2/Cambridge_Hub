@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Flame } from "lucide-react";
@@ -8,13 +8,26 @@ import { getReviewBank, recordAttempt, removeFromReviewBank, incrementReviewBank
 
 export default function ReviewSession() {
   const navigate = useNavigate();
-  const [bank, setBank] = useState(() => getReviewBank());
+  const [bank, setBank] = useState([]);
+  const [bankLoading, setBankLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    getReviewBank().then((rb) => { setBank(rb); setBankLoading(false); });
+  }, []);
+
   const current = bank[currentIndex];
+
+  if (bankLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!current) {
     return (
@@ -70,12 +83,12 @@ Analyse the student's answer against the mark scheme. Respond in the following J
     const isFullMarks = newScore >= current.total_marks;
 
     // Always record attempt to streak
-    recordAttempt("gravitational_fields", newScore);
+    await recordAttempt("gravitational_fields", newScore);
 
     if (isImprovement && isFullMarks) {
-      removeFromReviewBank(current.question_id);
-      incrementReviewBankClears();
-      const remainingBank = getReviewBank();
+      await removeFromReviewBank(current.question_id);
+      await incrementReviewBankClears();
+      const remainingBank = await getReviewBank();
       navigate("/review-affirmation", {
         state: {
           bankEmpty: remainingBank.length === 0,

@@ -8,7 +8,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/AppLayout';
 import Profile from './pages/Profile';
 // Add page imports here
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/Dashboard.jsx';
 import Reflection from './pages/Reflection';
 import SimilarQuestion from './pages/SimilarQuestion';
 import FamiliarityCheck from './pages/FamiliarityCheck';
@@ -34,9 +34,10 @@ import AstroSimilarQuestion from './pages/astrophysics/SimilarQuestion';
 import AstroFamiliarityCheck from './pages/astrophysics/FamiliarityCheck';
 import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
+import Welcome from './pages/Welcome';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, isAuthenticated } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -52,10 +53,24 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
+      // Show welcome screen — let user choose to sign up or log in
+      return (
+        <Routes>
+          <Route path="/welcome" element={<Welcome />} />
+          <Route path="*" element={<Welcome />} />
+        </Routes>
+      );
     }
+  }
+
+  // Not authenticated — show welcome screen
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/welcome" element={<Welcome />} />
+        <Route path="*" element={<Welcome />} />
+      </Routes>
+    );
   }
 
   // Render the main app
@@ -89,6 +104,7 @@ const AuthenticatedApp = () => {
         <Route path="/astrophysics/familiarity-check" element={<AstroFamiliarityCheck />} />
         <Route path="/mcq" element={<MCQSession />} />
         <Route path="/mcq-feedback" element={<MCQFeedback />} />
+        <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

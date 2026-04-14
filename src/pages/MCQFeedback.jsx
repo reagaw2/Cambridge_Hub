@@ -53,7 +53,7 @@ export default function MCQFeedback() {
   const correct_option = attemptData?.correct_option;
   const reasoning = attemptData?.reasoning;
 
-  // Save attempt to localStorage immediately on mount — must be before any early return
+  // Save attempt to DB immediately on mount — must be before any early return
   useEffect(() => {
     if (!feedback || !attemptData || !question) return;
     saveMCQAttempt({
@@ -66,6 +66,7 @@ export default function MCQFeedback() {
       flagged_as_guess: attemptData.flagged_as_guess,
       reasoning: attemptData.reasoning,
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!feedback || !attemptData || !question) {
@@ -73,9 +74,9 @@ export default function MCQFeedback() {
     return null;
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (guessReviewMode) {
-      const updatedBank = getGuessReviewBank();
+      const updatedBank = await getGuessReviewBank();
       if (updatedBank.length === 0) {
         navigate("/");
       } else {

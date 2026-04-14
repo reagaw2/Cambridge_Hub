@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import { preloadStore } from '@/lib/topicStore';
 // Sync dark mode with system preference
 function applyColorScheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
@@ -14,6 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
+  const [isLoadingProgress, setIsLoadingProgress] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
@@ -99,18 +101,24 @@ export const AuthProvider = ({ children }) => {
 
   const checkUserAuth = async () => {
     try {
-      // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
+
+      // Preload all student progress from DB before dashboard renders
+      if (currentUser?.email) {
+        setIsLoadingProgress(true);
+        await preloadStore(currentUser.email);
+        setIsLoadingProgress(false);
+      }
     } catch (error) {
       console.error('User auth check failed:', error);
       setIsLoadingAuth(false);
+      setIsLoadingProgress(false);
       setIsAuthenticated(false);
       
-      // If user auth fails, it might be an expired token
       if (error.status === 401 || error.status === 403) {
         setAuthError({
           type: 'auth_required',
@@ -144,6 +152,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated, 
       isLoadingAuth,
       isLoadingPublicSettings,
+      isLoadingProgress,
       authError,
       appPublicSettings,
       logout,

@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
-import { initStore, getTopicData, resetData, getReviewBank, getGuessReviewBank } from "../lib/topicStore";
+import { getTopicData, resetData, getReviewBank, getGuessReviewBank } from "../lib/topicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw } from "lucide-react";
 
 function BookmarkIcon() {
@@ -139,7 +139,6 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    if (user?.email) initStore(user.email);
     loadDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email]);
@@ -159,14 +158,6 @@ export default function Dashboard() {
   }
 
   const gf = topicData["gravitational_fields"];
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background flex justify-center">

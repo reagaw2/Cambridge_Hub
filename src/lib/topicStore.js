@@ -1,7 +1,7 @@
 /**
  * topicStore.js — Student data layer
- * Reads/writes from the StudentData entity (DB), keyed by user email.
- * Falls back gracefully if data not yet created.
+ * Single source of truth: DB. In-memory cache for the session.
+ * Always call preloadStore(userEmail) once after login before reading any data.
  */
 
 import { base44 } from "@/api/base44Client";
@@ -30,60 +30,93 @@ const DEFAULT_DATA = () => ({
   guess_review_bank: [],
 });
 
-// In-memory cache so we don't fetch from DB on every call within a session
+// Module-level state
 let _cache = null;
 let _recordId = null;
 let _userEmail = null;
+let _loadPromise = null; // deduplicate concurrent loads
 
+/**
+ * Call once after login. Fetches DB record, primes cache.
+ * Subsequent reads within the session use the cache.
+ */
+export async function preloadStore(userEmail) {
+  if (_userEmail !== userEmail) {
+    // Different user — full reset
+    _cache = null;
+    _recordId = null;
+    _userEmail = userEmail;
+    _loadPromise = null;
+  }
+  // Force a fresh DB fetch (bypasses cache)
+  _cache = null;
+  _loadPromise = null;
+  await loadFromDB();
+}
+
+/** Legacy init — keeps existing call sites working, but doesn't force a fetch */
 export function initStore(userEmail) {
   if (_userEmail !== userEmail) {
     _cache = null;
     _recordId = null;
     _userEmail = userEmail;
+    _loadPromise = null;
   }
 }
 
 async function loadFromDB() {
+  // Return cached data immediately if available
   if (_cache) return _cache;
-  if (!_userEmail) return DEFAULT_DATA();
 
-  try {
-    const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
-    if (records && records.length > 0) {
-      const record = records[0];
-      _recordId = record.id;
-      const data = {
-        topics: record.topics || DEFAULT_DATA().topics,
-        review_bank: record.review_bank || [],
-        review_bank_clears: record.review_bank_clears ?? 0,
-        mcq_attempts: record.mcq_attempts || [],
-        guess_review_bank: record.guess_review_bank || [],
-      };
-      _cache = data;
-      return data;
-    }
-  } catch (e) {
-    console.warn("topicStore: failed to load from DB", e);
+  // Deduplicate concurrent calls — only one DB fetch in flight at a time
+  if (_loadPromise) return _loadPromise;
+
+  if (!_userEmail) {
+    _cache = DEFAULT_DATA();
+    return _cache;
   }
 
-  _cache = DEFAULT_DATA();
-  return _cache;
+  _loadPromise = (async () => {
+    try {
+      const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
+      if (records && records.length > 0) {
+        const record = records[0];
+        _recordId = record.id;
+        _cache = {
+          topics: record.topics || DEFAULT_DATA().topics,
+          review_bank: record.review_bank || [],
+          review_bank_clears: record.review_bank_clears ?? 0,
+          mcq_attempts: record.mcq_attempts || [],
+          guess_review_bank: record.guess_review_bank || [],
+        };
+      } else {
+        _cache = DEFAULT_DATA();
+      }
+    } catch (e) {
+      console.warn("topicStore: failed to load from DB", e);
+      _cache = DEFAULT_DATA();
+    }
+    _loadPromise = null;
+    return _cache;
+  })();
+
+  return _loadPromise;
 }
 
 async function saveToDB(data) {
   if (!_userEmail) return;
   _cache = data;
 
-  try {
-    const payload = {
-      user_email: _userEmail,
-      topics: data.topics,
-      review_bank: data.review_bank,
-      review_bank_clears: data.review_bank_clears,
-      mcq_attempts: data.mcq_attempts,
-      guess_review_bank: data.guess_review_bank,
-    };
+  const payload = {
+    user_email: _userEmail,
+    topics: data.topics,
+    review_bank: data.review_bank,
+    review_bank_clears: data.review_bank_clears,
+    mcq_attempts: data.mcq_attempts,
+    guess_review_bank: data.guess_review_bank,
+  };
 
+  try {
     if (_recordId) {
       await base44.entities.StudentData.update(_recordId, payload);
     } else {
@@ -266,7 +299,6 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
   }
 
   await saveToDB(data);
-  console.log("MCQ attempt saved:", attempt);
 }
 
 export async function getMCQStats(topic) {

@@ -99,11 +99,10 @@ ${attemptData.flagged_as_guess ? "Student flagged this as a guess (no reasoning 
 
 Respond ONLY in this JSON format, no extra text:
 {
-  "result": "${isCorrect ? "correct" : "incorrect"}",
-  "correct_option": "${question.correct}",
-  "correct_text": ${JSON.stringify(correctText)},
-  "critical_keyword": "the single most important physics keyword or concept that unlocks this question (2–6 words)",
-  "reasoning_feedback": "one to two sentences commenting specifically on the student's reasoning or guess behaviour — if they flagged as a guess, encourage them to start building intuition; if they gave reasoning, assess how close their thinking was",
+  "critical_keyword_word": "the single most important physics keyword or concept that unlocks this question (2–6 words)",
+  "critical_keyword_explanation": "one to two sentences explaining why this keyword is central to answering this question correctly",
+  "reasoning_assessment": "${isGuess ? "null — student flagged as a guess" : "one to two sentences assessing how close the student's reasoning was to the correct physics — be specific and honest"}",
+  "reasoning_sound": ${isGuess ? "null" : "true or false — true if the reasoning demonstrates correct physics understanding, false if flawed or incomplete"},
   "answer_explanation": "two to three sentences explaining why the correct answer is right and why common wrong answers fail, using precise Cambridge language",
   "next_step": "one sentence telling the student exactly what to review or practise next"
 }`;
@@ -114,11 +113,10 @@ Respond ONLY in this JSON format, no extra text:
       response_json_schema: {
         type: "object",
         properties: {
-          result: { type: "string" },
-          correct_option: { type: "string" },
-          correct_text: { type: "string" },
-          critical_keyword: { type: "string" },
-          reasoning_feedback: { type: "string" },
+          critical_keyword_word: { type: "string" },
+          critical_keyword_explanation: { type: "string" },
+          reasoning_assessment: { type: "string" },
+          reasoning_sound: { type: "boolean" },
           answer_explanation: { type: "string" },
           next_step: { type: "string" },
         },

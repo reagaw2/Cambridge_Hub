@@ -75,7 +75,8 @@ const AuthenticatedApp = () => {
   }
 
   // First-time onboarding — show once, before dashboard
-  if (isAuthenticated && !user?.onboarding_completed) {
+  const localOnboardingDone = localStorage.getItem("cambridge_hub_onboarding_completed") === "true";
+  if (isAuthenticated && !user?.onboarding_completed && !localOnboardingDone) {
     return (
       <Routes>
         <Route path="*" element={<Onboarding />} />

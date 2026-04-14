@@ -121,8 +121,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const firstName = user?.full_name?.split(" ")[0] ?? null;
-  const displayName = (user?.preferred_name?.trim()) || firstName;
-  const avatarLetter = (user?.preferred_name?.trim()?.[0] ?? firstName?.[0])?.toUpperCase() ?? "?";
+  const localName = localStorage.getItem("cambridge_hub_preferred_name") || "";
+  const displayName = user?.preferred_name?.trim() || localName || firstName;
+  const avatarLetter = (displayName?.[0])?.toUpperCase() ?? "?";
 
   async function loadDashboardData() {
     setLoading(true);

@@ -7,18 +7,25 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [preferredName, setPreferredName] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const firstName = user?.full_name?.split(" ")[0] ?? "you";
   const displayPreview = preferredName.trim() || firstName;
 
-  async function handleContinue() {
-    setSaving(true);
-    await base44.auth.updateMe({
-      preferred_name: preferredName.trim() || "",
-      onboarding_completed: true,
-    });
+  function handleContinue() {
+    const name = preferredName.trim();
+
+    // Step 1 — instant localStorage write
+    localStorage.setItem("cambridge_hub_preferred_name", name);
+    localStorage.setItem("cambridge_hub_onboarding_completed", "true");
+
+    // Step 2 — navigate immediately, no waiting
     navigate("/", { replace: true });
+
+    // Step 3 — background DB sync (fire and forget)
+    base44.auth.updateMe({
+      preferred_name: name,
+      onboarding_completed: true,
+    }).catch(() => {});
   }
 
   return (
@@ -66,10 +73,9 @@ export default function Onboarding() {
         {/* CTA */}
         <button
           onClick={handleContinue}
-          disabled={saving}
-          className="w-full bg-primary text-primary-foreground font-semibold text-sm py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
+          className="w-full bg-primary text-primary-foreground font-semibold text-sm py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
         >
-          {saving ? "Saving..." : "Let's go →"}
+          Let's go →
         </button>
 
       </div>

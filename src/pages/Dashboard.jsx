@@ -7,9 +7,23 @@ function BookmarkIcon() {
   return <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />;
 }
 
+// Topics that have MCQ questions but no written questions yet
+const MCQ_ONLY_TOPICS = [
+  "Physical Quantities & Units",
+  "Dynamics & Newton's Laws",
+  "Momentum & Collisions",
+  "Forces, Torques & Equilibrium",
+  "Work, Energy & Power",
+  "Deformation of Solids",
+  "Waves",
+  "Electricity",
+  "Nuclear Physics & Particle Physics",
+];
+
 const COMING_SOON = [
-"Magnetic Fields", "Medical Physics", "Telecommunications",
-"Ideal Gases", "Waves", "Superposition", "Mechanics", "Circular Motion"];
+  "Magnetic Fields", "Medical Physics", "Telecommunications",
+  "Ideal Gases", "Superposition", "Mechanics", "Circular Motion",
+];
 
 
 function getGreeting() {
@@ -286,6 +300,28 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* MCQ-only topics */}
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Multiple Choice Topics</p>
+            <p className="text-xs text-muted-foreground/60">AS Level MCQ practice — no written questions yet.</p>
+          </div>
+
+          {MCQ_ONLY_TOPICS.map((label) => (
+            <div
+              key={label}
+              onClick={() => navigate("/mcq", { state: { topic: label } })}
+              className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all"
+            >
+              <div className="flex items-start justify-between">
+                <div className="space-y-1 flex-1">
+                  <p className="font-semibold text-foreground text-sm">{label}</p>
+                  <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
+              </div>
+            </div>
+          ))}
 
           {/* Reset button for dev testing */}
           <div className="flex justify-center pt-4 pb-2">

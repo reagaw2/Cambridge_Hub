@@ -379,11 +379,16 @@ export async function resetData() {
 // ── MCQ Attempts ───────────────────────────────────────────────────────────
 
 export async function saveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
+  const normKey = normaliseTopicKey(topic);
+  console.log(`[topicStore] saveMCQAttempt — raw key: "${topic}" → normalised: "${normKey}"`);
+
   const data = await loadFromDB();
   if (!data.mcq_attempts) data.mcq_attempts = [];
   if (!data.guess_review_bank) data.guess_review_bank = [];
 
   const today = toDateString(new Date());
+  const yesterday = toDateString(new Date(Date.now() - 86400000));
+
   const attempt = {
     question_id,
     topic,  // keep original display name for UI display
@@ -394,6 +399,24 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
 
   data.mcq_attempts.push(attempt);
 
+  // Step 3: also write to topics object under normalised key so getTopicData can read it
+  if (!data.topics[normKey]) {
+    data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
+  }
+  const topicEntry = data.topics[normKey];
+  const score = correct ? 1 : 0;
+  topicEntry.attempts.push({ score, total_marks: 1, date: today, question_id });
+  topicEntry.last_attempted = today;
+
+  if (topicEntry.last_streak_date === today) {
+    // already recorded today
+  } else if (topicEntry.last_streak_date === yesterday) {
+    topicEntry.streak = (topicEntry.streak || 0) + 1;
+  } else {
+    topicEntry.streak = 1;
+  }
+  topicEntry.last_streak_date = today;
+
   if (flagged_as_guess) {
     if (!data.guess_review_bank.includes(question_id)) {
       data.guess_review_bank.push(question_id);
@@ -403,6 +426,7 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
   }
 
   await saveToDB(data);
+  console.log(`[topicStore] saveMCQAttempt complete — topics object:`, JSON.stringify(data.topics));
 }
 
 export async function getMCQStats(topic) {

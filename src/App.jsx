@@ -35,9 +35,10 @@ import AstroFamiliarityCheck from './pages/astrophysics/FamiliarityCheck';
 import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
+import Onboarding from './pages/Onboarding';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, isAuthenticated } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, isAuthenticated, user } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -69,6 +70,15 @@ const AuthenticatedApp = () => {
       <Routes>
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<Welcome />} />
+      </Routes>
+    );
+  }
+
+  // First-time onboarding — show once, before dashboard
+  if (isAuthenticated && !user?.onboarding_completed) {
+    return (
+      <Routes>
+        <Route path="*" element={<Onboarding />} />
       </Routes>
     );
   }

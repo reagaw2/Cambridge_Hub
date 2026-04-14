@@ -12,8 +12,13 @@
     },
     "preferred_name": {
       "type": "string",
-      "description": "The name the student prefers to be called. If empty, falls back to first name from full_name.",
+      "description": "The name the student prefers to be called.",
       "maxLength": 20
+    },
+    "onboarding_completed": {
+      "type": "boolean",
+      "description": "Whether the student has completed the first-time onboarding screen.",
+      "default": false
     }
   },
   "required": [

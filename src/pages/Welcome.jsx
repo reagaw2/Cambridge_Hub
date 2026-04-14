@@ -47,6 +47,12 @@ export default function Welcome() {
           </button>
         </div>
 
+        {/* Google OAuth notice */}
+        <p className="text-xs text-amber-500/70 text-center leading-relaxed">
+          Please use email and password to sign up or log in.<br />
+          Google login is not available yet.
+        </p>
+
       </div>
     </div>
   );

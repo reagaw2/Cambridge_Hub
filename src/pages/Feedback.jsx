@@ -209,7 +209,7 @@ export default function Feedback() {
     if (!recorded.current) {
       recorded.current = true;
       if (!isReview) {
-        recordAttempt(resolvedTopicKey, marksEarned);
+        recordAttempt(resolvedTopicKey, marksEarned, { total_marks: maxMarks, question_id: questionId });
         if (!fullMarks && questionId && QUESTION_META[questionId]) {
           addToReviewBank({
             ...QUESTION_META[questionId],

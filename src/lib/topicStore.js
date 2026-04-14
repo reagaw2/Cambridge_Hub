@@ -12,6 +12,19 @@ export function toDateString(date) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+/**
+ * BUG 1 FIX — Normalise any topic name to snake_case.
+ * "Physical Quantities & Units" → "physical_quantities_units"
+ * "Gravitational Fields" → "gravitational_fields"
+ */
+export function normaliseTopicKey(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")   // strip non-alphanumeric (removes & / - etc.)
+    .trim()
+    .replace(/\s+/g, "_");          // spaces → underscores
+}
+
 const DEFAULT_DATA = () => ({
   topics: {
     gravitational_fields: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
@@ -145,17 +158,27 @@ async function saveToDB(data) {
 
 // ── Topic attempts ─────────────────────────────────────────────────────────
 
-export async function recordAttempt(topicKey, score) {
+/**
+ * BUG 1 + 2 + 3 FIX:
+ * - topicKey is normalised via normaliseTopicKey before writing
+ * - attempt is saved as an object { score, total_marks, date, question_id }
+ * - console.log confirms the exact key used
+ */
+export async function recordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
+  const normKey = normaliseTopicKey(topicKey);
+  console.log(`[topicStore] recordAttempt — raw key: "${topicKey}" → normalised: "${normKey}", score: ${score}/${total_marks}`);
+
   const data = await loadFromDB();
-  if (!data.topics[topicKey]) {
-    data.topics[topicKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
+  if (!data.topics[normKey]) {
+    data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   }
 
-  const topic = data.topics[topicKey];
+  const topic = data.topics[normKey];
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
-  topic.attempts.push(score);
+  // BUG 2 FIX: store as object, not raw number
+  topic.attempts.push({ score, total_marks, date: today, question_id });
   topic.last_attempted = today;
 
   if (topic.last_streak_date === today) {
@@ -184,14 +207,20 @@ const TOPIC_KEY_TO_DISPLAY = {
 };
 
 export async function getTopicData(topicKey) {
+  const normKey = normaliseTopicKey(topicKey);
+  console.log(`[topicStore] getTopicData — raw key: "${topicKey}" → normalised: "${normKey}"`);
+
   const data = await loadFromDB();
-  const topic = data.topics[topicKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
-  const { attempts, last_attempted } = topic;
+  const topic = data.topics[normKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
 
-  const displayName = TOPIC_KEY_TO_DISPLAY[topicKey] ?? topicKey;
-  const mcqAttempts = (data.mcq_attempts || []).filter(a => a.topic === displayName);
+  // BUG 2 FIX: filter out legacy raw numbers, keep only proper attempt objects
+  const attempts = (topic.attempts || []).filter(a => a !== null && typeof a === "object");
+  const { last_attempted } = topic;
 
-  console.log(`[topicStore] getTopicData(${topicKey}): attempts=${JSON.stringify(attempts)}, last_attempted=${last_attempted}, mcqAttempts=${mcqAttempts.length}`);
+  // BUG 1 FIX: MCQ attempts are now stored with normalised key, look them up the same way
+  const mcqAttempts = (data.mcq_attempts || []).filter(a => normaliseTopicKey(a.topic) === normKey);
+
+  console.log(`[topicStore] getTopicData(${normKey}): attempts=${JSON.stringify(attempts)}, last_attempted=${last_attempted}, mcqAttempts=${mcqAttempts.length}`);
 
   const hasWritten = attempts.length > 0;
   const hasMCQ = mcqAttempts.length > 0;
@@ -201,15 +230,13 @@ export async function getTopicData(topicKey) {
   // ── Trend: based on most recent attempt (written takes priority if same session) ──
   let trend = "steady";
   if (hasWritten) {
-    // attempts stores raw scores (e.g. 0, 1, 2). We need % of max marks.
-    // We don't store max marks per attempt, so we use relative comparison:
-    // score === 0 → needs_work, score > 0 → steady by default.
-    // recordAttempt stores the score value passed in — for written Qs it's marks earned.
-    // Full marks is typically 1–3, partial is >0, zero is 0.
     const last = attempts[attempts.length - 1];
-    if (last === 0) trend = "needs_work";
-    else if (last >= 2) trend = "improving";
-    else trend = "steady"; // score of 1 (partial)
+    const score = last.score ?? 0;
+    const total = last.total_marks ?? 1;
+    const ratio = total > 0 ? score / total : 0;
+    if (score === 0) trend = "needs_work";
+    else if (ratio >= 1) trend = "improving";
+    else trend = "steady"; // partial marks
   }
 
   // If there are MCQ attempts more recent than the last written attempt, let them influence trend
@@ -357,10 +384,13 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
   if (!data.mcq_attempts) data.mcq_attempts = [];
   if (!data.guess_review_bank) data.guess_review_bank = [];
 
+  const today = toDateString(new Date());
   const attempt = {
-    question_id, topic, source, chosen_option, correct_option, correct,
+    question_id,
+    topic,  // keep original display name for UI display
+    source, chosen_option, correct_option, correct,
     flagged_as_guess, reasoning,
-    date: toDateString(new Date()),
+    date: today,
   };
 
   data.mcq_attempts.push(attempt);

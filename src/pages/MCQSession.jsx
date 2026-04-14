@@ -135,7 +135,7 @@ Respond ONLY in this JSON format, no extra text:
 
     setLoading(false);
 
-    await recordAttempt(question.topic, isCorrect ? 1 : 0);
+    await recordAttempt(question.topic, isCorrect ? 1 : 0, { total_marks: 1, question_id: question.id });
 
     navigate("/mcq-feedback", {
       state: {

@@ -83,7 +83,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
     const isFullMarks = newScore >= current.total_marks;
 
     // Always record attempt to streak
-    await recordAttempt("gravitational_fields", newScore);
+    await recordAttempt(current.topic, newScore, { total_marks: current.total_marks, question_id: current.question_id });
 
     if (isImprovement && isFullMarks) {
       await removeFromReviewBank(current.question_id);

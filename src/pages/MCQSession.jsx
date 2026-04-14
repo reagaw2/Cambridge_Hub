@@ -44,6 +44,7 @@ export default function MCQSession() {
   const [reasoning, setReasoning] = useState("");
   const [isGuess, setIsGuess] = useState(false);
   const [noSelectionError, setNoSelectionError] = useState(false);
+  const [noReasoningError, setNoReasoningError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -67,13 +68,15 @@ export default function MCQSession() {
     if (noSelectionError) setNoSelectionError(false);
   }
 
-  function toggleGuess() {
-    setIsGuess((g) => !g);
-  }
+  const reasoningValid = isGuess || reasoning.trim().length > 0;
 
   async function handleSubmit() {
     if (!selected) {
       setNoSelectionError(true);
+      return;
+    }
+    if (!reasoningValid) {
+      setNoReasoningError(true);
       return;
     }
 
@@ -221,7 +224,7 @@ Respond ONLY in this JSON format, no extra text:
             ) : (
               <textarea
                 value={reasoning}
-                onChange={(e) => setReasoning(e.target.value)}
+                onChange={(e) => { setReasoning(e.target.value); if (noReasoningError) setNoReasoningError(false); }}
                 placeholder="Brief reason — one or two sentences is enough"
                 rows={3}
                 className="w-full bg-card border border-border rounded-xl p-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
@@ -229,10 +232,15 @@ Respond ONLY in this JSON format, no extra text:
             )}
           </div>
 
+          {/* Reasoning validation message */}
+          {noReasoningError && (
+            <p className="text-sm text-amber-400/90 text-center -mt-1">Please explain your reasoning or tap Just a guess</p>
+          )}
+
           {/* 6. Just a guess + Submit row */}
           <div className="flex items-center gap-3">
             <button
-              onClick={toggleGuess}
+              onClick={() => { setIsGuess((g) => !g); if (noReasoningError) setNoReasoningError(false); }}
               className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
                 isGuess
                   ? "bg-amber-400 text-amber-900"
@@ -244,7 +252,11 @@ Respond ONLY in this JSON format, no extra text:
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-2.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className={`flex-1 bg-primary text-primary-foreground font-semibold text-sm py-2.5 rounded-xl transition-all ${
+                reasoningValid && !loading
+                  ? "hover:brightness-110 active:scale-[0.98] opacity-100 cursor-pointer"
+                  : "opacity-50 cursor-not-allowed"
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {loading ? "Analysing..." : "Submit Answer"}
             </button>

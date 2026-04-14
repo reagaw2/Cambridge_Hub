@@ -171,7 +171,7 @@ const TOPIC_KEY_TO_DISPLAY = {
 export async function getTopicData(topicKey) {
   const data = await loadFromDB();
   const topic = data.topics[topicKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
-  const { attempts, last_attempted, streak } = topic;
+  const { attempts, last_attempted } = topic;
 
   const displayName = TOPIC_KEY_TO_DISPLAY[topicKey] ?? topicKey;
   const mcqAttempts = (data.mcq_attempts || []).filter(a => a.topic === displayName);
@@ -181,23 +181,39 @@ export async function getTopicData(topicKey) {
 
   if (!hasWritten && !hasMCQ) return null;
 
+  // ── Trend: based on most recent attempt (written takes priority if same session) ──
   let trend = "steady";
   if (hasWritten) {
+    // attempts stores raw scores (e.g. 0, 1, 2). We need % of max marks.
+    // We don't store max marks per attempt, so we use relative comparison:
+    // score === 0 → needs_work, score > 0 → steady by default.
+    // recordAttempt stores the score value passed in — for written Qs it's marks earned.
+    // Full marks is typically 1–3, partial is >0, zero is 0.
     const last = attempts[attempts.length - 1];
-    if (last >= 2) trend = "improving";
-    else if (last === 1) trend = "steady";
-    else trend = "needs_work";
-  } else {
-    const lastMCQ = mcqAttempts[mcqAttempts.length - 1];
-    if (lastMCQ.correct && !lastMCQ.flagged_as_guess) trend = "improving";
-    else if (lastMCQ.correct && lastMCQ.flagged_as_guess) trend = "steady";
-    else trend = "needs_work";
+    if (last === 0) trend = "needs_work";
+    else if (last >= 2) trend = "improving";
+    else trend = "steady"; // score of 1 (partial)
   }
 
+  // If there are MCQ attempts more recent than the last written attempt, let them influence trend
+  if (hasMCQ) {
+    const today = toDateString(new Date());
+    const lastMCQ = mcqAttempts[mcqAttempts.length - 1];
+    const lastWrittenDate = last_attempted;
+    // Use MCQ trend only if no written attempts, or MCQ is more recent
+    const mcqIsMoreRecent = !lastWrittenDate || lastMCQ.date >= lastWrittenDate;
+    if (!hasWritten || mcqIsMoreRecent) {
+      if (lastMCQ.correct && !lastMCQ.flagged_as_guess) trend = "improving";
+      else if (lastMCQ.correct && lastMCQ.flagged_as_guess) trend = "steady";
+      else trend = "needs_work";
+    }
+  }
+
+  // ── Last attempted date ──
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
-  let latestDate = last_attempted;
+  let latestDate = last_attempted || null;
   if (hasMCQ) {
     const lastMCQDate = mcqAttempts[mcqAttempts.length - 1].date;
     if (!latestDate || lastMCQDate > latestDate) latestDate = lastMCQDate;
@@ -207,19 +223,61 @@ export async function getTopicData(topicKey) {
   if (latestDate) {
     if (latestDate === today) lastLabel = "Today";
     else if (latestDate === yesterday) lastLabel = "Yesterday";
-    else lastLabel = latestDate;
+    else {
+      // Calculate days ago from dd/mm/yyyy format
+      const parts = latestDate.split("/");
+      if (parts.length === 3) {
+        const dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        const diffMs = new Date() - dateObj;
+        const diffDays = Math.floor(diffMs / 86400000);
+        lastLabel = diffDays === 1 ? "Yesterday" : `${diffDays} days ago`;
+      } else {
+        lastLabel = latestDate;
+      }
+    }
   }
 
-  let currentStreak = streak || 0;
+  // ── Streak: count consecutive days with at least one attempt ending today or yesterday ──
+  // Collect all attempt dates (written + MCQ)
+  const writtenDates = last_attempted ? [last_attempted] : [];
+  // For written attempts we only have last_attempted, not per-attempt dates.
+  // Use mcq dates + last_attempted for written topics.
+  const allDates = new Set([
+    ...writtenDates,
+    ...mcqAttempts.map(a => a.date),
+  ]);
+
+  // Also include per-day written data from streak tracking in topic object
+  // The streak field on the topic is already maintained by recordAttempt.
+  // We trust it unless it's stale (last_streak_date is older than yesterday → reset to 0).
+  let currentStreak = topic.streak || 0;
+  const lastStreakDate = topic.last_streak_date || null;
+  if (lastStreakDate && lastStreakDate !== today && lastStreakDate !== yesterday) {
+    currentStreak = 0;
+  }
+
+  // For MCQ-only topics, recompute streak from MCQ attempt dates
   if (!hasWritten && hasMCQ) {
     const days = [...new Set(mcqAttempts.map(a => a.date))].sort();
     let s = 0;
     let checkDate = today;
     for (let i = days.length - 1; i >= 0; i--) {
-      if (days[i] === checkDate) {
-        s++;
-        checkDate = toDateString(new Date(new Date(checkDate.split("/").reverse().join("-")).getTime() - 86400000));
-      } else break;
+      if (days[i] === checkDate || (s === 0 && days[i] === yesterday)) {
+        if (s === 0 && days[i] === yesterday) {
+          // Allow streak starting from yesterday
+        }
+        if (days[i] === checkDate) {
+          s++;
+          const parts = checkDate.split("/");
+          const prevDay = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          prevDay.setDate(prevDay.getDate() - 1);
+          checkDate = toDateString(prevDay);
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
     }
     currentStreak = s;
   }

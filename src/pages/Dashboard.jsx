@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
@@ -43,10 +43,11 @@ function TrendBadge({ trend }) {
     <span className="flex items-center gap-1 text-xs font-medium text-amber-400">
       <ArrowRight className="w-3 h-3" /> Steady
     </span>);
-  return (
+  if (trend === "needs_work") return (
     <span className="flex items-center gap-1 text-xs font-medium text-red-400">
       <ArrowDown className="w-3 h-3" /> Needs work
     </span>);
+  return null;
 }
 
 function RecommendationBanner({ trend, navigate }) {
@@ -115,6 +116,7 @@ const WRITTEN_TOPICS = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [topicData, setTopicData] = useState({});
   const [reviewBank, setReviewBank] = useState([]);
@@ -138,10 +140,11 @@ export default function Dashboard() {
     setLoading(false);
   }
 
+  // Reload whenever the dashboard route is visited (including returning from question pages)
   useEffect(() => {
     loadDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email]);
+  }, [user?.email, location.key]);
 
   const handleRefresh = useCallback(async () => {
     await new Promise((r) => setTimeout(r, 300));
@@ -279,11 +282,15 @@ export default function Dashboard() {
                       <>
                         <TrendBadge trend={data.trend} />
                         <div className="flex items-center gap-4 pt-1">
-                          <span className="text-[11px] text-muted-foreground">Last attempt: {data.lastLabel}</span>
-                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <Flame className="w-3 h-3 text-orange-400/80" />
-                            {data.streak} day streak
-                          </span>
+                          {data.lastLabel && (
+                            <span className="text-[11px] text-muted-foreground">Last attempt: {data.lastLabel}</span>
+                          )}
+                          {data.streak > 0 && (
+                            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Flame className="w-3 h-3 text-orange-400/80" />
+                              {data.streak} day streak
+                            </span>
+                          )}
                         </div>
                       </>
                     ) : (

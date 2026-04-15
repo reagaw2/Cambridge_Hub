@@ -36,6 +36,22 @@ import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
 import Onboarding from './pages/Onboarding';
+import GravitationalQuestion1a from './pages/gravitational/Question1a';
+import GravitationalQuestion1bi from './pages/gravitational/Question1bi';
+import ThermalQuestion2a from './pages/thermal/Question2a';
+import ThermalQuestion2bi from './pages/thermal/Question2bi';
+import ThermalQuestion2bii from './pages/thermal/Question2bii';
+import ThermalQuestion3a from './pages/thermal/Question3a';
+import ThermalQuestion3bii from './pages/thermal/Question3bii';
+import OscillationsQuestion4a from './pages/oscillations/Question4a';
+import OscillationsQuestion4bii from './pages/oscillations/Question4bii';
+import ElectricQuestion5a from './pages/electric/Question5a';
+import ElectricQuestion5b from './pages/electric/Question5b';
+import CapacitanceQuestion6a from './pages/capacitance/Question6a';
+import AstroQuestion8ai from './pages/astrophysics/Question8ai';
+import AstroQuestion11a from './pages/astrophysics/Question11a';
+import NuclearQuestion9a from './pages/nuclear/Question9a';
+import NuclearQuestion9cii from './pages/nuclear/Question9cii';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, isLoadingProgress, authError, navigateToLogin, isAuthenticated, user } = useAuth();
@@ -118,6 +134,22 @@ const AuthenticatedApp = () => {
         <Route path="/astrophysics/familiarity-check" element={<AstroFamiliarityCheck />} />
         <Route path="/mcq" element={<MCQSession />} />
         <Route path="/mcq-feedback" element={<MCQFeedback />} />
+        <Route path="/gravitational/q1a" element={<GravitationalQuestion1a />} />
+        <Route path="/gravitational/q1bi" element={<GravitationalQuestion1bi />} />
+        <Route path="/thermal/q2a" element={<ThermalQuestion2a />} />
+        <Route path="/thermal/q2bi" element={<ThermalQuestion2bi />} />
+        <Route path="/thermal/q2bii" element={<ThermalQuestion2bii />} />
+        <Route path="/thermal/q3a" element={<ThermalQuestion3a />} />
+        <Route path="/thermal/q3bii" element={<ThermalQuestion3bii />} />
+        <Route path="/oscillations/q4a" element={<OscillationsQuestion4a />} />
+        <Route path="/oscillations/q4bii" element={<OscillationsQuestion4bii />} />
+        <Route path="/electric/q5a" element={<ElectricQuestion5a />} />
+        <Route path="/electric/q5b" element={<ElectricQuestion5b />} />
+        <Route path="/capacitance/q6a" element={<CapacitanceQuestion6a />} />
+        <Route path="/astrophysics/q8ai" element={<AstroQuestion8ai />} />
+        <Route path="/astrophysics/q11a" element={<AstroQuestion11a />} />
+        <Route path="/nuclear/q9a" element={<NuclearQuestion9a />} />
+        <Route path="/nuclear/q9cii" element={<NuclearQuestion9cii />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>

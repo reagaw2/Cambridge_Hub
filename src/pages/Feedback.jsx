@@ -179,6 +179,118 @@ const QUESTION_META = {
     question_text: "Explain how Hubble's law leads to the Big Bang theory of the origin of the universe.",
     mark_scheme: "B1: speed of recession proportional to distance. B1+B1: any two of — more distant galaxies represent further back in time; all matter was once very close together; all matter was once moving apart very fast.",
     total_marks: 3
+  },
+  "9702-41-ALA26-Q1a": {
+    question_id: "9702-41-ALA26-Q1a",
+    topic: "Gravitational Fields",
+    question_text: "State Newton's law of gravitation.",
+    mark_scheme: "B1: force proportional to product of masses and inversely proportional to square of separation. B1: force acts between point masses.",
+    total_marks: 2
+  },
+  "9702-41-ALA26-Q1bi": {
+    question_id: "9702-41-ALA26-Q1bi",
+    topic: "Gravitational Fields",
+    question_text: "Each planet orbits at constant speed. Explain whether the planets are in equilibrium.",
+    mark_scheme: "B1: direction of motion changes so there is acceleration / resultant force — therefore NOT in equilibrium.",
+    total_marks: 1
+  },
+  "9702-41-ALA26-Q2a": {
+    question_id: "9702-41-ALA26-Q2a",
+    topic: "Thermal Physics",
+    question_text: "Use one of the assumptions of the kinetic theory of gases to explain why the potential energy of the molecules of an ideal gas is zero.",
+    mark_scheme: "B1: no intermolecular forces so no potential energy.",
+    total_marks: 1
+  },
+  "9702-41-ALA26-Q2bi": {
+    question_id: "9702-41-ALA26-Q2bi",
+    topic: "Thermal Physics",
+    question_text: "State the meaning of the symbol mean square speed in the expression for average translational kinetic energy.",
+    mark_scheme: "B1: mean square speed of the molecules.",
+    total_marks: 1
+  },
+  "9702-41-ALA26-Q2bii": {
+    question_id: "9702-41-ALA26-Q2bii",
+    topic: "Thermal Physics",
+    question_text: "In the expression EK = (3/2)kT, state the meaning of the symbol T.",
+    mark_scheme: "B1: kelvin / thermodynamic / absolute temperature.",
+    total_marks: 1
+  },
+  "9702-41-ALA26-Q3a": {
+    question_id: "9702-41-ALA26-Q3a",
+    topic: "Thermal Physics",
+    question_text: "State what is meant by specific latent heat.",
+    mark_scheme: "B1: thermal energy per unit mass to change state. B1: at constant temperature.",
+    total_marks: 2
+  },
+  "9702-41-ALA26-Q3bii": {
+    question_id: "9702-41-ALA26-Q3bii",
+    topic: "Thermal Physics",
+    question_text: "Explain why, although the power of the heater is changed, the rate of loss of thermal energy to the surroundings may be assumed to be constant.",
+    mark_scheme: "B1: temperature difference between liquid and surroundings does not change so rate of heat loss is the same.",
+    total_marks: 1
+  },
+  "9702-41-ALA26-Q4a": {
+    question_id: "9702-41-ALA26-Q4a",
+    topic: "Oscillations",
+    question_text: "State, by reference to simple harmonic motion, what is meant by angular frequency.",
+    mark_scheme: "B1: angular frequency = 2π × frequency or 2π / period.",
+    total_marks: 1
+  },
+  "9702-41-ALA26-Q4bii": {
+    question_id: "9702-41-ALA26-Q4bii",
+    topic: "Oscillations",
+    question_text: "Show that the load on the metal strip is undergoing simple harmonic motion.",
+    mark_scheme: "B1: displacement measured from equilibrium. B1: acceleration proportional to displacement. B1: acceleration and displacement in opposite directions.",
+    total_marks: 3
+  },
+  "9702-41-ALA26-Q5a": {
+    question_id: "9702-41-ALA26-Q5a",
+    topic: "Electric Fields",
+    question_text: "State the relationship between electric field and electric potential.",
+    mark_scheme: "M1: E = negative potential gradient. A1: field points in direction of decreasing potential.",
+    total_marks: 2
+  },
+  "9702-41-ALA26-Q5b": {
+    question_id: "9702-41-ALA26-Q5b",
+    topic: "Electric Fields",
+    question_text: "Explain why it is NOT possible for the total electric potential and the resultant electric field to simultaneously be zero at point P.",
+    mark_scheme: "B1: for V=0 charges must be opposite signs. B1: for E=0 charges must be same sign. B1: contradiction — impossible simultaneously.",
+    total_marks: 3
+  },
+  "9702-41-ALA26-Q6a": {
+    question_id: "9702-41-ALA26-Q6a",
+    topic: "Capacitance",
+    question_text: "Define the capacitance of a parallel-plate capacitor.",
+    mark_scheme: "M1: C = Q/V. A1: Q is charge on one plate, V is p.d. between the plates.",
+    total_marks: 2
+  },
+  "9702-41-ALA26-Q8ai": {
+    question_id: "9702-41-ALA26-Q8ai",
+    topic: "Astrophysics",
+    question_text: "A distant galaxy is moving away from the Earth. Explain how the positions of the lines in the emission spectrum seen by an observer on the Earth differ from the original positions.",
+    mark_scheme: "B1: movement causes change in observed frequency / redshift. B1: observed frequency lower / lines shift to longer wavelength.",
+    total_marks: 2
+  },
+  "9702-41-ALA26-Q11a": {
+    question_id: "9702-41-ALA26-Q11a",
+    topic: "Astrophysics",
+    question_text: "State what is meant by the luminosity of a star.",
+    mark_scheme: "B1: total power of radiation emitted by the star.",
+    total_marks: 1
+  },
+  "9702-41-ALA26-Q9a": {
+    question_id: "9702-41-ALA26-Q9a",
+    topic: "Nuclear Physics",
+    question_text: "Polonium-211 decays by alpha emission to form a stable isotope of lead. Write a complete nuclear equation for this decay.",
+    mark_scheme: "B1: Pb-207, proton number 82. B1: alpha particle mass 4, proton number 2.",
+    total_marks: 2
+  },
+  "9702-41-ALA26-Q9cii": {
+    question_id: "9702-41-ALA26-Q9cii",
+    topic: "Nuclear Physics",
+    question_text: "Suggest why the total amount of energy released by the decay process is greater than the energy given to the alpha particles alone.",
+    mark_scheme: "B1: lead nuclei have recoil kinetic energy OR gamma photons are also emitted.",
+    total_marks: 1
   }
 };
 

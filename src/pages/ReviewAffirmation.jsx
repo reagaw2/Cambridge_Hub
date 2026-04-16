@@ -25,7 +25,7 @@ export default function ReviewAffirmation() {
     const nav = setTimeout(() => {
       if (bankEmpty) {
         setShowBankCleared(true);
-        setTimeout(() => navigate("/"), 2000);
+        setTimeout(() => navigate("/physics"), 2000);
       } else {
         navigate("/review", { replace: true });
       }

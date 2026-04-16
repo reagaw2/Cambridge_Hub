@@ -62,7 +62,7 @@ Analyse the student's answer against the mark scheme. Award 1 mark for each dist
         answer,
         topicKey: TOPIC_KEY,
         questionId: QUESTION_ID,
-        nextFullRoute: "/",
+        nextFullRoute: "/physics",
         nextRetryRoute: "/electric/q5b",
         backRoute: "/electric/q5a",
         paperRef: PAPER_REF,

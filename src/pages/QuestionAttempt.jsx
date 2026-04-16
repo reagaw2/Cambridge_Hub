@@ -74,7 +74,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
         questionId: "q1",
         nextFullRoute: "/similar-question",
         nextRetryRoute: "/question",
-        backRoute: "/gravitational/question",
+        backRoute: "/physics",
         paperRef: "9702/44 · May/Jun 2025",
       }
     });

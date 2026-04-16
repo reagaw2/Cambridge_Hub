@@ -161,7 +161,7 @@ Respond ONLY in this JSON format, no extra text:
         {/* 1. Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/physics")}
             className="flex items-center justify-center min-w-[44px] min-h-[44px] -ml-2 rounded-lg hover:bg-secondary transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-foreground" />

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Routes where bottom nav should be hidden (question/answer flows)
 const NO_NAV_PATTERNS = [
+  /^\/$/,
   /\/question$/,
   /\/similar-question$/,
   /\/familiarity-check$/,
@@ -13,6 +14,7 @@ const NO_NAV_PATTERNS = [
   /^\/review-affirmation$/,
   /^\/mcq$/,
   /^\/mcq-feedback$/,
+  /\/q\d/,
 ];
 
 function shouldHideNav(pathname) {
@@ -39,8 +41,8 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const hideNav = shouldHideNav(location.pathname);
 
-  // Active tab is "/" or "/profile"; anything else keeps previous tab highlighted
-  const activeTab = location.pathname === "/profile" ? "/profile" : "/";
+  // Active tab is "/physics" or "/profile"; anything else keeps previous tab highlighted
+  const activeTab = location.pathname === "/profile" ? "/profile" : "/physics";
 
   return (
     <div
@@ -74,8 +76,8 @@ export default function AppLayout() {
             onClick={() => navigate("/")}
             className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
           >
-            <Home className={`w-5 h-5 ${activeTab === "/" ? "text-primary" : "text-muted-foreground/50"}`} />
-            <span className={`text-[10px] font-medium ${activeTab === "/" ? "text-primary" : "text-muted-foreground/50"}`}>
+            <Home className={`w-5 h-5 ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`} />
+            <span className={`text-[10px] font-medium ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`}>
               Home
             </span>
           </button>

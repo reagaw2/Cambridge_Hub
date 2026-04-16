@@ -35,7 +35,7 @@ export default function ReviewSession() {
         <p className="text-lg font-semibold text-foreground max-w-sm leading-relaxed">
           No questions in your review bank right now.
         </p>
-        <button onClick={() => navigate("/")} className="mt-8 text-sm text-primary hover:brightness-110">
+        <button onClick={() => navigate("/physics")} className="mt-8 text-sm text-primary hover:brightness-110">
           Back to dashboard
         </button>
       </div>
@@ -97,7 +97,6 @@ Analyse the student's answer against the mark scheme. Respond in the following J
         }
       });
     } else {
-      // keep in bank, show standard feedback with try-again
       navigate("/feedback", {
         state: {
           feedback: result,
@@ -117,7 +116,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate("/")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">Review Session</span>

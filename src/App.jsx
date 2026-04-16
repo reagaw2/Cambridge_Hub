@@ -9,6 +9,7 @@ import AppLayout from '@/components/AppLayout';
 import Profile from './pages/Profile';
 // Add page imports here
 import Dashboard from './pages/Dashboard.jsx';
+import SubjectSelection from './pages/SubjectSelection.jsx';
 import Reflection from './pages/Reflection';
 import SimilarQuestion from './pages/SimilarQuestion';
 import FamiliarityCheck from './pages/FamiliarityCheck';
@@ -107,7 +108,8 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<SubjectSelection />} />
+        <Route path="/physics" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/question" element={<QuestionAttempt />} />
         <Route path="/feedback" element={<Feedback />} />

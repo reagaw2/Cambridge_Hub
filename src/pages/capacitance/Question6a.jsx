@@ -60,7 +60,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
         answer,
         topicKey: TOPIC_KEY,
         questionId: QUESTION_ID,
-        nextFullRoute: "/",
+        nextFullRoute: "/physics",
         nextRetryRoute: "/capacitance/q6a",
         backRoute: "/",
         paperRef: PAPER_REF,

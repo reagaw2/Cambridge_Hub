@@ -34,7 +34,7 @@ export default function Reflection() {
 
   useEffect(() => {
     if (step === "done") {
-      const t = setTimeout(() => navigate(nextDest ?? "/"), 2000);
+      const t = setTimeout(() => navigate(nextDest ?? "/physics"), 2000);
       return () => clearTimeout(t);
     }
   }, [step, navigate, nextDest]);

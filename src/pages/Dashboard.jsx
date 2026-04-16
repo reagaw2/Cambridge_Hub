@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames, normaliseTopicKey } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft } from "lucide-react";
 
 function BookmarkIcon() {
   return <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />;
@@ -32,6 +32,31 @@ function getGreeting(firstName) {
   if (h < 12) return `Good morning, ${name}. Let's build on yesterday.`;
   if (h < 17) return `Good afternoon, ${name}. Your exam won't wait.`;
   return `Good evening, ${name}. One more session before you rest.`;
+}
+
+const WRITTEN_KEYS_FOR_CONFIDENCE = [
+  "gravitational_fields", "nuclear_physics", "thermal_physics", "oscillations",
+  "electric_fields", "capacitance", "electromagnetic_induction", "quantum_physics", "astrophysics",
+];
+
+function trendToScore(trend) {
+  if (trend === "improving") return 85;
+  if (trend === "steady") return 60;
+  return 30;
+}
+
+function OverallConfidence({ topicData, mcqOnlyTopics }) {
+  const allData = [
+    ...WRITTEN_KEYS_FOR_CONFIDENCE.map(k => topicData[k]),
+    ...mcqOnlyTopics.map(t => topicData[t.key]),
+  ].filter(Boolean);
+
+  if (allData.length === 0) {
+    return <span className="text-xs text-muted-foreground/60">No data yet</span>;
+  }
+  const avg = Math.round(allData.reduce((sum, d) => sum + trendToScore(d.trend), 0) / allData.length);
+  const color = avg >= 70 ? "text-green-400" : avg >= 50 ? "text-amber-400" : "text-red-400";
+  return <span className={`text-sm font-bold ${color}`}>{avg}%</span>;
 }
 
 function TrendBadge({ trend }) {
@@ -66,7 +91,8 @@ function RecommendationBanner({ trend, navigate }) {
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:brightness-110 transition-all">
         Start session →
       </button>
-    </div>);
+    </div>
+  );
 }
 
 const PTR_THRESHOLD = 72;
@@ -171,6 +197,8 @@ export default function Dashboard() {
     await loadDashboardData();
   }
 
+
+
   const gf = topicData["gravitational_fields"];
 
   return (
@@ -196,13 +224,25 @@ export default function Dashboard() {
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <span className="text-base font-bold tracking-wide text-foreground">Cambridge Hub</span>
+          <button
+            onClick={() => navigate("/")}
+            className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-foreground" />
+          </button>
+          <span className="text-base font-bold tracking-wide text-foreground">Physics</span>
           <button
             onClick={() => navigate("/profile")}
             className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center"
           >
             <span className="text-xs font-bold text-primary">{avatarLetter}</span>
           </button>
+        </div>
+
+        {/* Overall confidence row */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30 bg-card/40">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Overall confidence</span>
+          {!loading && <OverallConfidence topicData={topicData} mcqOnlyTopics={mcqOnlyTopics} />}
         </div>
 
         <div className="flex-1 flex flex-col gap-6 p-4 pt-6">
@@ -251,6 +291,7 @@ export default function Dashboard() {
               <div
                 className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
                 onClick={() => navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank } })}
+
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <span className="text-base shrink-0">🎲</span>

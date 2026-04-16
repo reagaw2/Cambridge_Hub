@@ -64,7 +64,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
         questionId: "w25_44_Q8a",
         nextFullRoute: "/nuclear/similar-question",
         nextRetryRoute: "/nuclear/question",
-        backRoute: "/",
+        backRoute: "/physics",
         paperRef: "9702/44 · Oct/Nov 2025"
       }
     });

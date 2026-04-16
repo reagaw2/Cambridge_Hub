@@ -304,7 +304,7 @@ export default function Feedback() {
 
   // Fall back to gravitational fields defaults for backwards compat
   const resolvedTopicKey = topicKey ?? "gravitational_fields";
-  const resolvedBack = backRoute ?? "/question";
+  const resolvedBack = backRoute ?? "/physics";
 
   // Derive maxMarks strictly from QUESTION_META when questionId is present
   const metaEntry = questionId ? QUESTION_META[questionId] : null;
@@ -356,7 +356,7 @@ export default function Feedback() {
       const situation = detectSituation(feedback, isQ3, maxMarks);
 
       // Use passed nextFullRoute, or fall back to old GF logic
-      const nextDest = nextFullRoute ?? (isQ3 ? "/" : fmc === 1 ? "/similar-question" : "/familiarity-check");
+      const nextDest = nextFullRoute ?? (isQ3 ? "/physics" : fmc === 1 ? "/similar-question" : "/familiarity-check");
 
       const topicDisplayName = metaEntry?.topic ?? resolvedTopicKey.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
       if (situation) {
@@ -366,7 +366,7 @@ export default function Feedback() {
       }
     } else {
       sessionStorage.setItem("consecutive_full_marks", "0");
-      const retryDest = nextRetryRoute ?? (isQ3 ? resolvedBack : isQ2 ? "/similar-question" : "/");
+      const retryDest = nextRetryRoute ?? (isQ3 ? resolvedBack : isQ2 ? "/similar-question" : "/physics");
       navigate(retryDest);
     }
   }
@@ -378,7 +378,7 @@ export default function Feedback() {
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate(resolvedBack)} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <button onClick={() => navigate(resolvedBack === "/" ? "/physics" : resolvedBack)} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>

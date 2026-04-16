@@ -70,7 +70,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
         questionId: QUESTION_ID,
         nextFullRoute: "/thermal/similar-question",
         nextRetryRoute: "/thermal/question",
-        backRoute: "/",
+        backRoute: "/physics",
         paperRef: PAPER_REF,
       }
     });

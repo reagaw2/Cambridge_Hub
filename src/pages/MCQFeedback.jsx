@@ -78,7 +78,7 @@ export default function MCQFeedback() {
     if (guessReviewMode) {
       const updatedBank = await getGuessReviewBank();
       if (updatedBank.length === 0) {
-        navigate("/");
+        navigate("/physics");
       } else {
         navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank: updatedBank, sessionIndex: nextSessionIndex ?? 1 } });
       }
@@ -88,7 +88,7 @@ export default function MCQFeedback() {
   }
 
   function handleSwitchToWritten() {
-    navigate("/");
+    navigate("/physics");
   }
 
   // Determine reasoning border colour from Claude's assessment
@@ -105,7 +105,7 @@ export default function MCQFeedback() {
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/physics")}
             className="flex items-center justify-center min-w-[44px] min-h-[44px] -ml-2 rounded-lg hover:bg-secondary transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-foreground" />

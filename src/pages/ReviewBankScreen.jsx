@@ -1,20 +1,21 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Lock } from "lucide-react";
 import { getReviewBank, resetReviewBankLock } from "@/lib/topicStore";
 
-function getLockStatus(locked_until) {
+function getLockStatus(locked_until, now) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
-  const ms = new Date(locked_until).getTime() - Date.now();
+  const ms = new Date(locked_until).getTime() - now;
   return { locked: ms > 0, msRemaining: Math.max(0, ms) };
 }
 
 function formatCountdown(ms) {
+  if (ms < 60000) return "Unlocking now...";
   const totalMinutes = Math.floor(ms / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  if (hours > 0) return `Unlocks in ${hours}h ${minutes}m`;
+  return `Unlocks in ${minutes}m`;
 }
 
 // Route map to navigate directly to a specific question
@@ -56,7 +57,7 @@ const QUESTION_ROUTES = {
 };
 
 function QuestionCard({ q, now, navigate }) {
-  const { locked, msRemaining } = getLockStatus(q.locked_until);
+  const { locked, msRemaining } = getLockStatus(q.locked_until, now);
   const preview = q.question_text?.slice(0, 80) + (q.question_text?.length > 80 ? "…" : "");
   const [lockedMsg, setLockedMsg] = useState(false);
 
@@ -98,7 +99,7 @@ function QuestionCard({ q, now, navigate }) {
         <span className="text-[11px] text-muted-foreground">You scored {q.first_attempt_score}/{q.total_marks}</span>
         <div className="flex items-center gap-1.5 text-amber-400/80">
           <Lock className="w-3 h-3" />
-          <span className="text-[11px] font-medium">Unlocks in {formatCountdown(msRemaining)}</span>
+          <span className="text-[11px] font-medium">{formatCountdown(msRemaining)}</span>
         </div>
       </div>
       {lockedMsg && (
@@ -120,9 +121,9 @@ export default function ReviewBankScreen() {
     getReviewBank().then(rb => { setBank(rb); setLoading(false); });
   }, []);
 
-  // Tick every 60s — re-render to update countdowns and unlock states
+  // Tick every 30s — recalculates lock status and countdown displays reactively
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60000);
+    const interval = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -134,16 +135,12 @@ export default function ReviewBankScreen() {
     );
   }
 
-  const unlocked = bank.filter(q => !getLockStatus(q.locked_until).locked);
-  const locked = bank.filter(q => getLockStatus(q.locked_until).locked);
+  const unlocked = bank.filter(q => !getLockStatus(q.locked_until, now).locked);
+  const locked = bank.filter(q => getLockStatus(q.locked_until, now).locked);
 
   // Sort locked by soonest unlock
   const sortedLocked = [...locked].sort((a, b) => new Date(a.locked_until) - new Date(b.locked_until));
   const nextUnlock = sortedLocked[0];
-
-  const oldestRef = bank.length > 0
-    ? (bank.sort((a, b) => new Date(a.locked_until) - new Date(b.locked_until))[0])
-    : null;
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -182,7 +179,7 @@ export default function ReviewBankScreen() {
               </p>
               {nextUnlock && (
                 <p className="text-sm text-amber-400 font-medium">
-                  Next question unlocks in {formatCountdown(getLockStatus(nextUnlock.locked_until).msRemaining)}
+                  {formatCountdown(getLockStatus(nextUnlock.locked_until, now).msRemaining)}
                 </p>
               )}
             </div>

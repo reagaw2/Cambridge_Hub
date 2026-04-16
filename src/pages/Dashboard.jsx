@@ -3,10 +3,47 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames, normaliseTopicKey } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock } from "lucide-react";
 
 function BookmarkIcon() {
   return <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />;
+}
+
+function getLockStatus(locked_until) {
+  if (!locked_until) return { locked: false, msRemaining: 0 };
+  const ms = new Date(locked_until).getTime() - Date.now();
+  return { locked: ms > 0, msRemaining: Math.max(0, ms) };
+}
+
+function formatCountdown(ms) {
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function reviewBankSubtitle(bank) {
+  const unlocked = bank.filter(q => !getLockStatus(q.locked_until).locked);
+  const locked = bank.filter(q => getLockStatus(q.locked_until).locked);
+  if (unlocked.length === 0) {
+    const soonest = [...locked].sort((a, b) => new Date(a.locked_until) - new Date(b.locked_until))[0];
+    return `All waiting · Next unlocks in ${formatCountdown(getLockStatus(soonest?.locked_until).msRemaining)}`;
+  }
+  if (locked.length === 0) return `${unlocked.length} question${unlocked.length !== 1 ? "s" : ""} ready to attempt`;
+  return `${unlocked.length} ready to attempt · ${locked.length} waiting`;
+}
+
+function guessBankSubtitle(bank) {
+  const normalised = bank.map(e => typeof e === "string" ? { question_id: e, locked_until: null } : e);
+  const unlocked = normalised.filter(e => !getLockStatus(e.locked_until).locked);
+  const locked = normalised.filter(e => getLockStatus(e.locked_until).locked);
+  if (unlocked.length === 0 && locked.length > 0) {
+    const soonest = [...locked].sort((a, b) => new Date(a.locked_until) - new Date(b.locked_until))[0];
+    return `All waiting · Next unlocks in ${formatCountdown(getLockStatus(soonest?.locked_until).msRemaining)}`;
+  }
+  if (locked.length === 0) return `${unlocked.length} question${unlocked.length !== 1 ? "s" : ""} ready`;
+  return `${unlocked.length} ready · ${locked.length} waiting`;
 }
 
 const MCQ_ONLY_TOPICS = [
@@ -264,22 +301,22 @@ export default function Dashboard() {
               </div>
               <div
                 className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
-                onClick={() => navigate("/review")}>
+                onClick={() => navigate("/review-bank")}>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <BookmarkIcon />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">
-                      {reviewBank.length} question{reviewBank.length !== 1 ? "s" : ""} need another attempt
+                      {reviewBank.length} question{reviewBank.length !== 1 ? "s" : ""} in review bank
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                      {reviewBank[0].topic} · Added {reviewBank[0].date_added === new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) ? "today" : reviewBank[0].date_added}
+                      {reviewBankSubtitle(reviewBank)}
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={(e) => { e.stopPropagation(); navigate("/review"); }}
+                  onClick={(e) => { e.stopPropagation(); navigate("/review-bank"); }}
                   className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all">
-                  Review now →
+                  View →
                 </button>
               </div>
             </div>
@@ -290,8 +327,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <div
                 className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
-                onClick={() => navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank } })}
-
+                onClick={() => navigate("/guess-review-bank")}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <span className="text-base shrink-0">🎲</span>
@@ -300,15 +336,15 @@ export default function Dashboard() {
                       {guessReviewBank.length} MCQ question{guessReviewBank.length !== 1 ? "s" : ""} flagged as guesses
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Correct guesses are unverified — prove you know them
+                      {guessBankSubtitle(guessReviewBank)}
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={(e) => { e.stopPropagation(); navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank } }); }}
+                  onClick={(e) => { e.stopPropagation(); navigate("/guess-review-bank"); }}
                   className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all"
                 >
-                  Review now →
+                  View →
                 </button>
               </div>
             </div>

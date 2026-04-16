@@ -337,14 +337,25 @@ export async function addToReviewBank({ question_id, topic, question_text, mark_
   if (data.review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
 
   const priority = first_attempt_score === 0 ? 1 : 2;
+  const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   data.review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
     first_attempt_score, first_attempt_feedback,
     date_added: toDateString(new Date()),
     priority,
+    locked_until,
   });
 
   await saveToDB(data);
+}
+
+export async function resetReviewBankLock(question_id) {
+  const data = await loadFromDB();
+  const entry = data.review_bank.find(q => q.question_id === question_id);
+  if (entry) {
+    entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await saveToDB(data);
+  }
 }
 
 export async function removeFromReviewBank(question_id) {
@@ -420,11 +431,13 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
   topicEntry.last_streak_date = today;
 
   if (flagged_as_guess) {
-    if (!data.guess_review_bank.includes(question_id)) {
-      data.guess_review_bank.push(question_id);
+    const existing = data.guess_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
+    if (!existing) {
+      const locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+      data.guess_review_bank.push({ question_id, locked_until });
     }
   } else if (correct && !flagged_as_guess) {
-    data.guess_review_bank = data.guess_review_bank.filter(id => id !== question_id);
+    data.guess_review_bank = data.guess_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
 
   await saveToDB(data);
@@ -462,5 +475,26 @@ export async function getMCQStats(topic) {
 
 export async function getGuessReviewBank() {
   const data = await loadFromDB();
-  return data.guess_review_bank || [];
+  // Normalise legacy string entries to objects
+  return (data.guess_review_bank || []).map(e =>
+    typeof e === "string" ? { question_id: e, locked_until: null } : e
+  );
+}
+
+export async function resetGuessReviewBankLock(question_id) {
+  const data = await loadFromDB();
+  const entry = data.guess_review_bank.find(e =>
+    (typeof e === "string" ? e : e.question_id) === question_id
+  );
+  if (entry && typeof entry === "object") {
+    entry.locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+    await saveToDB(data);
+  } else if (typeof entry === "string") {
+    const idx = data.guess_review_bank.indexOf(entry);
+    data.guess_review_bank[idx] = {
+      question_id,
+      locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+    };
+    await saveToDB(data);
+  }
 }

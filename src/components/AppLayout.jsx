@@ -11,6 +11,8 @@ const NO_NAV_PATTERNS = [
   /^\/feedback$/,
   /^\/reflection$/,
   /^\/review$/,
+  /^\/review-bank$/,
+  /^\/guess-review-bank$/,
   /^\/review-affirmation$/,
   /^\/mcq$/,
   /^\/mcq-feedback$/,

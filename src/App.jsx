@@ -16,6 +16,8 @@ import FamiliarityCheck from './pages/FamiliarityCheck';
 import QuestionAttempt from './pages/QuestionAttempt';
 import Feedback from './pages/Feedback';
 import ReviewSession from './pages/ReviewSession';
+import ReviewBankScreen from './pages/ReviewBankScreen';
+import GuessReviewBankScreen from './pages/GuessReviewBankScreen';
 import NuclearQuestionAttempt from './pages/nuclear/QuestionAttempt';
 import NuclearSimilarQuestion from './pages/nuclear/SimilarQuestion';
 import NuclearFamiliarityCheck from './pages/nuclear/FamiliarityCheck';
@@ -117,6 +119,8 @@ const AuthenticatedApp = () => {
         <Route path="/similar-question" element={<SimilarQuestion />} />
         <Route path="/familiarity-check" element={<FamiliarityCheck />} />
         <Route path="/review" element={<ReviewSession />} />
+        <Route path="/review-bank" element={<ReviewBankScreen />} />
+        <Route path="/guess-review-bank" element={<GuessReviewBankScreen />} />
         <Route path="/nuclear/question" element={<NuclearQuestionAttempt />} />
         <Route path="/nuclear/similar-question" element={<NuclearSimilarQuestion />} />
         <Route path="/nuclear/familiarity-check" element={<NuclearFamiliarityCheck />} />

@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Flame } from "lucide-react";
 import AnswerInput from "../components/AnswerInput";
 import SubmitButton from "../components/SubmitButton";
-import { getReviewBank, recordAttempt, removeFromReviewBank, incrementReviewBankClears } from "../lib/topicStore";
+import { getReviewBank, recordAttempt, removeFromReviewBank, incrementReviewBankClears, resetReviewBankLock } from "../lib/topicStore";
 
 export default function ReviewSession() {
   const navigate = useNavigate();
@@ -97,6 +97,8 @@ Analyse the student's answer against the mark scheme. Respond in the following J
         }
       });
     } else {
+      // Reset the lock for another 24-hour wait
+      await resetReviewBankLock(current.question_id);
       navigate("/feedback", {
         state: {
           feedback: result,

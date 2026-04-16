@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
-import { saveMCQAttempt, getGuessReviewBank } from "@/lib/topicStore";
+import { saveMCQAttempt, getGuessReviewBank, resetGuessReviewBankLock } from "@/lib/topicStore";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
@@ -76,12 +76,11 @@ export default function MCQFeedback() {
 
   async function handleNext() {
     if (guessReviewMode) {
-      const updatedBank = await getGuessReviewBank();
-      if (updatedBank.length === 0) {
-        navigate("/physics");
-      } else {
-        navigate("/mcq", { state: { topic: null, guessReviewMode: true, guessReviewBank: updatedBank, sessionIndex: nextSessionIndex ?? 1 } });
+      // If student guessed again or got it wrong — reset the 12-hour lock
+      if (flagged_as_guess || !correct) {
+        await resetGuessReviewBankLock(attemptData.question_id);
       }
+      navigate("/guess-review-bank");
     } else {
       navigate("/mcq", { state: { topic, sessionIndex: nextSessionIndex ?? 1 } });
     }

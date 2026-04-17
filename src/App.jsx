@@ -48,6 +48,7 @@ import CSLanguageTranslatorsQuestion from './pages/cs/LanguageTranslatorsQuestio
 import CSDataRepresentationQuestion from './pages/cs/DataRepresentationQuestion';
 import CSCompressionQuestion from './pages/cs/CompressionQuestion';
 import CSComputersAndComponentsQuestion from './pages/cs/ComputersAndComponentsQuestion';
+import CSEthicsAndOwnershipQuestion from './pages/cs/EthicsAndOwnershipQuestion';
 import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
@@ -181,6 +182,7 @@ const AuthenticatedApp = () => {
         <Route path="/cs/data-representation/question" element={<CSDataRepresentationQuestion />} />
         <Route path="/cs/compression/question" element={<CSCompressionQuestion />} />
         <Route path="/cs/computers-and-components/question" element={<CSComputersAndComponentsQuestion />} />
+        <Route path="/cs/ethics-and-ownership/question" element={<CSEthicsAndOwnershipQuestion />} />
         <Route path="/cs/feedback" element={<CSFeedback />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />

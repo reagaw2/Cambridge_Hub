@@ -153,7 +153,7 @@ const CHAPTERS = [
   {
     chapter: "Chapter 7 — Ethics and Ownership",
     topics: [
-      { label: "Ethics and Ownership", key: "ethics_and_ownership", active: false },
+      { label: "Ethics and Ownership", key: "ethics_and_ownership", active: true, route: "/cs/ethics-and-ownership/question" },
     ],
   },
   {

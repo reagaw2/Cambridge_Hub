@@ -20,6 +20,7 @@ import ReviewBankScreen from './pages/ReviewBankScreen';
 import GuessReviewBankScreen from './pages/GuessReviewBankScreen';
 import PhysicalQuantitiesQuestionAttempt from './pages/physicalquantities/QuestionAttempt';
 import CircularMotionQuestionAttempt from './pages/circularmotion/QuestionAttempt';
+import MedicalImagingQuestionAttempt from './pages/medicalimaging/QuestionAttempt';
 import WavesQuestionAttempt from './pages/waves/QuestionAttempt';
 import KinematicsQuestionAttempt from './pages/kinematics/QuestionAttempt';
 import ForcesQuestionAttempt from './pages/forces/QuestionAttempt';
@@ -132,6 +133,7 @@ const AuthenticatedApp = () => {
         <Route path="/review-affirmation" element={<ReviewAffirmation />} />
         <Route path="/physicalquantities/question" element={<PhysicalQuantitiesQuestionAttempt />} />
         <Route path="/circularmotion/question" element={<CircularMotionQuestionAttempt />} />
+        <Route path="/medicalimaging/question" element={<MedicalImagingQuestionAttempt />} />
         <Route path="/waves/question" element={<WavesQuestionAttempt />} />
         <Route path="/kinematics/question" element={<KinematicsQuestionAttempt />} />
         <Route path="/forces/question" element={<ForcesQuestionAttempt />} />

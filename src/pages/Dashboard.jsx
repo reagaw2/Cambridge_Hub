@@ -71,7 +71,7 @@ function getGreeting(firstName) {
 }
 
 const WRITTEN_KEYS_FOR_CONFIDENCE = [
-  "physical_quantities_units", "kinematics", "forces_equilibrium", "circular_motion",
+  "physical_quantities_units", "kinematics", "forces_equilibrium", "circular_motion", "medical_imaging",
   "gravitational_fields", "nuclear_physics", "thermal_physics", "oscillations",
   "electric_fields", "capacitance", "waves", "electromagnetic_induction", "quantum_physics", "astrophysics",
 ];
@@ -180,6 +180,7 @@ const WRITTEN_TOPICS = [
   { label: "Electromagnetic Induction", key: "electromagnetic_induction", route: "/eminduction/question" },
   { label: "Quantum Physics", key: "quantum_physics", route: "/quantum/question" },
   { label: "Astrophysics", key: "astrophysics", route: "/astrophysics/question" },
+  { label: "Medical Imaging", key: "medical_imaging", route: "/medicalimaging/question" },
 ];
 
 export default function Dashboard() {

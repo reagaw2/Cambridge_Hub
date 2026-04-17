@@ -42,6 +42,7 @@ const DEFAULT_DATA = () => ({
     electromagnetic_induction: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     quantum_physics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     astrophysics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
+    medical_imaging: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
   },
   review_bank: [],
   review_bank_clears: 0,

@@ -4,15 +4,15 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
-import { getNextAstrophysicsQuestion, advanceAstrophysicsIndex } from "@/lib/astrophysicsBank";
+import { getNextMedicalImagingQuestion, advanceMedicalImagingIndex } from "@/lib/medicalImagingBank";
 
-export default function AstroQuestionAttempt() {
+export default function MedicalImagingQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const { question, idx, total } = getNextAstrophysicsQuestion();
+  const { question, idx, total } = getNextMedicalImagingQuestion();
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -27,7 +27,7 @@ export default function AstroQuestionAttempt() {
     setLoading(false);
     if (!feedback) { setError("Something went wrong. Please try again."); return; }
 
-    advanceAstrophysicsIndex();
+    advanceMedicalImagingIndex();
 
     navigate("/feedback", {
       state: {
@@ -35,8 +35,8 @@ export default function AstroQuestionAttempt() {
         answer,
         topicKey: question.topic_key,
         questionId: question.id,
-        nextFullRoute: "/astrophysics/question",
-        nextRetryRoute: "/astrophysics/question",
+        nextFullRoute: "/medicalimaging/question",
+        nextRetryRoute: "/medicalimaging/question",
         backRoute: "/physics",
         paperRef: question.paper_ref,
       },

@@ -21,6 +21,29 @@ function formatCountdown(ms) {
 // Route map to navigate directly to a specific question
 const QUESTION_ROUTES = {
   "9702-22-W19-Q1a": "/physicalquantities/question",
+  // Quantum Physics (new)
+  "9702-42-W23-Q8a": "/quantum/question",
+  "9702-42-W23-Q8bi": "/quantum/question",
+  "9702-42-W23-Q8bii": "/quantum/question",
+  "9702-42-S23-Q8a": "/quantum/question",
+  "9702-42-M24-Q7ci": "/quantum/question",
+  "9702-43-S23-Q7a": "/quantum/question",
+  "9702-43-S23-Q7bii": "/quantum/question",
+  "9702-43-S23-Q7cii": "/quantum/question",
+  "9702-41-S24-Q8bi": "/quantum/question",
+  "9702-41-W23-Q8c": "/quantum/question",
+  "9702-42-M22-Q8a": "/quantum/question",
+  "9702-42-M22-Q8bi": "/quantum/question",
+  "9702-42-M22-Q8bii": "/quantum/question",
+  "9702-42-M22-Q8biii": "/quantum/question",
+  "9702-42-M23-Q7a": "/quantum/question",
+  "9702-42-W24-Q9a": "/quantum/question",
+  "9702-42-W24-Q9c": "/quantum/question",
+  // Astrophysics (new)
+  "9702-43-W24-Q10a": "/astrophysics/question",
+  "9702-42-S24-Q8ai": "/astrophysics/question",
+  // Medical Imaging
+  "9702-41-S24-Q8d": "/medicalimaging/question",
   // Circular Motion
   "9702-41-S10-Q1a": "/circularmotion/question",
   "9702-43-W10-Q1a-i": "/circularmotion/question",

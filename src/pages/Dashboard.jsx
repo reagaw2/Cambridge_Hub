@@ -71,7 +71,7 @@ function getGreeting(firstName) {
 }
 
 const WRITTEN_KEYS_FOR_CONFIDENCE = [
-  "physical_quantities_units", "kinematics", "forces_equilibrium",
+  "physical_quantities_units", "kinematics", "forces_equilibrium", "circular_motion",
   "gravitational_fields", "nuclear_physics", "thermal_physics", "oscillations",
   "electric_fields", "capacitance", "waves", "electromagnetic_induction", "quantum_physics", "astrophysics",
 ];
@@ -175,6 +175,7 @@ const WRITTEN_TOPICS = [
   { label: "Oscillations", key: "oscillations", route: "/oscillations/question" },
   { label: "Electric Fields", key: "electric_fields", route: "/electric/question" },
   { label: "Capacitance", key: "capacitance", route: "/capacitance/question" },
+  { label: "Circular Motion", key: "circular_motion", route: "/circularmotion/question" },
   { label: "Waves", key: "waves", route: "/waves/question" },
   { label: "Electromagnetic Induction", key: "electromagnetic_induction", route: "/eminduction/question" },
   { label: "Quantum Physics", key: "quantum_physics", route: "/quantum/question" },

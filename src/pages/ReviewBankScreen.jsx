@@ -21,6 +21,17 @@ function formatCountdown(ms) {
 // Route map to navigate directly to a specific question
 const QUESTION_ROUTES = {
   "9702-22-W19-Q1a": "/physicalquantities/question",
+  // Circular Motion
+  "9702-41-S10-Q1a": "/circularmotion/question",
+  "9702-43-W10-Q1a-i": "/circularmotion/question",
+  "9702-43-W10-Q1a-ii": "/circularmotion/question",
+  "9702-41-W14-Q2a-ii": "/circularmotion/question",
+  "9702-43-W21-Q1a": "/circularmotion/question",
+  "9702-42-W21-Q1a": "/circularmotion/question",
+  "9702-42-W21-Q1b-i": "/circularmotion/question",
+  "9702-42-W21-Q1b-ii": "/circularmotion/question",
+  "9702-42-W21-Q1d": "/circularmotion/question",
+  "9702-43-S23-Q2a": "/circularmotion/question",
   "9702-22-ON17-Q4a": "/waves/question",
   // Electric Fields (new)
   "9702-23-S17-Q3a": "/electric/question",

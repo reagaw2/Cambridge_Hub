@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { csGetTopicData, csGetReviewBank, csGetGuessReviewBank, normaliseTopicKey } from "@/lib/csTopicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock } from "lucide-react";
+import { toast } from "sonner";
 
 const CS_BLUE = "border-l-blue-500";
 const CS_BLUE_TEXT = "text-blue-400";
@@ -390,7 +391,9 @@ export default function CSDashboard() {
                 const data = topicData[key];
                 if (!active) {
                   return (
-                    <div key={key} className="bg-card border border-border rounded-xl p-4 opacity-40 cursor-default">
+                    <div key={key}
+                      onClick={() => toast("This topic is coming soon. Focus on the active topics for now.", { duration: 2000, style: { background: "#92400e", color: "#fef3c7", border: "none" } })}
+                      className="bg-card border border-border rounded-xl p-4 opacity-40 cursor-pointer">
                       <div className="flex items-center justify-between">
                         <p className="font-semibold text-muted-foreground text-sm">{label}</p>
                         <Lock className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />

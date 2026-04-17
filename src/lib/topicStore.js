@@ -28,6 +28,7 @@ export function normaliseTopicKey(name) {
 
 const DEFAULT_DATA = () => ({
   topics: {
+    physical_quantities_units: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     kinematics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     forces_equilibrium: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     waves: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },

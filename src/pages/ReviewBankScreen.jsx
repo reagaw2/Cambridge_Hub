@@ -20,7 +20,27 @@ function formatCountdown(ms) {
 
 // Route map to navigate directly to a specific question
 const QUESTION_ROUTES = {
+  "9702-22-W19-Q1a": "/physicalquantities/question",
   "9702-22-ON17-Q4a": "/waves/question",
+  // Electric Fields (new)
+  "9702-23-S17-Q3a": "/electric/question",
+  "9702-23-S17-Q3c": "/electric/question",
+  "9702-23-W19-Q3a-i": "/electric/question",
+  "9702-23-W19-Q3a-ii": "/electric/question",
+  "9702-23-W18-Q6a": "/electric/question",
+  "9702-21-S18-Q7c": "/electric/question",
+  "9702-23-W17-Q5a": "/electric/question",
+  "9702-23-W21-Q4f-ii": "/electric/question",
+  "9702-22-W17-Q5a": "/electric/question",
+  "9702-22-S19-Q6a": "/electric/question",
+  "9702-22-S19-Q6b": "/electric/question",
+  "9702-21-W18-Q5a": "/electric/question",
+  "9702-21-W17-Q6a": "/electric/question",
+  "9702-21-W19-Q6a": "/electric/question",
+  "9702-22-M19-Q4a": "/electric/question",
+  // Nuclear Physics (new)
+  "9702-23-W21-Q4f-iii": "/nuclear/question",
+  "9702-21-W18-Q5c-ii": "/nuclear/question",
   // Kinematics
   "9702-22-ON19-Q2a": "/kinematics/question",
   "9702-23-ON24-Q1a": "/kinematics/question",

@@ -4,15 +4,15 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
-import { getNextNuclearQuestion, advanceNuclearIndex } from "@/lib/nuclearBank";
+import { getNextPhysicalQuantitiesQuestion, advancePhysicalQuantitiesIndex } from "@/lib/physicalQuantitiesBank";
 
-export default function NuclearQuestionAttempt() {
+export default function PhysicalQuantitiesQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const { question, idx, total } = getNextNuclearQuestion();
+  const { question, idx, total } = getNextPhysicalQuantitiesQuestion();
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -27,7 +27,7 @@ export default function NuclearQuestionAttempt() {
     setLoading(false);
     if (!feedback) { setError("Something went wrong. Please try again."); return; }
 
-    advanceNuclearIndex();
+    advancePhysicalQuantitiesIndex();
 
     navigate("/feedback", {
       state: {
@@ -35,8 +35,8 @@ export default function NuclearQuestionAttempt() {
         answer,
         topicKey: question.topic_key,
         questionId: question.id,
-        nextFullRoute: question.nextFullRoute ?? "/nuclear/question",
-        nextRetryRoute: question.nextRetryRoute ?? "/nuclear/question",
+        nextFullRoute: "/physicalquantities/question",
+        nextRetryRoute: "/physicalquantities/question",
         backRoute: "/physics",
         paperRef: question.paper_ref,
       },

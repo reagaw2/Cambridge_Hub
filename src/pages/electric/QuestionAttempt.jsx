@@ -4,75 +4,42 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
-
-const QUESTION = {
-  label: "Question 5(a)",
-  topic: "Electric Fields",
-  text: "Explain why the electric potential near an isolated proton is positive.",
-  marks: "[3 marks]",
-};
-const PAPER_REF = "9702/44 · Oct/Nov 2025";
-const TOPIC_KEY = "electric_fields";
-const QUESTION_ID = "w25_44_Q5a";
+import { getNextElectricQuestion, advanceElectricIndex } from "@/lib/electricBank";
 
 export default function ElectricQuestionAttempt() {
+  const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
-  useState(() => {
-    sessionStorage.setItem("full_marks_count", "0");
-    sessionStorage.setItem("consecutive_full_marks", "0");
-    sessionStorage.setItem("previous_score", "-1");
-  });
+  const { question, idx, total } = getNextElectricQuestion();
 
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+
     const feedback = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are a Cambridge A Level Physics examiner. A student has answered the following question:
-Question: Explain why the electric potential near an isolated proton is positive.
-Mark scheme:
-- B1 mark 1: potential is defined as zero at infinity
-- B1 mark 2: proton has a positive charge and so repels another positive charge
-- B1 mark 3: work is done on two positive charges to move them towards each other, or work is done by two positive charges as they move apart from each other
-Student's answer: ${answer}
-Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
-{
-  "marks_earned": [number out of 3],
-  "mark_1": { "earned": true or false, "keyword": "potential defined as zero at infinity", "found": true or false, "feedback": "one sentence explanation" },
-  "mark_2": { "earned": true or false, "keyword": "proton has positive charge and repels another positive charge", "found": true or false, "feedback": "one sentence explanation" },
-  "mark_3": { "earned": true or false, "keyword": "work done moving positive charges together", "found": true or false, "feedback": "one sentence explanation" },
-  "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone",
-  "next_step": "one sentence telling the student exactly what to focus on in their next attempt"
-}`,
+      prompt: question.prompt(answer),
       model: "claude_sonnet_4_6",
-      response_json_schema: {
-        type: "object",
-        properties: {
-          marks_earned: { type: "number" },
-          mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
-          mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
-          mark_3: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
-          cambridge_insight: { type: "string" },
-          next_step: { type: "string" }
-        }
-      }
+      response_json_schema: question.response_schema,
     }).catch(() => null);
+
     setLoading(false);
     if (!feedback) { setError("Something went wrong. Please try again."); return; }
+
+    advanceElectricIndex();
+
     navigate("/feedback", {
       state: {
         feedback: feedback.response ?? feedback,
         answer,
-        topicKey: TOPIC_KEY,
-        questionId: QUESTION_ID,
-        nextFullRoute: "/physics",
+        topicKey: question.topic_key,
+        questionId: question.id,
+        nextFullRoute: "/electric/question",
         nextRetryRoute: "/electric/question",
         backRoute: "/physics",
-        paperRef: PAPER_REF,
-      }
+        paperRef: question.paper_ref,
+      },
     });
   };
 
@@ -80,19 +47,34 @@ Analyse the student's answer against the mark scheme. Respond in the following J
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate("/")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{PAPER_REF}</span>
+          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
+            {question.paper_ref}
+          </span>
         </div>
+
         <div className="flex-1 flex flex-col gap-4 p-4">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">{QUESTION.label}</span>
-            <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">{QUESTION.topic}</span>
-            <p className="text-[15px] leading-relaxed text-foreground/90">{QUESTION.text}</p>
-            <div className="flex justify-end"><span className="font-mono text-xs text-muted-foreground">{QUESTION.marks}</span></div>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                {question.label}
+              </span>
+              <span className="font-mono text-[11px] text-muted-foreground">Q{idx + 1} of {total}</span>
+            </div>
+            <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+              {question.topic}
+            </span>
+            <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
+            <div className="flex justify-end">
+              <span className="font-mono text-xs text-muted-foreground">
+                [{question.total_marks} mark{question.total_marks !== 1 ? "s" : ""}]
+              </span>
+            </div>
           </div>
+
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
           {error && <p className="text-center text-sm text-red-400/80">{error}</p>}

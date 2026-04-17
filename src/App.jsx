@@ -18,6 +18,7 @@ import Feedback from './pages/Feedback';
 import ReviewSession from './pages/ReviewSession';
 import ReviewBankScreen from './pages/ReviewBankScreen';
 import GuessReviewBankScreen from './pages/GuessReviewBankScreen';
+import PhysicalQuantitiesQuestionAttempt from './pages/physicalquantities/QuestionAttempt';
 import WavesQuestionAttempt from './pages/waves/QuestionAttempt';
 import KinematicsQuestionAttempt from './pages/kinematics/QuestionAttempt';
 import ForcesQuestionAttempt from './pages/forces/QuestionAttempt';
@@ -128,6 +129,7 @@ const AuthenticatedApp = () => {
         <Route path="/nuclear/similar-question" element={<NuclearSimilarQuestion />} />
         <Route path="/nuclear/familiarity-check" element={<NuclearFamiliarityCheck />} />
         <Route path="/review-affirmation" element={<ReviewAffirmation />} />
+        <Route path="/physicalquantities/question" element={<PhysicalQuantitiesQuestionAttempt />} />
         <Route path="/waves/question" element={<WavesQuestionAttempt />} />
         <Route path="/kinematics/question" element={<KinematicsQuestionAttempt />} />
         <Route path="/forces/question" element={<ForcesQuestionAttempt />} />

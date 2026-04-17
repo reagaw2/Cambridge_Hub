@@ -21,6 +21,21 @@ function formatCountdown(ms) {
 // Route map to navigate directly to a specific question
 const QUESTION_ROUTES = {
   "9702-22-W19-Q1a": "/physicalquantities/question",
+  // Thermal Physics (new)
+  "9702-41-W19-Q2a": "/thermal/question",
+  "9702-42-W19-Q2aii": "/thermal/question",
+  "9702-43-S21-Q2b": "/thermal/question",
+  "9702-41-S24-Q3ai": "/thermal/question",
+  "9702-41-S24-Q3aii": "/thermal/question",
+  "9702-43-W24-Q3ai": "/thermal/question",
+  "9702-43-W24-Q3aii": "/thermal/question",
+  "9702-42-W21-Q3ai": "/thermal/question",
+  "9702-42-W21-Q3aii": "/thermal/question",
+  "9702-43-S23-Q4a": "/thermal/question",
+  "9702-43-W23-Q3ai": "/thermal/question",
+  "9702-43-W23-Q3d": "/thermal/question",
+  "9702-42-W22-Q3a": "/thermal/question",
+  "9702-42-M23-Q2bii": "/thermal/question",
   // Quantum Physics (new)
   "9702-42-W23-Q8a": "/quantum/question",
   "9702-42-W23-Q8bi": "/quantum/question",

@@ -392,7 +392,7 @@ export default function CSDashboard() {
                 if (!active) {
                   return (
                     <div key={key}
-                      onClick={() => toast("This topic is coming soon. Focus on the active topics for now.", { duration: 2000, style: { background: "#92400e", color: "#fef3c7", border: "none" } })}
+                      onClick={() => toast("This topic is coming soon. Focus on the active topics for now.", { duration: 2000, position: "bottom-center", style: { background: "#92400e", color: "#fef3c7", border: "none" } })}
                       className="bg-card border border-border rounded-xl p-4 opacity-40 cursor-pointer">
                       <div className="flex items-center justify-between">
                         <p className="font-semibold text-muted-foreground text-sm">{label}</p>

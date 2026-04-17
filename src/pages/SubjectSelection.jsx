@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, getMCQOnlyTopicNames } from "@/lib/topicStore";
-import { Atom, Lock } from "lucide-react";
+import { csGetTopicData } from "@/lib/csTopicStore";
+import { Atom, Lock, Code2 } from "lucide-react";
 import { toast } from "sonner";
 
 function getGreeting(name) {
@@ -31,6 +32,16 @@ export default function SubjectSelection() {
   const { displayName, avatarLetter } = useDisplayName();
   const [physicsScore, setPhysicsScore] = useState(null);
   const [physicsLoaded, setPhysicsLoaded] = useState(false);
+  const [csScore, setCsScore] = useState(null);
+  const [csLoaded, setCsLoaded] = useState(false);
+
+  const CS_ACTIVE_KEYS = ["data_representation", "compression", "computers_and_components", "operating_systems", "language_translators"];
+
+  const trendToScore = (trend) => {
+    if (trend === "improving") return 85;
+    if (trend === "steady") return 60;
+    return 30;
+  };
 
   useEffect(() => {
     async function calcPhysicsScore() {
@@ -39,17 +50,20 @@ export default function SubjectSelection() {
       const results = await Promise.all(allKeys.map(k => getTopicData(k)));
       const attempted = results.filter(Boolean);
       if (attempted.length === 0) { setPhysicsLoaded(true); return; }
-
-      const trendToScore = (trend) => {
-        if (trend === "improving") return 85;
-        if (trend === "steady") return 60;
-        return 30;
-      };
       const avg = Math.round(attempted.reduce((sum, d) => sum + trendToScore(d.trend), 0) / attempted.length);
       setPhysicsScore(avg);
       setPhysicsLoaded(true);
     }
+    async function calcCSScore() {
+      const results = await Promise.all(CS_ACTIVE_KEYS.map(k => csGetTopicData(k)));
+      const attempted = results.filter(Boolean);
+      if (attempted.length === 0) { setCsLoaded(true); return; }
+      const avg = Math.round(attempted.reduce((sum, d) => sum + trendToScore(d.trend), 0) / attempted.length);
+      setCsScore(avg);
+      setCsLoaded(true);
+    }
     calcPhysicsScore();
+    calcCSScore();
   }, [user?.email]);
 
   function handleLocked() {
@@ -120,27 +134,28 @@ export default function SubjectSelection() {
               <p className="text-[11px] text-amber-500/70 mt-3 font-medium">Coming soon</p>
             </button>
 
-            {/* Computer Science — locked */}
+            {/* Computer Science — active */}
             <button
-              onClick={handleLocked}
-              className="relative flex flex-col justify-between rounded-xl border border-border bg-card p-4 text-left opacity-50 cursor-default"
+              onClick={() => navigate("/cs")}
+              className="relative flex flex-col justify-between rounded-xl border border-border border-l-4 border-l-blue-500 bg-card p-4 text-left hover:brightness-110 active:scale-[0.98] transition-all"
               style={{ minHeight: 140 }}
             >
-              <div className="absolute top-2 right-2">
-                <Lock className="w-3.5 h-3.5 text-muted-foreground/60" />
-              </div>
               <div className="space-y-1">
-                <span className="text-2xl mb-2 block">{`</>`}</span>
-                <p className="font-bold text-muted-foreground text-sm">Computer Science</p>
-                <p className="text-[11px] text-muted-foreground/60">9618 · A Level</p>
+                <Code2 className="w-6 h-6 text-blue-400 mb-2" />
+                <p className="font-bold text-foreground text-sm">Computer Science</p>
+                <p className="text-[11px] text-muted-foreground">9618 · A Level</p>
               </div>
-              <p className="text-[11px] text-amber-500/70 mt-3 font-medium">Coming soon</p>
+              <div className="mt-3">
+                {csLoaded ? <ConfidenceScore score={csScore} /> : (
+                  <span className="text-xs text-muted-foreground/40">Loading...</span>
+                )}
+              </div>
             </button>
 
           </div>
 
           <p className="text-[11px] text-muted-foreground/40 text-center leading-relaxed">
-            More subjects coming soon — Mathematics, Computer Science, Chemistry, Biology.
+            More subjects coming soon — Mathematics, Chemistry, Biology.
           </p>
 
         </div>

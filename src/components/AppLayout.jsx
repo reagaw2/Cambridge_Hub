@@ -17,6 +17,7 @@ const NO_NAV_PATTERNS = [
   /^\/mcq$/,
   /^\/mcq-feedback$/,
   /\/q\d/,
+  /^\/cs/,
 ];
 
 function shouldHideNav(pathname) {

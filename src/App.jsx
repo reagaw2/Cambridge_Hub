@@ -41,6 +41,12 @@ import QuantumQuestionAttempt from './pages/quantum/QuestionAttempt';
 import AstroQuestionAttempt from './pages/astrophysics/QuestionAttempt';
 import AstroSimilarQuestion from './pages/astrophysics/SimilarQuestion';
 import AstroFamiliarityCheck from './pages/astrophysics/FamiliarityCheck';
+import CSDashboard from './pages/cs/Dashboard';
+import CSOperatingSystemsQuestion from './pages/cs/OperatingSystemsQuestion';
+import CSLanguageTranslatorsQuestion from './pages/cs/LanguageTranslatorsQuestion';
+import CSDataRepresentationQuestion from './pages/cs/DataRepresentationQuestion';
+import CSCompressionQuestion from './pages/cs/CompressionQuestion';
+import CSComputersAndComponentsQuestion from './pages/cs/ComputersAndComponentsQuestion';
 import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
@@ -168,6 +174,12 @@ const AuthenticatedApp = () => {
         <Route path="/astrophysics/q11a" element={<AstroQuestion11a />} />
         <Route path="/nuclear/q9a" element={<NuclearQuestion9a />} />
         <Route path="/nuclear/q9cii" element={<NuclearQuestion9cii />} />
+        <Route path="/cs" element={<CSDashboard />} />
+        <Route path="/cs/operating-systems/question" element={<CSOperatingSystemsQuestion />} />
+        <Route path="/cs/language-translators/question" element={<CSLanguageTranslatorsQuestion />} />
+        <Route path="/cs/data-representation/question" element={<CSDataRepresentationQuestion />} />
+        <Route path="/cs/compression/question" element={<CSCompressionQuestion />} />
+        <Route path="/cs/computers-and-components/question" element={<CSComputersAndComponentsQuestion />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>

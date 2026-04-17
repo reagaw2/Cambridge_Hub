@@ -72,6 +72,7 @@ function getGreeting(firstName) {
 }
 
 const WRITTEN_KEYS_FOR_CONFIDENCE = [
+  "kinematics", "forces_equilibrium",
   "gravitational_fields", "nuclear_physics", "thermal_physics", "oscillations",
   "electric_fields", "capacitance", "electromagnetic_induction", "quantum_physics", "astrophysics",
 ];
@@ -166,6 +167,8 @@ function usePullToRefresh(onRefresh) {
 }
 
 const WRITTEN_TOPICS = [
+  { label: "Kinematics", key: "kinematics", route: "/kinematics/question" },
+  { label: "Forces & Equilibrium", key: "forces_equilibrium", route: "/forces/question" },
   { label: "Gravitational Fields", key: "gravitational_fields", route: "/gravitational/question" },
   { label: "Nuclear Physics", key: "nuclear_physics", route: "/nuclear/question" },
   { label: "Thermal Physics", key: "thermal_physics", route: "/thermal/question" },

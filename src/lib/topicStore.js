@@ -30,6 +30,7 @@ const DEFAULT_DATA = () => ({
   topics: {
     kinematics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     forces_equilibrium: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
+    waves: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     gravitational_fields: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     nuclear_physics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     thermal_physics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },

@@ -47,6 +47,8 @@ function detectSituation(feedback, isQ3, maxMarks) {
 
 // Question metadata map — used to add questions to the review bank
 const QUESTION_META = {
+  // ── Waves ──────────────────────────────────────────────────────────────
+  "9702-22-ON17-Q4a": { question_id: "9702-22-ON17-Q4a", topic: "Waves", question_text: "State the conditions required for the formation of a stationary wave.", mark_scheme: "B1: two waves travelling at the same speed in opposite directions overlap. B1: the waves are the same type and have the same frequency or wavelength.", total_marks: 2 },
   // ── Kinematics ─────────────────────────────────────────────────────────
   "9702-22-ON19-Q2a": { question_id: "9702-22-ON19-Q2a", topic: "Kinematics", question_text: "Define acceleration.", mark_scheme: "B1: change in velocity divided by time taken.", total_marks: 1 },
   "9702-23-ON24-Q1a": { question_id: "9702-23-ON24-Q1a", topic: "Kinematics", question_text: "Define acceleration.", mark_scheme: "B1: rate of change of velocity.", total_marks: 1 },

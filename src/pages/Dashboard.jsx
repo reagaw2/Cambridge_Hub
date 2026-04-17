@@ -53,7 +53,6 @@ const MCQ_ONLY_TOPICS = [
   "Forces, Torques & Equilibrium",
   "Work, Energy & Power",
   "Deformation of Solids",
-  "Waves",
   "Electricity",
   "Nuclear Physics & Particle Physics",
 ];
@@ -74,7 +73,7 @@ function getGreeting(firstName) {
 const WRITTEN_KEYS_FOR_CONFIDENCE = [
   "kinematics", "forces_equilibrium",
   "gravitational_fields", "nuclear_physics", "thermal_physics", "oscillations",
-  "electric_fields", "capacitance", "electromagnetic_induction", "quantum_physics", "astrophysics",
+  "electric_fields", "capacitance", "waves", "electromagnetic_induction", "quantum_physics", "astrophysics",
 ];
 
 function trendToScore(trend) {
@@ -175,6 +174,7 @@ const WRITTEN_TOPICS = [
   { label: "Oscillations", key: "oscillations", route: "/oscillations/question" },
   { label: "Electric Fields", key: "electric_fields", route: "/electric/question" },
   { label: "Capacitance", key: "capacitance", route: "/capacitance/question" },
+  { label: "Waves", key: "waves", route: "/waves/question" },
   { label: "Electromagnetic Induction", key: "electromagnetic_induction", route: "/eminduction/question" },
   { label: "Quantum Physics", key: "quantum_physics", route: "/quantum/question" },
   { label: "Astrophysics", key: "astrophysics", route: "/astrophysics/question" },

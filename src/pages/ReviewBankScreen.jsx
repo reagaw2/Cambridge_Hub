@@ -20,6 +20,7 @@ function formatCountdown(ms) {
 
 // Route map to navigate directly to a specific question
 const QUESTION_ROUTES = {
+  "9702-22-ON17-Q4a": "/waves/question",
   // Kinematics
   "9702-22-ON19-Q2a": "/kinematics/question",
   "9702-23-ON24-Q1a": "/kinematics/question",

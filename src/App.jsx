@@ -54,6 +54,7 @@ import CSDataSecurityQuestion from './pages/cs/DataSecurityQuestion';
 import CSDataIntegrityQuestion from './pages/cs/DataIntegrityQuestion';
 import CSReviewBank from './pages/cs/CSReviewBank';
 import CSReviewSession from './pages/cs/CSReviewSession';
+import CSEndOfBank from './pages/cs/CSEndOfBank';
 import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
@@ -193,6 +194,7 @@ const AuthenticatedApp = () => {
         <Route path="/cs/data-integrity/question" element={<CSDataIntegrityQuestion />} />
         <Route path="/cs/review-bank" element={<CSReviewBank />} />
         <Route path="/cs/review-session" element={<CSReviewSession />} />
+        <Route path="/cs/end-of-bank" element={<CSEndOfBank />} />
         <Route path="/cs/feedback" element={<CSFeedback />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />

@@ -23,11 +23,25 @@ const TOPIC_ROUTES = {
   data_integrity: "/cs/data-integrity/question",
 };
 
-export default function CSQuestionAttempt({ question, idx, total, onAdvance }) {
+export default function CSQuestionAttempt({ question, idx, total, onAdvance, topicLabel }) {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Guard: if question bank is empty or question is undefined, show a graceful fallback
+  if (!question) {
+    return (
+      <div className="min-h-screen bg-background flex justify-center">
+        <div className="w-full max-w-[480px] flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <p className="text-lg font-semibold text-foreground">No questions available right now.</p>
+          <button onClick={() => navigate("/cs")} className="text-sm text-blue-400">Back to CS dashboard</button>
+        </div>
+      </div>
+    );
+  }
+
+  const topicRoute = TOPIC_ROUTES[question.topic_key] ?? "/cs";
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -60,6 +74,9 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance }) {
       });
     }
 
+    const nextIdx = idx + 1;
+    const isLastQuestion = nextIdx >= total;
+
     onAdvance();
 
     navigate("/cs/feedback", {
@@ -69,9 +86,13 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance }) {
         topicKey: question.topic_key,
         questionId: question.id,
         totalMarks: question.total_marks,
-        backRoute: TOPIC_ROUTES[question.topic_key] ?? "/cs",
+        // topicRoute: where "Next question" goes (same topic). If last Q, go to end-of-bank.
+        topicRoute: isLastQuestion ? null : topicRoute,
+        backRoute: topicRoute,
         dashRoute: "/cs",
         paperRef: question.paper_ref,
+        topicLabel: topicLabel ?? question.topic,
+        isLastQuestion,
       },
     });
   };

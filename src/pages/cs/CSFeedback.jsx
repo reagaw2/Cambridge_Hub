@@ -26,7 +26,7 @@ function RingProgress({ value, max }) {
 export default function CSFeedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback, totalMarks, backRoute, dashRoute, paperRef } = state || {};
+  const { feedback, totalMarks, backRoute, dashRoute, paperRef, isReview, topicRoute, topicLabel, attempted, correct, isLastQuestion } = state || {};
 
   if (!feedback) { navigate("/cs"); return null; }
 
@@ -35,9 +35,25 @@ export default function CSFeedback() {
   const fullMarks = marksEarned >= maxMarks;
   const marks = [feedback.mark_1, feedback.mark_2, feedback.mark_3, feedback.mark_4, feedback.mark_5, feedback.mark_6].filter(Boolean);
 
-  function handleNext() {
-    navigate(backRoute ?? "/cs");
+  // For review mode: full marks → back to review bank; wrong → try again (same review question)
+  // For normal mode: full marks → next question (topicRoute). If last question → end-of-bank. Wrong → retry same topic.
+  function handlePrimary() {
+    if (isReview) {
+      navigate(fullMarks ? "/cs/review-bank" : backRoute ?? "/cs/review-session");
+    } else {
+      if (fullMarks && isLastQuestion) {
+        navigate("/cs/end-of-bank", { state: { topicLabel, topicRoute: backRoute } });
+      } else if (fullMarks && topicRoute) {
+        navigate(topicRoute);
+      } else {
+        navigate(backRoute ?? "/cs");
+      }
+    }
   }
+
+  const primaryLabel = isReview
+    ? (fullMarks ? "Back to review bank →" : "Try again")
+    : (fullMarks ? "Next question →" : "Try again");
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -93,11 +109,23 @@ export default function CSFeedback() {
           </div>
 
           <button
-            onClick={handleNext}
+            onClick={handlePrimary}
             className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
           >
-            {fullMarks ? "Next question →" : "Try Again"}
+            {primaryLabel}
           </button>
+
+          {/* Secondary nav links */}
+          <div className="flex items-center justify-center gap-6">
+            {isReview && (
+              <button onClick={() => navigate("/cs/review-bank")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Review bank
+              </button>
+            )}
+            <button onClick={() => navigate("/cs")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              CS dashboard
+            </button>
+          </div>
 
         </div>
       </div>

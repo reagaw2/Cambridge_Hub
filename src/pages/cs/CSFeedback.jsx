@@ -33,7 +33,7 @@ export default function CSFeedback() {
   const marksEarned = feedback.marks_earned ?? 0;
   const maxMarks = totalMarks ?? 1;
   const fullMarks = marksEarned >= maxMarks;
-  const marks = [feedback.mark_1, feedback.mark_2, feedback.mark_3, feedback.mark_4].filter(Boolean);
+  const marks = [feedback.mark_1, feedback.mark_2, feedback.mark_3, feedback.mark_4, feedback.mark_5, feedback.mark_6].filter(Boolean);
 
   function handleNext() {
     navigate(backRoute ?? "/cs");

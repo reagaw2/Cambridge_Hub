@@ -10,7 +10,18 @@ import AnswerInput from "@/components/AnswerInput";
 import SubmitButton from "@/components/SubmitButton";
 import { csRecordAttempt, csAddToReviewBank } from "@/lib/csTopicStore";
 
-const CS_QUESTION_META = {};
+// Maps topic_key → the registered route path
+const TOPIC_ROUTES = {
+  operating_systems: "/cs/operating-systems/question",
+  language_translators: "/cs/language-translators/question",
+  data_representation: "/cs/data-representation/question",
+  compression: "/cs/compression/question",
+  computers_and_components: "/cs/computers-and-components/question",
+  ethics_and_ownership: "/cs/ethics-and-ownership/question",
+  networks_and_the_internet: "/cs/networks/question",
+  data_security: "/cs/data-security/question",
+  data_integrity: "/cs/data-integrity/question",
+};
 
 export default function CSQuestionAttempt({ question, idx, total, onAdvance }) {
   const navigate = useNavigate();
@@ -58,7 +69,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance }) {
         topicKey: question.topic_key,
         questionId: question.id,
         totalMarks: question.total_marks,
-        backRoute: `/cs/${question.topic_key.replace(/_/g, "-")}/question`,
+        backRoute: TOPIC_ROUTES[question.topic_key] ?? "/cs",
         dashRoute: "/cs",
         paperRef: question.paper_ref,
       },

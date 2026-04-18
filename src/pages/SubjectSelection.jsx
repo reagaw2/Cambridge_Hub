@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
@@ -26,22 +26,27 @@ function ConfidenceScore({ score }) {
   return <span className={`text-sm font-bold ${color}`}>{score}%</span>;
 }
 
+const CS_ACTIVE_KEYS = [
+  "data_representation", "compression", "computers_and_components",
+  "operating_systems", "language_translators", "ethics_and_ownership",
+  "networks_and_the_internet", "data_security", "data_integrity",
+];
+
+const trendToScore = (trend) => {
+  if (trend === "improving") return 85;
+  if (trend === "steady") return 60;
+  return 30;
+};
+
 export default function SubjectSelection() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { displayName, avatarLetter } = useDisplayName();
   const [physicsScore, setPhysicsScore] = useState(null);
   const [physicsLoaded, setPhysicsLoaded] = useState(false);
   const [csScore, setCsScore] = useState(null);
   const [csLoaded, setCsLoaded] = useState(false);
-
-  const CS_ACTIVE_KEYS = ["data_representation", "compression", "computers_and_components", "operating_systems", "language_translators"];
-
-  const trendToScore = (trend) => {
-    if (trend === "improving") return 85;
-    if (trend === "steady") return 60;
-    return 30;
-  };
 
   useEffect(() => {
     async function calcPhysicsScore() {
@@ -55,16 +60,17 @@ export default function SubjectSelection() {
       setPhysicsLoaded(true);
     }
     async function calcCSScore() {
+      setCsLoaded(false);
       const results = await Promise.all(CS_ACTIVE_KEYS.map(k => csGetTopicData(k)));
       const attempted = results.filter(Boolean);
-      if (attempted.length === 0) { setCsLoaded(true); return; }
+      if (attempted.length === 0) { setCsLoaded(true); setCsScore(null); return; }
       const avg = Math.round(attempted.reduce((sum, d) => sum + trendToScore(d.trend), 0) / attempted.length);
       setCsScore(avg);
       setCsLoaded(true);
     }
     calcPhysicsScore();
     calcCSScore();
-  }, [user?.email]);
+  }, [user?.email, location.key]);
 
   function handleLocked() {
     toast("Coming soon. Focus on Physics for now.", { duration: 2500 });

@@ -52,6 +52,8 @@ import CSEthicsAndOwnershipQuestion from './pages/cs/EthicsAndOwnershipQuestion'
 import CSNetworksQuestion from './pages/cs/NetworksQuestion';
 import CSDataSecurityQuestion from './pages/cs/DataSecurityQuestion';
 import CSDataIntegrityQuestion from './pages/cs/DataIntegrityQuestion';
+import CSReviewBank from './pages/cs/CSReviewBank';
+import CSReviewSession from './pages/cs/CSReviewSession';
 import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
@@ -189,6 +191,8 @@ const AuthenticatedApp = () => {
         <Route path="/cs/networks/question" element={<CSNetworksQuestion />} />
         <Route path="/cs/data-security/question" element={<CSDataSecurityQuestion />} />
         <Route path="/cs/data-integrity/question" element={<CSDataIntegrityQuestion />} />
+        <Route path="/cs/review-bank" element={<CSReviewBank />} />
+        <Route path="/cs/review-session" element={<CSReviewSession />} />
         <Route path="/cs/feedback" element={<CSFeedback />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />

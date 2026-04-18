@@ -146,8 +146,8 @@ const CHAPTERS = [
   {
     chapter: "Chapter 6 — Security, Privacy and Data Integrity",
     topics: [
-      { label: "Data Security", key: "data_security", active: false },
-      { label: "Data Integrity", key: "data_integrity", active: false },
+      { label: "Data Security", key: "data_security", active: true, route: "/cs/data-security/question" },
+      { label: "Data Integrity", key: "data_integrity", active: true, route: "/cs/data-integrity/question" },
     ],
   },
   {

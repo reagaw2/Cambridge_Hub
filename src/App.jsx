@@ -50,6 +50,8 @@ import CSCompressionQuestion from './pages/cs/CompressionQuestion';
 import CSComputersAndComponentsQuestion from './pages/cs/ComputersAndComponentsQuestion';
 import CSEthicsAndOwnershipQuestion from './pages/cs/EthicsAndOwnershipQuestion';
 import CSNetworksQuestion from './pages/cs/NetworksQuestion';
+import CSDataSecurityQuestion from './pages/cs/DataSecurityQuestion';
+import CSDataIntegrityQuestion from './pages/cs/DataIntegrityQuestion';
 import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
@@ -185,6 +187,8 @@ const AuthenticatedApp = () => {
         <Route path="/cs/computers-and-components/question" element={<CSComputersAndComponentsQuestion />} />
         <Route path="/cs/ethics-and-ownership/question" element={<CSEthicsAndOwnershipQuestion />} />
         <Route path="/cs/networks/question" element={<CSNetworksQuestion />} />
+        <Route path="/cs/data-security/question" element={<CSDataSecurityQuestion />} />
+        <Route path="/cs/data-integrity/question" element={<CSDataIntegrityQuestion />} />
         <Route path="/cs/feedback" element={<CSFeedback />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />

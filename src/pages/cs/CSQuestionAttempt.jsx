@@ -2,7 +2,7 @@
  * Shared CS question attempt UI.
  * Used by all CS topic question pages.
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
@@ -28,6 +28,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const submittedRef = useRef(false);
 
   // Guard: if question bank is empty or question is undefined, show a graceful fallback
   if (!question) {
@@ -44,6 +45,8 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
   const topicRoute = TOPIC_ROUTES[question.topic_key] ?? "/cs";
 
   const handleSubmit = async () => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -54,7 +57,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     }).catch(() => null);
 
     setLoading(false);
-    if (!feedback) { setError("Something went wrong. Please try again."); return; }
+    if (!feedback) { submittedRef.current = false; setError("Something went wrong. Please try again."); return; }
 
     const fb = feedback.response ?? feedback;
     const marksEarned = fb.marks_earned ?? 0;

@@ -4,16 +4,21 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
-import { getNextEMInductionQuestion, advanceEMInductionIndex } from "@/lib/emInductionBank";
+import { getNextEMInductionQuestion, advanceEMInductionIndex, EM_INDUCTION_QUESTIONS } from "@/lib/emInductionBank";
 import { recordAttempt, addToReviewBank } from "@/lib/topicStore";
+import DevQuestionJumper from "@/components/DevQuestionJumper";
 
 export default function EMInductionQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [overrideQuestion, setOverrideQuestion] = useState(null);
 
-  const { question, idx, total } = getNextEMInductionQuestion();
+  const queued = getNextEMInductionQuestion();
+  const question = overrideQuestion ?? queued.question;
+  const idx = overrideQuestion ? 0 : queued.idx;
+  const total = overrideQuestion ? 1 : queued.total;
 
   if (!question) {
     return (
@@ -97,6 +102,7 @@ export default function EMInductionQuestionAttempt() {
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
           {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+          <DevQuestionJumper allQuestions={EM_INDUCTION_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); }} />
         </div>
       </div>
     </div>

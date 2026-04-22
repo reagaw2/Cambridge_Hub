@@ -4,15 +4,20 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
-import { getNextMedicalImagingQuestion, advanceMedicalImagingIndex } from "@/lib/medicalImagingBank";
+import { getNextMedicalImagingQuestion, advanceMedicalImagingIndex, MEDICAL_IMAGING_QUESTIONS } from "@/lib/medicalImagingBank";
+import DevQuestionJumper from "@/components/DevQuestionJumper";
 
 export default function MedicalImagingQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [overrideQuestion, setOverrideQuestion] = useState(null);
 
-  const { question, idx, total } = getNextMedicalImagingQuestion();
+  const queued = getNextMedicalImagingQuestion();
+  const question = overrideQuestion ?? queued.question;
+  const idx = overrideQuestion ? 0 : queued.idx;
+  const total = overrideQuestion ? 1 : queued.total;
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -78,6 +83,7 @@ export default function MedicalImagingQuestionAttempt() {
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
           {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+          <DevQuestionJumper allQuestions={MEDICAL_IMAGING_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); }} />
         </div>
       </div>
     </div>

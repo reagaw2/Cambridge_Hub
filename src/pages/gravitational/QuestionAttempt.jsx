@@ -4,16 +4,21 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
 import SubmitButton from "../../components/SubmitButton";
-import { getNextGravitationalQuestion, advanceGravitationalIndex } from "@/lib/gravitationalBank";
+import { getNextGravitationalQuestion, advanceGravitationalIndex, GRAVITATIONAL_QUESTIONS } from "@/lib/gravitationalBank";
 import { recordAttempt, addToReviewBank } from "@/lib/topicStore";
+import DevQuestionJumper from "@/components/DevQuestionJumper";
 
 export default function GravitationalQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [overrideQuestion, setOverrideQuestion] = useState(null);
 
-  const { question, idx, total } = getNextGravitationalQuestion();
+  const queued = getNextGravitationalQuestion();
+  const question = overrideQuestion ?? queued.question;
+  const idx = overrideQuestion ? 0 : queued.idx;
+  const total = overrideQuestion ? 1 : queued.total;
 
   if (!question) {
     return (
@@ -97,6 +102,7 @@ export default function GravitationalQuestionAttempt() {
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
           {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+          <DevQuestionJumper allQuestions={GRAVITATIONAL_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); }} />
         </div>
       </div>
     </div>

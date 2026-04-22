@@ -237,6 +237,7 @@ export default function CSDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isLoadingProgress, isLoadingAuth } = useAuth();
+  console.log("[csDashboard] rendering — isLoadingProgress:", isLoadingProgress, "isLoadingAuth:", isLoadingAuth);
   const { avatarLetter } = useDisplayName();
   const [topicData, setTopicData] = useState({});
   const [reviewBank, setReviewBank] = useState([]);
@@ -244,6 +245,7 @@ export default function CSDashboard() {
   const [loading, setLoading] = useState(true);
 
   async function loadDashboardData() {
+    console.log("[csDashboard] loadDashboardData called — isLoadingProgress:", isLoadingProgress);
     setLoading(true);
     const topicResults = await Promise.all(
       ACTIVE_KEYS.map(async (k) => {
@@ -262,10 +264,11 @@ export default function CSDashboard() {
   }
 
   useEffect(() => {
-    if (isLoadingAuth || isLoadingProgress) return; // wait for auth + preloadCSStore to finish
-    loadDashboardData();
+    if (!isLoadingProgress) {
+      loadDashboardData();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email, location.key, isLoadingAuth, isLoadingProgress]);
+  }, [isLoadingProgress]);
 
   const handleRefresh = useCallback(async () => {
     await new Promise(r => setTimeout(r, 300));

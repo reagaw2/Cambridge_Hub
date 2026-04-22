@@ -236,7 +236,7 @@ const ACTIVE_KEYS = CHAPTERS.flatMap(c => c.topics.filter(t => t.active).map(t =
 export default function CSDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isLoadingProgress, isLoadingAuth } = useAuth();
   const { avatarLetter } = useDisplayName();
   const [topicData, setTopicData] = useState({});
   const [reviewBank, setReviewBank] = useState([]);
@@ -259,9 +259,10 @@ export default function CSDashboard() {
   }
 
   useEffect(() => {
+    if (isLoadingAuth || isLoadingProgress) return; // wait for auth + preloadCSStore to finish
     loadDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email, location.key]);
+  }, [user?.email, location.key, isLoadingAuth, isLoadingProgress]);
 
   const handleRefresh = useCallback(async () => {
     await new Promise(r => setTimeout(r, 300));

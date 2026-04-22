@@ -287,6 +287,63 @@ Analyse the student's answer against the mark scheme. Respond in the following J
       },
     },
   },
+  // ── 9702/41/O/N/25 questions ───────────────────────────────────────────
+  {
+    id: "Q_9702_41_N25_001",
+    label: "Question 1(a)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Circular Motion",
+    topic_key: "circular_motion",
+    difficulty: "medium",
+    text: "In terms of velocity and acceleration, describe uniform circular motion of an object.",
+    total_marks: 2,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: In terms of velocity and acceleration, describe uniform circular motion of an object.
+Mark scheme:
+- B1 mark 1: velocity and acceleration both have constant magnitude
+- B1 mark 2: velocity is always perpendicular to acceleration
+Examiner insight: Most candidates knew velocity and acceleration were perpendicular. Far fewer noted that the magnitude of both remains constant — this second point was frequently missed.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "velocity and acceleration both have constant magnitude", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "velocity is always perpendicular to acceleration", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: {
+      type: "object",
+      properties: {
+        marks_earned: { type: "number" },
+        mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
+        mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+      },
+    },
+  },
+  {
+    id: "Q_9702_41_N25_002",
+    label: "Question 1(c)(iv)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Circular Motion",
+    topic_key: "circular_motion",
+    difficulty: "hard",
+    text: "Explain, with reference to the equation x = R sin ωt, why the motion of the shadow of the ball on the screen may be modelled as simple harmonic.",
+    total_marks: 1,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: Explain, with reference to the equation x = R sin ωt, why the motion of the shadow of the ball on the screen may be modelled as simple harmonic.
+Mark scheme:
+- B1 mark 1: the equation is of the form x = x₀ sin ωt, which is the defining equation for simple harmonic motion
+Examiner insight: Many candidates ignored the instruction to reference the given equation and instead wrote general statements about acceleration being proportional and opposite to displacement. Always address the specific equation provided.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 1], "mark_1": { "earned": true or false, "keyword": "equation is of form x = x₀ sin ωt which is the defining equation for SHM", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: {
+      type: "object",
+      properties: {
+        marks_earned: { type: "number" },
+        mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+      },
+    },
+  },
 ];
 
 const PROGRESS_KEY = "ala_hub_circular_motion_progress";

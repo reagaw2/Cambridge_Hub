@@ -141,6 +141,45 @@ Analyse the student's answer against the mark scheme. Respond in the following J
 { "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "movement of star causes change in observed frequency / redshift", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "observed frequency is lower than emitted frequency", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences", "next_step": "one sentence" }`,
     response_schema: makeSchema(2),
   },
+  // ── 9702/41/O/N/25 questions ───────────────────────────────────────────
+  {
+    id: "Q_9702_41_N25_014",
+    label: "Question 9(a)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Astrophysics",
+    topic_key: "astrophysics",
+    text: "State Wien's displacement law.",
+    total_marks: 2,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: State Wien's displacement law.
+Mark scheme:
+- M1 mark 1: the thermodynamic surface temperature of a star is inversely proportional to the wavelength — mandatory mark
+- A1 mark 2: at which the maximum emission rate from the star occurs
+Examiner insight: Common omissions: not specifying surface temperature, and not clarifying that it is the wavelength at peak (maximum) emission. Both qualifications are necessary for full marks.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "thermodynamic surface temperature inversely proportional to wavelength", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "wavelength at which maximum emission rate occurs", "found": true or false, "feedback": "one sentence explanation — cannot be awarded unless mark 1 is also awarded" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: makeSchema(2),
+  },
+  {
+    id: "Q_9702_41_N25_015",
+    label: "Question 9(c)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Astrophysics",
+    topic_key: "astrophysics",
+    text: "Star X is in a galaxy that is moving away from the Earth. Suggest, with a reason, how the emission spectrum line for star X would appear differently if it had been obtained from data measured on the Earth.",
+    total_marks: 2,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: Star X is in a galaxy moving away from Earth. Suggest with a reason how its emission spectrum line would appear differently when measured from Earth.
+Mark scheme:
+- B1 mark 1: the light from star X is redshifted
+- B1 mark 2: the wavelength of peak emission rate would be greater when measured from Earth
+Examiner insight: Candidates more readily identified the visible change (peak shifts to longer wavelength) than correctly naming redshift as the cause. A minority incorrectly described the star itself as being redshifted rather than the light from it.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "light from star X is redshifted", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "wavelength of peak emission rate would be greater when measured from Earth", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: makeSchema(2),
+  },
 ];
 
 const PROGRESS_KEY = "ala_hub_astrophysics_progress";

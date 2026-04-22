@@ -348,6 +348,66 @@ Analyse the student's answer against the mark scheme. Respond in the following J
 { "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "work is done on the gas", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "internal energy increases so temperature increases", "found": true or false, "feedback": "one sentence explanation — cannot be awarded unless mark 1 is also awarded" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
     response_schema: makeSchema(2),
   },
+  // ── 9702/41/O/N/25 questions ───────────────────────────────────────────
+  {
+    id: "Q_9702_41_N25_003",
+    label: "Question 2(a)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Thermal Physics",
+    topic_key: "thermal_physics",
+    text: "State two ways in which the first law of thermodynamics describes that the internal energy of a system may be changed.",
+    total_marks: 2,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: State two ways in which the first law of thermodynamics describes that the internal energy of a system may be changed.
+Mark scheme:
+- B1 mark 1: work done on or by the system
+- B1 mark 2: thermal energy supplied to or removed from the system
+Examiner insight: Stronger candidates clearly referred to a system. A common error was stating that changes in work or thermal energy are required — internal energy changes when work is done or heat is transferred, not when those quantities themselves change.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "work done on or by the system", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "thermal energy supplied to or removed from the system", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: makeSchema(2),
+  },
+  {
+    id: "Q_9702_41_N25_004",
+    label: "Question 2(b)(i)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Thermal Physics",
+    topic_key: "thermal_physics",
+    text: "Use the first law of thermodynamics to explain why a bicycle pump gets hot when it is used to pump up a tyre quickly.",
+    total_marks: 3,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: Use the first law of thermodynamics to explain why a bicycle pump gets hot when it is used to pump up a tyre quickly.
+Mark scheme:
+- B1 mark 1: no thermal energy transferred to or from the system because the process is too quick
+- B1 mark 2: work is done on the gas to compress it / decrease its volume
+- B1 mark 3: internal energy increases so temperature increases
+Examiner insight: The key is identifying that the process is adiabatic (too quick for heat exchange), then linking compression → work done on gas → rise in internal energy → rise in temperature. Weaker answers confused thermal energy with internal energy or temperature.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 3], "mark_1": { "earned": true or false, "keyword": "no thermal energy transferred because process is too quick", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "work is done on the gas to compress it", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "internal energy increases so temperature increases", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: makeSchema(3),
+  },
+  {
+    id: "Q_9702_41_N25_005",
+    label: "Question 2(b)(ii)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Thermal Physics",
+    topic_key: "thermal_physics",
+    text: "With reference to molecular energies, explain why the temperature of water remains at 100 °C when it vaporises in a kettle, even though it is being heated.",
+    total_marks: 3,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: With reference to molecular energies, explain why the temperature of water remains at 100 °C when it vaporises in a kettle, even though it is being heated.
+Mark scheme:
+- B1 mark 1: during vaporisation, molecular separation increases
+- B1 mark 2: heating causes the potential energy of molecules to increase
+- B1 mark 3: kinetic energy of molecules is unchanged so temperature is unchanged
+Examiner insight: Many answers mentioned bonds breaking rather than molecular separation and potential energy increasing. The full chain is: separation increases → potential energy increases → kinetic energy unchanged → temperature unchanged. All three steps must be present.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 3], "mark_1": { "earned": true or false, "keyword": "during vaporisation molecular separation increases", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "heating causes potential energy of molecules to increase", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "kinetic energy unchanged so temperature unchanged", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: makeSchema(3),
+  },
 ];
 
 const PROGRESS_KEY = "ala_hub_thermal_progress";

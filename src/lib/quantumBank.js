@@ -336,6 +336,26 @@ Analyse the student's answer against the mark scheme. Respond in the following J
 { "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "greater momentum so smaller de Broglie wavelength", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "fringes become closer together", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences", "next_step": "one sentence" }`,
     response_schema: makeSchema(2),
   },
+  // ── 9702/41/O/N/25 questions ───────────────────────────────────────────
+  {
+    id: "Q_9702_41_N25_011",
+    label: "Question 8(a)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Quantum Physics",
+    topic_key: "quantum_physics",
+    text: "State what is meant by a photon.",
+    total_marks: 2,
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: State what is meant by a photon.
+Mark scheme:
+- M1 mark 1: a packet or quantum of energy — mandatory mark
+- A1 mark 2: of electromagnetic radiation
+Examiner insight: Well understood by most candidates. Both components are needed — the nature (quantum/packet of energy) and the medium (electromagnetic radiation).
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "packet or quantum of energy", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "of electromagnetic radiation", "found": true or false, "feedback": "one sentence explanation — cannot be awarded unless mark 1 is also awarded" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: makeSchema(2),
+  },
 ];
 
 const PROGRESS_KEY = "ala_hub_quantum_progress";

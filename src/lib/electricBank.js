@@ -460,6 +460,37 @@ Analyse the student's answer against the mark scheme. Respond in the following J
       },
     },
   },
+  // ── 9702/41/O/N/25 questions ───────────────────────────────────────────
+  {
+    id: "Q_9702_41_N25_008",
+    label: "Question 5(a)",
+    paper_ref: "9702/41 · Oct/Nov 2025",
+    topic: "Electric Fields",
+    topic_key: "electric_fields",
+    difficulty: "medium",
+    text: "Define electric potential at a point.",
+    total_marks: 2,
+    mark_scheme: "M1: work done per unit charge. A1: work done moving a positive charge from infinity to that point.",
+    prompt: (answer) => `You are a Cambridge A Level Physics examiner. A student has answered the following question:
+Question: Define electric potential at a point.
+Mark scheme:
+- M1 mark 1: work done per unit charge — mandatory mark
+- A1 mark 2: work done moving a positive charge from infinity to that point
+Examiner insight: The two most common omissions: not making clear it is a ratio (per unit charge), and not specifying that the charge moved from infinity is positive. Both conditions are needed for full credit.
+Student's answer: ${answer}
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "work done per unit charge", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "work done moving a positive charge from infinity to that point", "found": true or false, "feedback": "one sentence explanation — cannot be awarded unless mark 1 is also awarded" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+    response_schema: {
+      type: "object",
+      properties: {
+        marks_earned: { type: "number" },
+        mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
+        mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+      },
+    },
+  },
 ];
 
 const PROGRESS_KEY = "ala_hub_electric_progress";

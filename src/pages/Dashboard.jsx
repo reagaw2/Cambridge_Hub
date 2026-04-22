@@ -58,8 +58,8 @@ const MCQ_ONLY_TOPICS = [
 ];
 
 const COMING_SOON = [
-  "Magnetic Fields", "Medical Physics", "Telecommunications",
-  "Ideal Gases", "Superposition", "Mechanics", "Circular Motion",
+  "Medical Physics", "Telecommunications",
+  "Ideal Gases", "Superposition", "Mechanics",
 ];
 
 function getGreeting(firstName) {
@@ -71,9 +71,10 @@ function getGreeting(firstName) {
 }
 
 const WRITTEN_KEYS_FOR_CONFIDENCE = [
-  "physical_quantities_units", "kinematics", "forces_equilibrium", "circular_motion", "medical_imaging",
-  "gravitational_fields", "nuclear_physics", "thermal_physics", "oscillations",
-  "electric_fields", "capacitance", "waves", "electromagnetic_induction", "quantum_physics", "astrophysics",
+  "physical_quantities_units", "kinematics", "forces_equilibrium", "waves",
+  "circular_motion", "gravitational_fields", "thermal_physics", "oscillations",
+  "electric_fields", "capacitance", "magnetic_fields", "electromagnetic_induction",
+  "alternating_currents", "quantum_physics", "nuclear_physics", "medical_imaging", "astrophysics",
 ];
 
 function trendToScore(trend) {
@@ -165,23 +166,33 @@ function usePullToRefresh(onRefresh) {
   return { containerRef, pullY, refreshing, onTouchStart, onTouchMove, onTouchEnd };
 }
 
-const WRITTEN_TOPICS = [
+// AS Level topics (Papers 1 & 2)
+const AS_TOPICS = [
   { label: "Physical Quantities & Units", key: "physical_quantities_units", route: "/physicalquantities/question" },
   { label: "Kinematics", key: "kinematics", route: "/kinematics/question" },
   { label: "Forces & Equilibrium", key: "forces_equilibrium", route: "/forces/question" },
+  { label: "Waves", key: "waves", route: "/waves/question" },
+];
+
+// A Level topics (Paper 4) — in syllabus order
+const A_LEVEL_TOPICS = [
+  { label: "Circular Motion", key: "circular_motion", route: "/circularmotion/question" },
   { label: "Gravitational Fields", key: "gravitational_fields", route: "/gravitational/question" },
-  { label: "Nuclear Physics", key: "nuclear_physics", route: "/nuclear/question" },
   { label: "Thermal Physics", key: "thermal_physics", route: "/thermal/question" },
   { label: "Oscillations", key: "oscillations", route: "/oscillations/question" },
   { label: "Electric Fields", key: "electric_fields", route: "/electric/question" },
   { label: "Capacitance", key: "capacitance", route: "/capacitance/question" },
-  { label: "Circular Motion", key: "circular_motion", route: "/circularmotion/question" },
-  { label: "Waves", key: "waves", route: "/waves/question" },
+  { label: "Magnetic Fields", key: "magnetic_fields", route: null },
   { label: "Electromagnetic Induction", key: "electromagnetic_induction", route: "/eminduction/question" },
+  { label: "Alternating Currents", key: "alternating_currents", route: null },
   { label: "Quantum Physics", key: "quantum_physics", route: "/quantum/question" },
-  { label: "Astrophysics", key: "astrophysics", route: "/astrophysics/question" },
+  { label: "Nuclear Physics", key: "nuclear_physics", route: "/nuclear/question" },
   { label: "Medical Imaging", key: "medical_imaging", route: "/medicalimaging/question" },
+  { label: "Astronomy & Cosmology", key: "astrophysics", route: "/astrophysics/question" },
 ];
+
+// Combined for data-fetching purposes
+const WRITTEN_TOPICS = [...AS_TOPICS, ...A_LEVEL_TOPICS];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -356,14 +367,68 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Topics section */}
+          {/* AS Level Topics */}
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Your Topics</p>
-            <p className="text-xs text-muted-foreground/60">Focus on trends, not totals.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">AS Level Topics</p>
+            <p className="text-xs text-muted-foreground/60">Papers 1 & 2 — Focus on trends, not totals.</p>
           </div>
 
-          {WRITTEN_TOPICS.map(({ label, key, route }) => {
+          {AS_TOPICS.map(({ label, key, route }) => {
             const data = topicData[key];
+            return (
+              <div
+                key={key}
+                onClick={() => navigate(route)}
+                className="bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2 flex-1">
+                    <p className="font-semibold text-foreground text-sm">{label}</p>
+                    {data ? (
+                      <>
+                        <TrendBadge trend={data.trend} />
+                        <div className="flex items-center gap-4 pt-1">
+                          {data.lastLabel && (
+                            <span className="text-[11px] text-muted-foreground">Last attempt: {data.lastLabel}</span>
+                          )}
+                          {data.streak > 0 && (
+                            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Flame className="w-3 h-3 text-orange-400/80" />
+                              {data.streak} day streak
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-xs text-primary/70 font-medium">Ready to start</span>
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* A Level Topics (Paper 4) */}
+          <div className="space-y-1 pt-2">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">A Level Topics</p>
+            <p className="text-xs text-muted-foreground/60">Paper 4 — Focus on trends, not totals.</p>
+          </div>
+
+          {A_LEVEL_TOPICS.map(({ label, key, route }) => {
+            const data = topicData[key];
+            if (!route) {
+              return (
+                <div key={key} className="bg-card border border-border rounded-xl p-4 opacity-40">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1 flex-1">
+                      <p className="font-semibold text-muted-foreground text-sm">{label}</p>
+                      <p className="text-[11px] text-amber-500/70 font-medium">Coming soon</p>
+                    </div>
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+                  </div>
+                </div>
+              );
+            }
             return (
               <div
                 key={key}

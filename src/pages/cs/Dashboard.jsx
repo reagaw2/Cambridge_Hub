@@ -121,7 +121,7 @@ const CHAPTERS = [
   {
     chapter: "Chapter 2 — Communication",
     topics: [
-      { label: "Networks and the Internet", key: "networks_and_the_internet", active: true, route: "/cs/networks/question" },
+      { label: "Networks and the Internet", key: "networks_and_internet", active: true, route: "/cs/networks/question" },
     ],
   },
   {

@@ -494,47 +494,6 @@ export async function getGuessReviewBank() {
   );
 }
 
-export async function recordCSAttempt(userEmail, topicKey, score, totalMarks, questionId) {
-  try {
-    const records = await base44.entities.StudentData.filter({ user_email: userEmail });
-    if (!records || records.length === 0) return;
-    const record = records.sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date))[0];
-    const csData = record.cs_data || { topics: {}, cs_review_bank: [], cs_guess_review_bank: [], cs_mcq_attempts: [] };
-    if (!csData.topics) csData.topics = {};
-    if (!csData.topics[topicKey]) {
-      csData.topics[topicKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
-    }
-    const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const topic = csData.topics[topicKey];
-    topic.attempts.push({ score, total_marks: totalMarks, date: today, question_id: questionId });
-    topic.last_attempted = today;
-    if (topic.last_streak_date === today) {
-      // no-op
-    } else if (topic.last_streak_date === yesterday) {
-      topic.streak = (topic.streak || 0) + 1;
-    } else {
-      topic.streak = 1;
-    }
-    topic.last_streak_date = today;
-    await base44.entities.StudentData.update(record.id, { cs_data: csData });
-  } catch (e) {
-    console.warn("[csStore] recordCSAttempt error:", e);
-  }
-}
-
-export async function preloadCSStore(userEmail) {
-  try {
-    const records = await base44.entities.StudentData.filter({ user_email: userEmail });
-    const record = records.sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date))[0];
-    _csCache = record?.cs_data || { topics: {}, cs_review_bank: [], cs_guess_review_bank: [] };
-    console.log("[csStore] raw DB cs_data for", userEmail, ":", _csCache);
-  } catch (e) {
-    _csCache = { topics: {}, cs_review_bank: [], cs_guess_review_bank: [] };
-    console.log("[csStore] error loading cs_data:", e);
-  }
-}
-
 export async function resetGuessReviewBankLock(question_id) {
   const data = await loadFromDB();
   const entry = data.guess_review_bank.find(e =>

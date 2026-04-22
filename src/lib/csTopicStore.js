@@ -135,6 +135,7 @@ export async function csRecordAttempt(topicKey, score, { total_marks = 1, questi
     topic.streak = 1;
   }
   topic.last_streak_date = today;
+  console.log("[csStore] recordCSAttempt — writing to DB record:", _recordId, "topic:", topicKey, "score:", score, "/", total_marks);
   await saveToDB(data);
 }
 

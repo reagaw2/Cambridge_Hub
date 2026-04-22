@@ -6,6 +6,8 @@
 
 import { base44 } from "@/api/base44Client";
 
+let _csCache = null;
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 export function toDateString(date) {
@@ -490,6 +492,18 @@ export async function getGuessReviewBank() {
   return (data.guess_review_bank || []).map(e =>
     typeof e === "string" ? { question_id: e, locked_until: null } : e
   );
+}
+
+export async function preloadCSStore(userEmail) {
+  try {
+    const records = await base44.entities.StudentData.filter({ user_email: userEmail });
+    const record = records.sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date))[0];
+    _csCache = record?.cs_data || { topics: {}, cs_review_bank: [], cs_guess_review_bank: [] };
+    console.log("[csStore] raw DB cs_data for", userEmail, ":", _csCache);
+  } catch (e) {
+    _csCache = { topics: {}, cs_review_bank: [], cs_guess_review_bank: [] };
+    console.log("[csStore] error loading cs_data:", e);
+  }
 }
 
 export async function resetGuessReviewBankLock(question_id) {

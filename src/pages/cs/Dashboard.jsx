@@ -245,11 +245,14 @@ export default function CSDashboard() {
 
   async function loadDashboardData() {
     setLoading(true);
-    const [rb, grb, ...topicResults] = await Promise.all([
-      csGetReviewBank(),
-      csGetGuessReviewBank(),
-      ...ACTIVE_KEYS.map(k => csGetTopicData(k)),
-    ]);
+    const topicResults = await Promise.all(
+      ACTIVE_KEYS.map(async (k) => {
+        const result = await csGetTopicData(k);
+        console.log("[csStore] csGetTopicData called for:", k, "result:", result);
+        return result;
+      })
+    );
+    const [rb, grb] = await Promise.all([csGetReviewBank(), csGetGuessReviewBank()]);
     setReviewBank(rb);
     setGuessReviewBank(grb);
     const dataMap = {};

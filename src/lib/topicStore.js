@@ -111,7 +111,12 @@ async function loadFromDB() {
       const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
       console.log("[topicStore] raw DB records for", _userEmail, JSON.stringify(records));
       if (records && records.length > 0) {
-        const record = records[0];
+        // If duplicates exist, use the most recently updated record
+        const record = records.sort((a, b) => {
+          const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
+          const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
+          return tb - ta;
+        })[0];
         _recordId = record.id;
         console.log("[topicStore] topics from DB:", JSON.stringify(record.topics));
         console.log("[topicStore] mcq_attempts count:", (record.mcq_attempts || []).length);

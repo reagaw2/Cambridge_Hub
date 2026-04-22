@@ -8,12 +8,12 @@
     },
     "topics": {
       "type": "object",
-      "description": "Per-topic attempt data keyed by topic key",
+      "description": "Per-topic attempt data keyed by topic key (Physics)",
       "additionalProperties": true
     },
     "review_bank": {
       "type": "array",
-      "description": "Questions awaiting review",
+      "description": "Physics questions awaiting review",
       "items": {
         "type": "object",
         "additionalProperties": true
@@ -25,7 +25,7 @@
     },
     "mcq_attempts": {
       "type": "array",
-      "description": "All MCQ attempt records",
+      "description": "All Physics MCQ attempt records",
       "items": {
         "type": "object",
         "additionalProperties": true
@@ -33,9 +33,20 @@
     },
     "guess_review_bank": {
       "type": "array",
-      "description": "Question IDs flagged as guesses",
+      "description": "Physics question IDs flagged as guesses",
       "items": {
         "type": "string"
+      }
+    },
+    "cs_data": {
+      "type": "object",
+      "description": "All Computer Science attempt data for this student",
+      "additionalProperties": true,
+      "default": {
+        "topics": {},
+        "cs_review_bank": [],
+        "cs_guess_review_bank": [],
+        "cs_mcq_attempts": []
       }
     }
   },

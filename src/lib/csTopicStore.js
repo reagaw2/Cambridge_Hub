@@ -1,7 +1,7 @@
 /**
  * csTopicStore.js — Computer Science student data layer
+ * All CS data is stored inside StudentData.cs_data on the student's record.
  * Completely separate from Physics topicStore.
- * All CS data is stored under the `cs_data` field on the StudentData record.
  */
 
 import { base44 } from "@/api/base44Client";
@@ -9,26 +9,20 @@ import { normaliseTopicKey, toDateString } from "./topicStore";
 
 export { normaliseTopicKey, toDateString };
 
-const CS_TOPIC_KEYS = [
-  "data_representation",
-  "compression",
-  "computers_and_components",
-  "operating_systems",
-  "language_translators",
-];
-
 const DEFAULT_CS_DATA = () => ({
-  topics: Object.fromEntries(CS_TOPIC_KEYS.map(k => [k, { attempts: [], last_attempted: null, streak: 0, last_streak_date: null }])),
-  review_bank: [],
-  review_bank_clears: 0,
-  mcq_attempts: [],
-  guess_review_bank: [],
+  topics: {},
+  cs_review_bank: [],
+  cs_review_bank_clears: 0,
+  cs_mcq_attempts: [],
+  cs_guess_review_bank: [],
 });
 
-let _cache = null;
-let _recordId = null;
+let _cache = null;       // in-memory CS data
+let _recordId = null;    // StudentData record ID
 let _userEmail = null;
 let _loadPromise = null;
+
+// ── Preload ────────────────────────────────────────────────────────────────
 
 export async function preloadCSStore(userEmail) {
   if (_userEmail !== userEmail) {
@@ -37,10 +31,13 @@ export async function preloadCSStore(userEmail) {
     _userEmail = userEmail;
     _loadPromise = null;
   }
+  // Force fresh fetch
   _cache = null;
   _loadPromise = null;
   return loadFromDB();
 }
+
+// ── Internal load/save ─────────────────────────────────────────────────────
 
 async function loadFromDB() {
   if (_cache) return _cache;
@@ -50,22 +47,36 @@ async function loadFromDB() {
   _loadPromise = (async () => {
     try {
       const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
+
       if (records && records.length > 0) {
-        const record = records[0];
+        // Use the most recently updated record; ignore duplicates
+        const record = records.sort((a, b) => {
+          const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
+          const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
+          return tb - ta;
+        })[0];
+
         _recordId = record.id;
-        const csData = record.cs_data;
-        _cache = csData ? {
-          topics: csData.topics || DEFAULT_CS_DATA().topics,
-          review_bank: csData.review_bank || [],
-          review_bank_clears: csData.review_bank_clears ?? 0,
-          mcq_attempts: csData.mcq_attempts || [],
-          guess_review_bank: csData.guess_review_bank || [],
-        } : DEFAULT_CS_DATA();
+        const raw = record.cs_data;
+
+        console.log(`[csStore] raw DB cs_data for ${_userEmail}:`, JSON.stringify(raw));
+
+        if (raw && typeof raw === "object" && Object.keys(raw).length > 0) {
+          _cache = {
+            topics: raw.topics || {},
+            cs_review_bank: raw.cs_review_bank || [],
+            cs_review_bank_clears: raw.cs_review_bank_clears ?? 0,
+            cs_mcq_attempts: raw.cs_mcq_attempts || [],
+            cs_guess_review_bank: raw.cs_guess_review_bank || [],
+          };
+        } else {
+          _cache = DEFAULT_CS_DATA();
+        }
       } else {
         _cache = DEFAULT_CS_DATA();
       }
     } catch (e) {
-      console.warn("csTopicStore: failed to load from DB", e);
+      console.warn("[csStore] failed to load from DB", e);
       _cache = DEFAULT_CS_DATA();
     }
     _loadPromise = null;
@@ -78,13 +89,20 @@ async function loadFromDB() {
 async function saveToDB(data) {
   if (!_userEmail) return;
   _cache = data;
+
   try {
     if (_recordId) {
       await base44.entities.StudentData.update(_recordId, { cs_data: data });
     } else {
+      // No record found during preload — find or create
       const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
       if (records && records.length > 0) {
-        _recordId = records[0].id;
+        const record = records.sort((a, b) => {
+          const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
+          const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
+          return tb - ta;
+        })[0];
+        _recordId = record.id;
         await base44.entities.StudentData.update(_recordId, { cs_data: data });
       } else {
         const created = await base44.entities.StudentData.create({ user_email: _userEmail, cs_data: data });
@@ -92,9 +110,11 @@ async function saveToDB(data) {
       }
     }
   } catch (e) {
-    console.warn("csTopicStore: failed to save to DB", e);
+    console.warn("[csStore] failed to save to DB", e);
   }
 }
+
+// ── Topic Attempts ─────────────────────────────────────────────────────────
 
 export async function csRecordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
   const normKey = normaliseTopicKey(topicKey);
@@ -123,7 +143,7 @@ export async function csGetTopicData(topicKey) {
   const data = await loadFromDB();
   const topic = data.topics[normKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   const attempts = (topic.attempts || []).filter(a => a !== null && typeof a === "object");
-  const mcqAttempts = (data.mcq_attempts || []).filter(a => normaliseTopicKey(a.topic) === normKey);
+  const mcqAttempts = (data.cs_mcq_attempts || []).filter(a => normaliseTopicKey(a.topic) === normKey);
 
   if (attempts.length === 0 && mcqAttempts.length === 0) return null;
 
@@ -181,9 +201,9 @@ export async function csGetTopicData(topicKey) {
 
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
-  if (data.review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
+  if (data.cs_review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
   const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  data.review_bank.push({
+  data.cs_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
     first_attempt_score, first_attempt_feedback,
     date_added: toDateString(new Date()),
@@ -195,18 +215,18 @@ export async function csAddToReviewBank({ question_id, topic, question_text, mar
 
 export async function csGetReviewBank() {
   const data = await loadFromDB();
-  return [...data.review_bank].sort((a, b) => a.priority - b.priority);
+  return [...(data.cs_review_bank || [])].sort((a, b) => a.priority - b.priority);
 }
 
 export async function csRemoveFromReviewBank(question_id) {
   const data = await loadFromDB();
-  data.review_bank = data.review_bank.filter(q => q.question_id !== question_id);
+  data.cs_review_bank = data.cs_review_bank.filter(q => q.question_id !== question_id);
   await saveToDB(data);
 }
 
 export async function csResetReviewBankLock(question_id) {
   const data = await loadFromDB();
-  const entry = data.review_bank.find(q => q.question_id === question_id);
+  const entry = data.cs_review_bank.find(q => q.question_id === question_id);
   if (entry) {
     entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await saveToDB(data);
@@ -218,12 +238,12 @@ export async function csResetReviewBankLock(question_id) {
 export async function csSaveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
   const normKey = normaliseTopicKey(topic);
   const data = await loadFromDB();
-  if (!data.mcq_attempts) data.mcq_attempts = [];
-  if (!data.guess_review_bank) data.guess_review_bank = [];
+  if (!data.cs_mcq_attempts) data.cs_mcq_attempts = [];
+  if (!data.cs_guess_review_bank) data.cs_guess_review_bank = [];
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
-  data.mcq_attempts.push({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning, date: today });
+  data.cs_mcq_attempts.push({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning, date: today });
 
   if (!data.topics[normKey]) {
     data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
@@ -241,12 +261,12 @@ export async function csSaveMCQAttempt({ question_id, topic, source, chosen_opti
   topicEntry.last_streak_date = today;
 
   if (flagged_as_guess) {
-    const existing = data.guess_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
+    const existing = data.cs_guess_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
     if (!existing) {
-      data.guess_review_bank.push({ question_id, locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() });
+      data.cs_guess_review_bank.push({ question_id, locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() });
     }
   } else if (correct && !flagged_as_guess) {
-    data.guess_review_bank = data.guess_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
+    data.cs_guess_review_bank = data.cs_guess_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
 
   await saveToDB(data);
@@ -254,5 +274,5 @@ export async function csSaveMCQAttempt({ question_id, topic, source, chosen_opti
 
 export async function csGetGuessReviewBank() {
   const data = await loadFromDB();
-  return (data.guess_review_bank || []).map(e => typeof e === "string" ? { question_id: e, locked_until: null } : e);
+  return (data.cs_guess_review_bank || []).map(e => typeof e === "string" ? { question_id: e, locked_until: null } : e);
 }

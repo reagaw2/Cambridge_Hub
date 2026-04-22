@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
+import { recordCSAttempt } from "@/lib/topicStore";
 
 function RingProgress({ value, max }) {
   const size = 80;
@@ -26,7 +28,17 @@ function RingProgress({ value, max }) {
 export default function CSFeedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { feedback, totalMarks, backRoute, dashRoute, paperRef, isReview, topicRoute, topicLabel, attempted, correct, isLastQuestion } = state || {};
+  const { user } = useAuth();
+  const { feedback, totalMarks, backRoute, dashRoute, paperRef, isReview, topicRoute, topicLabel, attempted, correct, isLastQuestion, topicKey, questionId } = state || {};
+
+  const recorded = useRef(false);
+  useEffect(() => {
+    if (!feedback || !user?.email || recorded.current) return;
+    recorded.current = true;
+    const score = feedback.marks_earned ?? 0;
+    recordCSAttempt(user.email, topicKey, score, totalMarks, questionId);
+    console.log("[csStore] recordCSAttempt called — topic:", topicKey, "score:", score, "/", totalMarks);
+  }, []);
 
   if (!feedback) { navigate("/cs"); return null; }
 

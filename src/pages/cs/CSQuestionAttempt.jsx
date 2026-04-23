@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import SubmitButton from "@/components/SubmitButton";
 import { csRecordAttempt, csAddToReviewBank } from "@/lib/csTopicStore";
+import DevQuestionJumper from "@/components/DevQuestionJumper";
 
 // Maps topic_key → the registered route path
 const TOPIC_ROUTES = {
@@ -23,7 +24,7 @@ const TOPIC_ROUTES = {
   data_integrity: "/cs/data-integrity/question",
 };
 
-export default function CSQuestionAttempt({ question, idx, total, onAdvance, topicLabel }) {
+export default function CSQuestionAttempt({ question, idx, total, onAdvance, topicLabel, allQuestions, onOverride }) {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
@@ -135,6 +136,9 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
           {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+          {allQuestions && onOverride && (
+            <DevQuestionJumper allQuestions={allQuestions} onJump={(q) => { onOverride(q); }} />
+          )}
         </div>
       </div>
     </div>

@@ -1,7 +1,11 @@
 /**
- * topicStore.js — Student data layer
+ * topicStore.js — Student data layer (Physics)
  * Single source of truth: DB. In-memory cache for the session.
  * Always call preloadStore(userEmail) once after login before reading any data.
+ *
+ * RENAME NOTES (safe migration):
+ *   review_bank → written_review_bank  (aliases kept for backward compat)
+ *   guess_review_bank → mcq_review_bank (aliases kept for backward compat)
  */
 
 import { base44 } from "@/api/base44Client";
@@ -14,18 +18,13 @@ export function toDateString(date) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-/**
- * BUG 1 FIX — Normalise any topic name to snake_case.
- * "Physical Quantities & Units" → "physical_quantities_units"
- * "Gravitational Fields" → "gravitational_fields"
- */
 export function normaliseTopicKey(name) {
   return name
     .toLowerCase()
-    .replace(/\s+/g, "_")           // spaces → underscores
-    .replace(/[^a-z0-9_]/g, "")     // strip non-alphanumeric except underscores
-    .replace(/_+/g, "_")            // collapse consecutive underscores
-    .replace(/^_|_$/g, "");         // trim leading/trailing underscores
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
 }
 
 const DEFAULT_DATA = () => ({
@@ -46,47 +45,43 @@ const DEFAULT_DATA = () => ({
     astrophysics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     medical_imaging: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
   },
-  review_bank: [],
+  // Always use written_review_bank internally; migrate review_bank on load
+  written_review_bank: [],
   review_bank_clears: 0,
   mcq_attempts: [],
-  guess_review_bank: [],
+  // Always use mcq_review_bank internally; migrate guess_review_bank on load
+  mcq_review_bank: [],
+  // Global streak fields
+  global_streak: 0,
+  global_streak_last_date: null,
+  rest_day_passes: 0,
+  daily_question_count: null, // { date: string, count: number }
+  last_session_time: null,
 });
 
-// Module-level state
 let _cache = null;
 let _recordId = null;
 let _userEmail = null;
-let _loadPromise = null; // deduplicate concurrent loads
+let _loadPromise = null;
 
-/**
- * Call once after login. Fetches DB record, primes cache.
- * Subsequent reads within the session use the cache.
- */
 export async function preloadStore(userEmail) {
   if (_userEmail !== userEmail) {
-    // Different user — full reset
     _cache = null;
     _recordId = null;
     _userEmail = userEmail;
     _loadPromise = null;
   }
-  // Force a fresh DB fetch (bypasses cache)
   _cache = null;
   _loadPromise = null;
   const result = await loadFromDB();
-  console.log("[topicStore] preloadStore complete for", userEmail, "— cache keys:", Object.keys(result.topics || {}));
+  console.log("[topicStore] preloadStore complete for", userEmail);
   return result;
 }
 
-/**
- * Returns true once the store has been loaded for the given user.
- * Used by the dashboard to avoid reading before preload completes.
- */
 export function isStoreReady(userEmail) {
   return _userEmail === userEmail && _cache !== null;
 }
 
-/** Legacy init — keeps existing call sites working, but doesn't force a fetch */
 export function initStore(userEmail) {
   if (_userEmail !== userEmail) {
     _cache = null;
@@ -97,12 +92,8 @@ export function initStore(userEmail) {
 }
 
 async function loadFromDB() {
-  // Return cached data immediately if available
   if (_cache) return _cache;
-
-  // Deduplicate concurrent calls — only one DB fetch in flight at a time
   if (_loadPromise) return _loadPromise;
-
   if (!_userEmail) {
     _cache = DEFAULT_DATA();
     return _cache;
@@ -111,27 +102,37 @@ async function loadFromDB() {
   _loadPromise = (async () => {
     try {
       const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
-      console.log("[topicStore] raw DB records for", _userEmail, JSON.stringify(records));
       if (records && records.length > 0) {
-        // If duplicates exist, use the most recently updated record
         const record = records.sort((a, b) => {
           const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
           const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
           return tb - ta;
         })[0];
         _recordId = record.id;
-        console.log("[topicStore] topics from DB:", JSON.stringify(record.topics));
-        console.log("[topicStore] mcq_attempts count:", (record.mcq_attempts || []).length);
-        console.log("[topicStore] review_bank count:", (record.review_bank || []).length);
+
+        // ── SAFE MIGRATION: review_bank → written_review_bank ──
+        const writtenReviewBank = record.written_review_bank
+          || record.review_bank  // migrate old field name
+          || [];
+
+        // ── SAFE MIGRATION: guess_review_bank → mcq_review_bank ──
+        const mcqReviewBank = record.mcq_review_bank
+          || record.guess_review_bank // migrate old field name
+          || [];
+
         _cache = {
           topics: record.topics || DEFAULT_DATA().topics,
-          review_bank: record.review_bank || [],
+          written_review_bank: writtenReviewBank,
           review_bank_clears: record.review_bank_clears ?? 0,
           mcq_attempts: record.mcq_attempts || [],
-          guess_review_bank: record.guess_review_bank || [],
+          mcq_review_bank: mcqReviewBank,
+          global_streak: record.global_streak ?? 0,
+          global_streak_last_date: record.global_streak_last_date ?? null,
+          rest_day_passes: record.rest_day_passes ?? 0,
+          daily_question_count: record.daily_question_count ?? null,
+          last_session_time: record.last_session_time ?? null,
         };
       } else {
-        console.log("[topicStore] no record found for user, using defaults");
         _cache = DEFAULT_DATA();
       }
     } catch (e) {
@@ -152,10 +153,16 @@ async function saveToDB(data) {
   const payload = {
     user_email: _userEmail,
     topics: data.topics,
-    review_bank: data.review_bank,
+    // Save under new field names
+    written_review_bank: data.written_review_bank,
     review_bank_clears: data.review_bank_clears,
     mcq_attempts: data.mcq_attempts,
-    guess_review_bank: data.guess_review_bank,
+    mcq_review_bank: data.mcq_review_bank,
+    global_streak: data.global_streak,
+    global_streak_last_date: data.global_streak_last_date,
+    rest_day_passes: data.rest_day_passes,
+    daily_question_count: data.daily_question_count,
+    last_session_time: data.last_session_time,
   };
 
   try {
@@ -170,18 +177,127 @@ async function saveToDB(data) {
   }
 }
 
-// ── Topic attempts ─────────────────────────────────────────────────────────
+// ── Global Streak + Daily Count ────────────────────────────────────────────
 
 /**
- * BUG 1 + 2 + 3 FIX:
- * - topicKey is normalised via normaliseTopicKey before writing
- * - attempt is saved as an object { score, total_marks, date, question_id }
- * - console.log confirms the exact key used
+ * Call once per question submitted (written or MCQ, Physics or CS).
+ * Handles daily count, global streak, rest day passes, and streak warning.
  */
+export async function recordGlobalQuestionAnswered() {
+  const data = await loadFromDB();
+  const today = toDateString(new Date());
+  const yesterday = toDateString(new Date(Date.now() - 86400000));
+
+  // ── Daily count ──
+  let dqc = data.daily_question_count;
+  if (!dqc || dqc.date !== today) {
+    dqc = { date: today, count: 0 };
+  }
+  dqc.count += 1;
+  data.daily_question_count = dqc;
+
+  // ── Streak logic (only fire once per day when 3rd question is answered) ──
+  if (dqc.count === 3) {
+    // Increment streak
+    if (data.global_streak_last_date === today) {
+      // already incremented today — no-op
+    } else if (data.global_streak_last_date === yesterday) {
+      data.global_streak = (data.global_streak || 0) + 1;
+    } else if (!data.global_streak_last_date) {
+      data.global_streak = 1;
+    } else {
+      // Missed days — check for rest day pass
+      const lastDate = data.global_streak_last_date;
+      const parts = lastDate.split("/");
+      const lastDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      const daysMissed = Math.floor((new Date() - lastDateObj) / 86400000) - 1;
+      if (daysMissed >= 1 && (data.rest_day_passes || 0) > 0) {
+        // Use pass
+        data.rest_day_passes = 0;
+        data.global_streak = (data.global_streak || 0) + 1;
+      } else {
+        data.global_streak = 1; // reset
+      }
+    }
+    data.global_streak_last_date = today;
+
+    // After 5 consecutive days, award 1 rest day pass (max 1)
+    if ((data.global_streak || 0) >= 5 && (data.rest_day_passes || 0) < 1) {
+      data.rest_day_passes = 1;
+    }
+  }
+
+  // ── Check for missed day on app open (handled here too when first question is answered) ──
+  // If streak was last updated before yesterday and no pass, reset streak
+  if (data.global_streak_last_date && data.global_streak_last_date !== today && data.global_streak_last_date !== yesterday && dqc.count === 1) {
+    const lastDate = data.global_streak_last_date;
+    const parts = lastDate.split("/");
+    const lastDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    const daysMissed = Math.floor((new Date() - lastDateObj) / 86400000);
+    if (daysMissed > 1) {
+      if ((data.rest_day_passes || 0) > 0) {
+        data.rest_day_passes = 0;
+      } else {
+        data.global_streak = 0;
+      }
+    }
+  }
+
+  await saveToDB(data);
+}
+
+/**
+ * Called on app open to record last_session_time and check if streak needs resetting.
+ * Returns the current streak data for display.
+ */
+export async function recordAppOpen() {
+  const data = await loadFromDB();
+  const today = toDateString(new Date());
+  const yesterday = toDateString(new Date(Date.now() - 86400000));
+
+  data.last_session_time = new Date().toISOString();
+
+  // Check for missed day streak reset
+  if (data.global_streak_last_date && data.global_streak_last_date !== today && data.global_streak_last_date !== yesterday) {
+    const parts = data.global_streak_last_date.split("/");
+    const lastDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    const daysMissed = Math.floor((new Date() - lastDateObj) / 86400000);
+    if (daysMissed > 1) {
+      if ((data.rest_day_passes || 0) > 0) {
+        data.rest_day_passes = 0;
+        // streak protected, no reset
+      } else {
+        data.global_streak = 0;
+      }
+    }
+  }
+
+  await saveToDB(data);
+
+  return {
+    global_streak: data.global_streak || 0,
+    rest_day_passes: data.rest_day_passes || 0,
+    daily_question_count: data.daily_question_count,
+    last_session_time: data.last_session_time,
+    written_review_bank_count: (data.written_review_bank || []).length,
+    mcq_review_bank_count: (data.mcq_review_bank || []).length,
+  };
+}
+
+export async function getStreakData() {
+  const data = await loadFromDB();
+  return {
+    global_streak: data.global_streak || 0,
+    rest_day_passes: data.rest_day_passes || 0,
+    daily_question_count: data.daily_question_count,
+    global_streak_last_date: data.global_streak_last_date,
+  };
+}
+
+// ── Topic attempts ─────────────────────────────────────────────────────────
+
 export async function recordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
   const normKey = normaliseTopicKey(topicKey);
-  console.log(`[topicStore] recordAttempt — raw key: "${topicKey}" → normalised: "${normKey}", score: ${score}/${total_marks}`);
-
   const data = await loadFromDB();
   if (!data.topics[normKey]) {
     data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
@@ -191,23 +307,23 @@ export async function recordAttempt(topicKey, score, { total_marks = 1, question
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
-  // BUG 2 FIX: store as object, not raw number
   topic.attempts.push({ score, total_marks, date: today, question_id });
   topic.last_attempted = today;
 
   if (topic.last_streak_date === today) {
-    // already recorded today — don't increment
+    // already recorded today
   } else if (topic.last_streak_date === yesterday) {
     topic.streak = (topic.streak || 0) + 1;
   } else {
     topic.streak = 1;
   }
-
   topic.last_streak_date = today;
   await saveToDB(data);
+
+  // Also update global daily count
+  await recordGlobalQuestionAnswered();
 }
 
-// Maps topicKey (snake_case) to the topic display name used in mcq_attempts
 const TOPIC_KEY_TO_DISPLAY = {
   gravitational_fields: "Gravitational Fields",
   nuclear_physics: "Nuclear Physics",
@@ -222,26 +338,18 @@ const TOPIC_KEY_TO_DISPLAY = {
 
 export async function getTopicData(topicKey) {
   const normKey = normaliseTopicKey(topicKey);
-  console.log(`[topicStore] getTopicData — raw key: "${topicKey}" → normalised: "${normKey}"`);
-
   const data = await loadFromDB();
   const topic = data.topics[normKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
 
-  // BUG 2 FIX: filter out legacy raw numbers, keep only proper attempt objects
   const attempts = (topic.attempts || []).filter(a => a !== null && typeof a === "object");
   const { last_attempted } = topic;
-
-  // BUG 1 FIX: MCQ attempts are now stored with normalised key, look them up the same way
   const mcqAttempts = (data.mcq_attempts || []).filter(a => normaliseTopicKey(a.topic) === normKey);
-
-  console.log(`[topicStore] getTopicData(${normKey}): attempts=${JSON.stringify(attempts)}, last_attempted=${last_attempted}, mcqAttempts=${mcqAttempts.length}`);
 
   const hasWritten = attempts.length > 0;
   const hasMCQ = mcqAttempts.length > 0;
 
   if (!hasWritten && !hasMCQ) return null;
 
-  // ── Trend: based on most recent attempt (written takes priority if same session) ──
   let trend = "steady";
   if (hasWritten) {
     const last = attempts[attempts.length - 1];
@@ -250,15 +358,13 @@ export async function getTopicData(topicKey) {
     const ratio = total > 0 ? score / total : 0;
     if (score === 0) trend = "needs_work";
     else if (ratio >= 1) trend = "improving";
-    else trend = "steady"; // partial marks
+    else trend = "steady";
   }
 
-  // If there are MCQ attempts more recent than the last written attempt, let them influence trend
   if (hasMCQ) {
     const today = toDateString(new Date());
     const lastMCQ = mcqAttempts[mcqAttempts.length - 1];
     const lastWrittenDate = last_attempted;
-    // Use MCQ trend only if no written attempts, or MCQ is more recent
     const mcqIsMoreRecent = !lastWrittenDate || lastMCQ.date >= lastWrittenDate;
     if (!hasWritten || mcqIsMoreRecent) {
       if (lastMCQ.correct && !lastMCQ.flagged_as_guess) trend = "improving";
@@ -267,7 +373,6 @@ export async function getTopicData(topicKey) {
     }
   }
 
-  // ── Last attempted date ──
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
@@ -282,7 +387,6 @@ export async function getTopicData(topicKey) {
     if (latestDate === today) lastLabel = "Today";
     else if (latestDate === yesterday) lastLabel = "Yesterday";
     else {
-      // Calculate days ago from dd/mm/yyyy format
       const parts = latestDate.split("/");
       if (parts.length === 3) {
         const dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -295,44 +399,23 @@ export async function getTopicData(topicKey) {
     }
   }
 
-  // ── Streak: count consecutive days with at least one attempt ending today or yesterday ──
-  // Collect all attempt dates (written + MCQ)
-  const writtenDates = last_attempted ? [last_attempted] : [];
-  // For written attempts we only have last_attempted, not per-attempt dates.
-  // Use mcq dates + last_attempted for written topics.
-  const allDates = new Set([
-    ...writtenDates,
-    ...mcqAttempts.map(a => a.date),
-  ]);
-
-  // Also include per-day written data from streak tracking in topic object
-  // The streak field on the topic is already maintained by recordAttempt.
-  // We trust it unless it's stale (last_streak_date is older than yesterday → reset to 0).
   let currentStreak = topic.streak || 0;
   const lastStreakDate = topic.last_streak_date || null;
   if (lastStreakDate && lastStreakDate !== today && lastStreakDate !== yesterday) {
     currentStreak = 0;
   }
 
-  // For MCQ-only topics, recompute streak from MCQ attempt dates
   if (!hasWritten && hasMCQ) {
     const days = [...new Set(mcqAttempts.map(a => a.date))].sort();
     let s = 0;
     let checkDate = today;
     for (let i = days.length - 1; i >= 0; i--) {
-      if (days[i] === checkDate || (s === 0 && days[i] === yesterday)) {
-        if (s === 0 && days[i] === yesterday) {
-          // Allow streak starting from yesterday
-        }
-        if (days[i] === checkDate) {
-          s++;
-          const parts = checkDate.split("/");
-          const prevDay = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-          prevDay.setDate(prevDay.getDate() - 1);
-          checkDate = toDateString(prevDay);
-        } else {
-          break;
-        }
+      if (days[i] === checkDate) {
+        s++;
+        const parts = checkDate.split("/");
+        const prevDay = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        prevDay.setDate(prevDay.getDate() - 1);
+        checkDate = toDateString(prevDay);
       } else {
         break;
       }
@@ -343,15 +426,15 @@ export async function getTopicData(topicKey) {
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
-// ── Review Bank ────────────────────────────────────────────────────────────
+// ── Written Review Bank (formerly review_bank) ─────────────────────────────
 
 export async function addToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
-  if (data.review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
+  if (data.written_review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
 
   const priority = first_attempt_score === 0 ? 1 : 2;
   const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  data.review_bank.push({
+  data.written_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
     first_attempt_score, first_attempt_feedback,
     date_added: toDateString(new Date()),
@@ -364,7 +447,7 @@ export async function addToReviewBank({ question_id, topic, question_text, mark_
 
 export async function resetReviewBankLock(question_id) {
   const data = await loadFromDB();
-  const entry = data.review_bank.find(q => q.question_id === question_id);
+  const entry = data.written_review_bank.find(q => q.question_id === question_id);
   if (entry) {
     entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await saveToDB(data);
@@ -373,13 +456,13 @@ export async function resetReviewBankLock(question_id) {
 
 export async function removeFromReviewBank(question_id) {
   const data = await loadFromDB();
-  data.review_bank = data.review_bank.filter(q => q.question_id !== question_id);
+  data.written_review_bank = data.written_review_bank.filter(q => q.question_id !== question_id);
   await saveToDB(data);
 }
 
 export async function getReviewBank() {
   const data = await loadFromDB();
-  return [...data.review_bank].sort((a, b) => a.priority - b.priority);
+  return [...data.written_review_bank].sort((a, b) => a.priority - b.priority);
 }
 
 export async function incrementReviewBankClears() {
@@ -388,54 +471,58 @@ export async function incrementReviewBankClears() {
   await saveToDB(data);
 }
 
-export async function resetData() {
-  _cache = DEFAULT_DATA();
-  if (_recordId && _userEmail) {
-    try {
-      await base44.entities.StudentData.update(_recordId, {
-        ..._cache,
-        user_email: _userEmail,
-      });
-    } catch (e) {
-      console.warn("topicStore: failed to reset data", e);
-    }
+// ── MCQ Review Bank (formerly guess_review_bank) ───────────────────────────
+
+export async function getGuessReviewBank() {
+  const data = await loadFromDB();
+  return (data.mcq_review_bank || []).map(e =>
+    typeof e === "string" ? { question_id: e, locked_until: null } : e
+  );
+}
+
+export async function resetGuessReviewBankLock(question_id) {
+  const data = await loadFromDB();
+  const entry = data.mcq_review_bank.find(e =>
+    (typeof e === "string" ? e : e.question_id) === question_id
+  );
+  if (entry && typeof entry === "object") {
+    entry.locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+    await saveToDB(data);
+  } else if (typeof entry === "string") {
+    const idx = data.mcq_review_bank.indexOf(entry);
+    data.mcq_review_bank[idx] = {
+      question_id,
+      locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+    };
+    await saveToDB(data);
   }
 }
 
-// ── MCQ Attempts ───────────────────────────────────────────────────────────
+// ── MCQ Attempts ────────────────────────────────────────────────────────────
 
 export async function saveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
   const normKey = normaliseTopicKey(topic);
-  console.log(`[topicStore] saveMCQAttempt — raw key: "${topic}" → normalised: "${normKey}"`);
-
   const data = await loadFromDB();
   if (!data.mcq_attempts) data.mcq_attempts = [];
-  if (!data.guess_review_bank) data.guess_review_bank = [];
+  if (!data.mcq_review_bank) data.mcq_review_bank = [];
 
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
   const attempt = {
-    question_id,
-    topic,  // keep original display name for UI display
-    source, chosen_option, correct_option, correct,
-    flagged_as_guess, reasoning,
-    date: today,
+    question_id, topic, source, chosen_option, correct_option, correct,
+    flagged_as_guess, reasoning, date: today,
   };
-
   data.mcq_attempts.push(attempt);
 
-  // Step 3: also write to topics object under normalised key so getTopicData can read it
   if (!data.topics[normKey]) {
     data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   }
   const topicEntry = data.topics[normKey];
-  const score = correct ? 1 : 0;
-  topicEntry.attempts.push({ score, total_marks: 1, date: today, question_id });
+  topicEntry.attempts.push({ score: correct ? 1 : 0, total_marks: 1, date: today, question_id });
   topicEntry.last_attempted = today;
-
   if (topicEntry.last_streak_date === today) {
-    // already recorded today
+    // no-op
   } else if (topicEntry.last_streak_date === yesterday) {
     topicEntry.streak = (topicEntry.streak || 0) + 1;
   } else {
@@ -443,24 +530,21 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
   }
   topicEntry.last_streak_date = today;
 
-  if (flagged_as_guess) {
-    const existing = data.guess_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
+  // MCQ review bank logic: wrong confident OR any guess → mcq_review_bank
+  if (flagged_as_guess || !correct) {
+    const existing = data.mcq_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
     if (!existing) {
       const locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
-      data.guess_review_bank.push({ question_id, locked_until });
+      data.mcq_review_bank.push({ question_id, locked_until, flagged_as_guess: !!flagged_as_guess });
     }
   } else if (correct && !flagged_as_guess) {
-    data.guess_review_bank = data.guess_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
+    data.mcq_review_bank = data.mcq_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
 
   await saveToDB(data);
-  console.log(`[topicStore] saveMCQAttempt complete — topics object:`, JSON.stringify(data.topics));
+  await recordGlobalQuestionAnswered();
 }
 
-/**
- * Returns unique display names of topics that have MCQ attempts,
- * excluding any that are already in the written topics list.
- */
 export async function getMCQOnlyTopicNames(writtenKeys) {
   const data = await loadFromDB();
   const seen = new Set();
@@ -486,28 +570,34 @@ export async function getMCQStats(topic) {
   return { total_attempted, reasoned_correct, guessed, reasoned_correct_percentage };
 }
 
-export async function getGuessReviewBank() {
+// ── Review Gate check ──────────────────────────────────────────────────────
+
+/**
+ * Returns true if the review gate should be shown on home screen.
+ * Condition: (written >= 5 OR mcq >= 5) AND (time since last_session >= 18h)
+ */
+export async function shouldShowReviewGate() {
   const data = await loadFromDB();
-  // Normalise legacy string entries to objects
-  return (data.guess_review_bank || []).map(e =>
-    typeof e === "string" ? { question_id: e, locked_until: null } : e
-  );
+  const writtenCount = (data.written_review_bank || []).length;
+  const mcqCount = (data.mcq_review_bank || []).length;
+  if (writtenCount < 5 && mcqCount < 5) return false;
+
+  const lastSession = data.last_session_time;
+  if (!lastSession) return false;
+  const hoursSince = (Date.now() - new Date(lastSession).getTime()) / (1000 * 60 * 60);
+  return hoursSince >= 18;
 }
 
-export async function resetGuessReviewBankLock(question_id) {
-  const data = await loadFromDB();
-  const entry = data.guess_review_bank.find(e =>
-    (typeof e === "string" ? e : e.question_id) === question_id
-  );
-  if (entry && typeof entry === "object") {
-    entry.locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
-    await saveToDB(data);
-  } else if (typeof entry === "string") {
-    const idx = data.guess_review_bank.indexOf(entry);
-    data.guess_review_bank[idx] = {
-      question_id,
-      locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
-    };
-    await saveToDB(data);
+export async function resetData() {
+  _cache = DEFAULT_DATA();
+  if (_recordId && _userEmail) {
+    try {
+      await base44.entities.StudentData.update(_recordId, {
+        ..._cache,
+        user_email: _userEmail,
+      });
+    } catch (e) {
+      console.warn("topicStore: failed to reset data", e);
+    }
   }
 }

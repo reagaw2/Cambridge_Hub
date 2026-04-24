@@ -2,10 +2,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
-import { getTopicData, getMCQOnlyTopicNames } from "@/lib/topicStore";
+import { getTopicData, getMCQOnlyTopicNames, getStreakData, recordAppOpen, shouldShowReviewGate, getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { csGetTopicData } from "@/lib/csTopicStore";
 import { Atom, Lock, Code2 } from "lucide-react";
 import { toast } from "sonner";
+import GlobalStreakBadge from "@/components/GlobalStreakBadge";
+import ReviewGate from "@/components/ReviewGate";
 
 function getGreeting(name) {
   const h = new Date().getHours();
@@ -47,6 +49,10 @@ export default function SubjectSelection() {
   const [physicsLoaded, setPhysicsLoaded] = useState(false);
   const [csScore, setCsScore] = useState(null);
   const [csLoaded, setCsLoaded] = useState(false);
+  const [streakData, setStreakData] = useState(null);
+  const [showGate, setShowGate] = useState(false);
+  const [gateWrittenCount, setGateWrittenCount] = useState(0);
+  const [gateMcqCount, setGateMcqCount] = useState(0);
 
   useEffect(() => {
     async function calcPhysicsScore() {
@@ -68,8 +74,25 @@ export default function SubjectSelection() {
       setCsScore(avg);
       setCsLoaded(true);
     }
+    async function loadStreakAndGate() {
+      const [sd, gateCheck, writtenBank, mcqBank] = await Promise.all([
+        getStreakData(),
+        shouldShowReviewGate(),
+        getReviewBank(),
+        getGuessReviewBank(),
+      ]);
+      setStreakData(sd);
+      if (gateCheck) {
+        setGateWrittenCount(writtenBank.length);
+        setGateMcqCount(mcqBank.length);
+        setShowGate(true);
+      }
+      // Record app open (updates last_session_time)
+      await recordAppOpen();
+    }
     calcPhysicsScore();
     calcCSScore();
+    loadStreakAndGate();
   }, [user?.email, location.key]);
 
   function handleLocked() {
@@ -92,6 +115,14 @@ export default function SubjectSelection() {
           </button>
         </div>
 
+        {showGate && (
+          <ReviewGate
+            writtenCount={gateWrittenCount}
+            mcqCount={gateMcqCount}
+            onComplete={() => setShowGate(false)}
+          />
+        )}
+
         <div className="flex-1 flex flex-col gap-6 p-4 pt-6">
 
           {/* Greeting */}
@@ -101,6 +132,13 @@ export default function SubjectSelection() {
             </p>
             <p className="text-sm text-muted-foreground mt-1">Choose a subject to begin your session.</p>
           </div>
+
+          {/* Global streak */}
+          {streakData && (streakData.global_streak > 0 || (streakData.daily_question_count?.count ?? 0) > 0) && (
+            <div className="flex justify-center">
+              <GlobalStreakBadge streakData={streakData} />
+            </div>
+          )}
 
           {/* Subject cards grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

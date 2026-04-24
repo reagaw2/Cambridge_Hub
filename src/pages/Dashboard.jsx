@@ -4,6 +4,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames, normaliseTopicKey } from "../lib/topicStore";
 import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock } from "lucide-react";
+import GlobalStreakBadge from "@/components/GlobalStreakBadge";
+import { getStreakData } from "@/lib/topicStore";
 
 function BookmarkIcon() {
   return <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />;
@@ -202,11 +204,13 @@ export default function Dashboard() {
   const [reviewBank, setReviewBank] = useState([]);
   const [guessReviewBank, setGuessReviewBank] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [streakData, setStreakData] = useState(null);
 
   const { displayName, avatarLetter } = useDisplayName();
 
   async function loadDashboardData() {
     setLoading(true);
+    getStreakData().then(sd => setStreakData(sd));
     const writtenKeys = WRITTEN_TOPICS.map(t => t.key);
     const [rb, grb, mcqTopics, ...topicResults] = await Promise.all([
       getReviewBank(),
@@ -304,6 +308,13 @@ export default function Dashboard() {
           <p className="text-2xl font-serif font-semibold text-foreground leading-snug">
             {getGreeting(displayName)}
           </p>
+
+          {/* Global streak */}
+          {streakData && (streakData.global_streak > 0 || (streakData.daily_question_count?.count ?? 0) > 0) && (
+            <div className="flex justify-center">
+              <GlobalStreakBadge streakData={streakData} />
+            </div>
+          )}
 
           {/* Recommendation banner */}
           <RecommendationBanner trend={gf ? gf.trend : null} navigate={navigate} />

@@ -5,7 +5,7 @@
  */
 
 import { base44 } from "@/api/base44Client";
-import { normaliseTopicKey, toDateString } from "./topicStore";
+import { normaliseTopicKey, toDateString, recordGlobalQuestionAnswered } from "./topicStore";
 
 export { normaliseTopicKey, toDateString };
 
@@ -17,12 +17,10 @@ const DEFAULT_CS_DATA = () => ({
   cs_guess_review_bank: [],
 });
 
-let _cache = null;       // in-memory CS data
-let _recordId = null;    // StudentData record ID
+let _cache = null;
+let _recordId = null;
 let _userEmail = null;
 let _loadPromise = null;
-
-// ── Preload ────────────────────────────────────────────────────────────────
 
 export async function preloadCSStore(userEmail) {
   if (_userEmail !== userEmail) {
@@ -31,13 +29,10 @@ export async function preloadCSStore(userEmail) {
     _userEmail = userEmail;
     _loadPromise = null;
   }
-  // Force fresh fetch
   _cache = null;
   _loadPromise = null;
   return loadFromDB();
 }
-
-// ── Internal load/save ─────────────────────────────────────────────────────
 
 async function loadFromDB() {
   if (_cache) return _cache;
@@ -47,20 +42,14 @@ async function loadFromDB() {
   _loadPromise = (async () => {
     try {
       const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
-
       if (records && records.length > 0) {
-        // Use the most recently updated record; ignore duplicates
         const record = records.sort((a, b) => {
           const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
           const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
           return tb - ta;
         })[0];
-
         _recordId = record.id;
         const raw = record.cs_data;
-
-        console.log(`[csStore] raw DB cs_data for ${_userEmail}:`, JSON.stringify(raw));
-
         if (raw && typeof raw === "object" && Object.keys(raw).length > 0) {
           _cache = {
             topics: raw.topics || {},
@@ -89,12 +78,10 @@ async function loadFromDB() {
 async function saveToDB(data) {
   if (!_userEmail) return;
   _cache = data;
-
   try {
     if (_recordId) {
       await base44.entities.StudentData.update(_recordId, { cs_data: data });
     } else {
-      // No record found during preload — find or create
       const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
       if (records && records.length > 0) {
         const record = records.sort((a, b) => {
@@ -113,8 +100,6 @@ async function saveToDB(data) {
     console.warn("[csStore] failed to save to DB", e);
   }
 }
-
-// ── Topic Attempts ─────────────────────────────────────────────────────────
 
 export async function csRecordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
   const normKey = normaliseTopicKey(topicKey);
@@ -135,8 +120,8 @@ export async function csRecordAttempt(topicKey, score, { total_marks = 1, questi
     topic.streak = 1;
   }
   topic.last_streak_date = today;
-  console.log("[csStore] recordCSAttempt — writing to DB record:", _recordId, "topic:", topicKey, "score:", score, "/", total_marks);
   await saveToDB(data);
+  await recordGlobalQuestionAnswered();
 }
 
 export async function csGetTopicData(topicKey) {
@@ -198,8 +183,6 @@ export async function csGetTopicData(topicKey) {
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
-// ── CS Review Bank ─────────────────────────────────────────────────────────
-
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
   if (data.cs_review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
@@ -233,8 +216,6 @@ export async function csResetReviewBankLock(question_id) {
     await saveToDB(data);
   }
 }
-
-// ── CS MCQ ─────────────────────────────────────────────────────────────────
 
 export async function csSaveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
   const normKey = normaliseTopicKey(topic);
@@ -271,6 +252,7 @@ export async function csSaveMCQAttempt({ question_id, topic, source, chosen_opti
   }
 
   await saveToDB(data);
+  await recordGlobalQuestionAnswered();
 }
 
 export async function csGetGuessReviewBank() {

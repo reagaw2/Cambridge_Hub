@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
-import SubmitButton from "../../components/SubmitButton";
 import { getNextNuclearQuestion, advanceNuclearIndex, NUCLEAR_QUESTIONS } from "@/lib/nuclearBank";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
+import TeachMeHow from "@/components/TeachMeHow";
 
 export default function NuclearQuestionAttempt() {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ export default function NuclearQuestionAttempt() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [overrideQuestion, setOverrideQuestion] = useState(null);
+  const [showTeachMe, setShowTeachMe] = useState(false);
 
   const queued = getNextNuclearQuestion();
   const question = overrideQuestion ?? queued.question;
@@ -80,10 +81,19 @@ export default function NuclearQuestionAttempt() {
             </div>
           </div>
 
-          <AnswerInput value={answer} onChange={setAnswer} />
-          <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
-          {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
-          <DevQuestionJumper allQuestions={NUCLEAR_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); }} />
+          {showTeachMe ? (
+            <TeachMeHow question={question} onFinalSubmit={async (fb, finalAnswer) => { const m = fb.marks_earned ?? 0; await import("@/lib/topicStore").then(({recordAttempt, addToReviewBank}) => Promise.all([recordAttempt(question.topic_key, m, { total_marks: question.total_marks, question_id: question.id }), addToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks, first_attempt_score: m, first_attempt_feedback: fb.cambridge_insight ?? "" })])); advanceNuclearIndex(); navigate("/feedback", { state: { feedback: fb, answer: finalAnswer, topicKey: question.topic_key, questionId: question.id, nextFullRoute: question.nextFullRoute ?? "/nuclear/question", nextRetryRoute: question.nextRetryRoute ?? "/nuclear/question", backRoute: "/physics", paperRef: question.paper_ref } }); }} onClose={() => setShowTeachMe(false)} />
+          ) : (
+            <>
+              <AnswerInput value={answer} onChange={setAnswer} />
+              <div className="flex gap-2">
+                <button onClick={() => setShowTeachMe(true)} disabled={answer.trim().length > 0} className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Teach Me How</button>
+                <button onClick={handleSubmit} disabled={answer.trim().length === 0 || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{loading ? "Marking..." : "Submit"}</button>
+              </div>
+              {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+            </>
+          )}
+          <DevQuestionJumper allQuestions={NUCLEAR_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); setShowTeachMe(false); }} />
         </div>
       </div>
     </div>

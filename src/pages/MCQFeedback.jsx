@@ -56,6 +56,8 @@ export default function MCQFeedback() {
   // Save attempt to DB immediately on mount — must be before any early return
   useEffect(() => {
     if (!feedback || !attemptData || !question) return;
+    // Signal review gate
+    sessionStorage.setItem("review_gate_attempt", "1");
     saveMCQAttempt({
       question_id: question.id,
       topic: question.topic,

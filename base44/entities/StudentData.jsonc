@@ -11,9 +11,17 @@
       "description": "Per-topic attempt data keyed by topic key (Physics)",
       "additionalProperties": true
     },
+    "written_review_bank": {
+      "type": "array",
+      "description": "Physics written questions awaiting review (formerly review_bank)",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
     "review_bank": {
       "type": "array",
-      "description": "Physics questions awaiting review",
+      "description": "Legacy field \u2014 migrated to written_review_bank on load",
       "items": {
         "type": "object",
         "additionalProperties": true
@@ -31,9 +39,17 @@
         "additionalProperties": true
       }
     },
+    "mcq_review_bank": {
+      "type": "array",
+      "description": "Physics MCQ questions flagged for review (formerly guess_review_bank)",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
     "guess_review_bank": {
       "type": "array",
-      "description": "Physics question IDs flagged as guesses",
+      "description": "Legacy field \u2014 migrated to mcq_review_bank on load",
       "items": {
         "type": "string"
       }
@@ -48,6 +64,29 @@
         "cs_guess_review_bank": [],
         "cs_mcq_attempts": []
       }
+    },
+    "global_streak": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of consecutive days with 3+ questions answered"
+    },
+    "global_streak_last_date": {
+      "type": "string",
+      "description": "Date string (dd/mm/yyyy) when streak was last incremented"
+    },
+    "rest_day_passes": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of rest day passes held (max 1)"
+    },
+    "daily_question_count": {
+      "type": "object",
+      "description": "{ date: string, count: number } \u2014 resets each day",
+      "additionalProperties": true
+    },
+    "last_session_time": {
+      "type": "string",
+      "description": "ISO timestamp of last app open"
     }
   },
   "required": [

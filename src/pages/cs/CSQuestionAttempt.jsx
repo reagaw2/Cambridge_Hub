@@ -7,9 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
-import SubmitButton from "@/components/SubmitButton";
 import { csRecordAttempt, csAddToReviewBank } from "@/lib/csTopicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
+import TeachMeHow from "@/components/TeachMeHow";
 
 // Maps topic_key → the registered route path
 const TOPIC_ROUTES = {
@@ -29,6 +29,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showTeachMe, setShowTeachMe] = useState(false);
   const submittedRef = useRef(false);
 
   // Guard: if question bank is empty or question is undefined, show a graceful fallback
@@ -44,6 +45,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
   }
 
   const topicRoute = TOPIC_ROUTES[question.topic_key] ?? "/cs";
+  const isEmpty = answer.trim().length === 0;
 
   const handleSubmit = async () => {
     if (submittedRef.current) return;
@@ -90,7 +92,41 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
         topicKey: question.topic_key,
         questionId: question.id,
         totalMarks: question.total_marks,
-        // topicRoute: where "Next question" goes (same topic). If last Q, go to end-of-bank.
+        topicRoute: isLastQuestion ? null : topicRoute,
+        backRoute: topicRoute,
+        dashRoute: "/cs",
+        paperRef: question.paper_ref,
+        topicLabel: topicLabel ?? question.topic,
+        isLastQuestion,
+      },
+    });
+  };
+
+  const handleTeachMeFinalSubmit = async (fb, finalAnswer) => {
+    const marksEarned = fb.marks_earned ?? 0;
+    const fullMarks = marksEarned >= question.total_marks;
+    const nextIdx = idx + 1;
+    const isLastQuestion = nextIdx >= total;
+
+    await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
+    // Always add to review bank for Teach Me How
+    await csAddToReviewBank({
+      question_id: question.id,
+      topic: question.topic,
+      question_text: question.text,
+      mark_scheme: "",
+      total_marks: question.total_marks,
+      first_attempt_score: marksEarned,
+      first_attempt_feedback: fb.cambridge_insight ?? "",
+    });
+    onAdvance();
+    navigate("/cs/feedback", {
+      state: {
+        feedback: fb,
+        answer: finalAnswer,
+        topicKey: question.topic_key,
+        questionId: question.id,
+        totalMarks: question.total_marks,
         topicRoute: isLastQuestion ? null : topicRoute,
         backRoute: topicRoute,
         dashRoute: "/cs",
@@ -133,9 +169,34 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
             </div>
           </div>
 
-          <AnswerInput value={answer} onChange={setAnswer} />
-          <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
-          {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+          {showTeachMe ? (
+            <TeachMeHow
+              question={question}
+              onFinalSubmit={handleTeachMeFinalSubmit}
+              onClose={() => setShowTeachMe(false)}
+            />
+          ) : (
+            <>
+              <AnswerInput value={answer} onChange={setAnswer} />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowTeachMe(true); }}
+                  disabled={!isEmpty}
+                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Teach Me How
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isEmpty || loading}
+                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Marking..." : "Submit"}
+                </button>
+              </div>
+              {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+            </>
+          )}
           {allQuestions && onOverride && (
             <DevQuestionJumper allQuestions={allQuestions} onJump={(q) => { onOverride(q); }} />
           )}

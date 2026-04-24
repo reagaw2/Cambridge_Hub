@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Lock } from "lucide-react";
-import { getReviewBank, resetReviewBankLock } from "@/lib/topicStore";
+import { getReviewBank, getGuessReviewBank, resetReviewBankLock } from "@/lib/topicStore";
 
 function getLockStatus(locked_until, now) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -216,11 +216,16 @@ function QuestionCard({ q, now, navigate }) {
 export default function ReviewBankScreen() {
   const navigate = useNavigate();
   const [bank, setBank] = useState([]);
+  const [mcqBank, setMcqBank] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    getReviewBank().then(rb => { setBank(rb); setLoading(false); });
+    Promise.all([getReviewBank(), getGuessReviewBank()]).then(([rb, grb]) => {
+      setBank(rb);
+      setMcqBank(grb);
+      setLoading(false);
+    });
   }, []);
 
   // Tick every 30s — recalculates lock status and countdown displays reactively
@@ -261,8 +266,32 @@ export default function ReviewBankScreen() {
 
         <div className="flex-1 flex flex-col gap-5 p-4">
 
+          {/* Two bank cards at top */}
+          {(bank.length > 0 || mcqBank.length > 0) && (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => navigate("/review")}
+                disabled={bank.length === 0}
+                className={`bg-card border border-border rounded-xl p-4 text-left transition-all ${bank.length > 0 ? "hover:brightness-110 active:scale-[0.98]" : "opacity-40 cursor-default"}`}
+              >
+                <div className="text-lg mb-1">📝</div>
+                <p className="text-xs font-semibold text-foreground">{bank.length > 0 ? `${bank.length} waiting` : "All clear ✓"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Written</p>
+              </button>
+              <button
+                onClick={() => navigate("/guess-review-bank")}
+                disabled={mcqBank.length === 0}
+                className={`bg-card border border-border rounded-xl p-4 text-left transition-all ${mcqBank.length > 0 ? "hover:brightness-110 active:scale-[0.98]" : "opacity-40 cursor-default"}`}
+              >
+                <div className="text-lg mb-1">☑</div>
+                <p className="text-xs font-semibold text-foreground">{mcqBank.length > 0 ? `${mcqBank.length} waiting` : "All clear ✓"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Multiple Choice</p>
+              </button>
+            </div>
+          )}
+
           {/* All locked — empty state */}
-          {bank.length === 0 && (
+          {bank.length === 0 && mcqBank.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-4">
               <p className="text-lg font-semibold text-foreground leading-relaxed">
                 No questions in your review bank right now.

@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
-import SubmitButton from "../../components/SubmitButton";
 import { getNextGravitationalQuestion, advanceGravitationalIndex, GRAVITATIONAL_QUESTIONS } from "@/lib/gravitationalBank";
 import { recordAttempt, addToReviewBank } from "@/lib/topicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
+import TeachMeHow from "@/components/TeachMeHow";
 
 export default function GravitationalQuestionAttempt() {
   const navigate = useNavigate();
@@ -14,11 +14,13 @@ export default function GravitationalQuestionAttempt() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [overrideQuestion, setOverrideQuestion] = useState(null);
+  const [showTeachMe, setShowTeachMe] = useState(false);
 
   const queued = getNextGravitationalQuestion();
   const question = overrideQuestion ?? queued.question;
   const idx = overrideQuestion ? 0 : queued.idx;
   const total = overrideQuestion ? 1 : queued.total;
+  const isEmpty = answer.trim().length === 0;
 
   if (!question) {
     return (
@@ -99,10 +101,29 @@ export default function GravitationalQuestionAttempt() {
               <span className="font-mono text-xs text-muted-foreground">[{question.total_marks} mark{question.total_marks !== 1 ? "s" : ""}]</span>
             </div>
           </div>
-          <AnswerInput value={answer} onChange={setAnswer} />
-          <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
-          {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
-          <DevQuestionJumper allQuestions={GRAVITATIONAL_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); }} />
+          {showTeachMe ? (
+            <TeachMeHow
+              question={question}
+              onFinalSubmit={async (fb, finalAnswer) => {
+                const marksEarned = fb.marks_earned ?? 0;
+                await recordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
+                await addToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "" });
+                advanceGravitationalIndex();
+                navigate("/feedback", { state: { feedback: fb, answer: finalAnswer, topicKey: question.topic_key, questionId: question.id, nextFullRoute: "/gravitational/question", nextRetryRoute: "/gravitational/question", backRoute: "/physics", paperRef: question.paper_ref } });
+              }}
+              onClose={() => setShowTeachMe(false)}
+            />
+          ) : (
+            <>
+              <AnswerInput value={answer} onChange={setAnswer} />
+              <div className="flex gap-2">
+                <button onClick={() => setShowTeachMe(true)} disabled={!isEmpty} className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Teach Me How</button>
+                <button onClick={handleSubmit} disabled={isEmpty || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{loading ? "Marking..." : "Submit"}</button>
+              </div>
+              {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
+            </>
+          )}
+          <DevQuestionJumper allQuestions={GRAVITATIONAL_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); setShowTeachMe(false); }} />
         </div>
       </div>
     </div>

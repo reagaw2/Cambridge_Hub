@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { ChevronDown } from "lucide-react";
+import VoiceInput from "./VoiceInput";
 
 const STAGES = {
   INITIAL_ATTEMPT: "initial_attempt",    // Step 1-3: minimal input + AI marking
@@ -93,14 +94,17 @@ export default function TeachMeHow({ question, onFinalSubmit, onClose }) {
           <label className="text-xs text-muted-foreground leading-relaxed">
             Write at least one word or idea before we walk through it together
           </label>
-          <div className="relative">
-            <textarea
-              value={minimalInput}
-              onChange={e => setMinimalInput(e.target.value)}
-              placeholder="Just one idea — anything you know..."
-              rows={3}
-              className="w-full bg-card border border-white/8 rounded-xl p-4 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
-            />
+          <div className="space-y-2">
+            <div className="relative">
+              <textarea
+                value={minimalInput}
+                onChange={e => setMinimalInput(e.target.value)}
+                placeholder="Just one idea — anything you know..."
+                rows={3}
+                className="w-full bg-card border border-white/8 rounded-xl p-4 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
+              />
+            </div>
+            <VoiceInput onTranscript={setMinimalInput} />
           </div>
           {minimalInput.trim().length > 0 && (
             <button
@@ -179,18 +183,21 @@ export default function TeachMeHow({ question, onFinalSubmit, onClose }) {
               {/* Final attempt */}
               <div className="space-y-3 pt-1">
                 <label className="text-xs text-muted-foreground">Now write it in your own words</label>
-                <div className="relative">
-                  <textarea
-                    value={finalInput}
-                    onChange={e => setFinalInput(e.target.value)}
-                    placeholder="Write your answer using Cambridge language..."
-                    rows={4}
-                    maxLength={800}
-                    className="w-full bg-card border border-white/8 rounded-xl p-4 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
-                  />
-                  <span className="absolute bottom-3 right-4 font-mono text-[11px] text-muted-foreground/50">
-                    {finalInput.length}/800
-                  </span>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <textarea
+                      value={finalInput}
+                      onChange={e => setFinalInput(e.target.value)}
+                      placeholder="Write your answer using Cambridge language..."
+                      rows={4}
+                      maxLength={800}
+                      className="w-full bg-card border border-white/8 rounded-xl p-4 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
+                    />
+                    <span className="absolute bottom-3 right-4 font-mono text-[11px] text-muted-foreground/50">
+                      {finalInput.length}/800
+                    </span>
+                  </div>
+                  <VoiceInput onTranscript={setFinalInput} />
                 </div>
                 <button
                   onClick={handleFinalSubmit}

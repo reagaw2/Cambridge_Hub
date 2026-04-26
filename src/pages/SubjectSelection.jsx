@@ -4,7 +4,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, getMCQOnlyTopicNames, getStreakData, recordAppOpen, shouldShowReviewGate, getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { csGetTopicData } from "@/lib/csTopicStore";
-import { Atom, Lock, Code2 } from "lucide-react";
+import { getAnyPausedSession } from "@/lib/examStore";
+import { Atom, Lock, Code2, FileText, Play } from "lucide-react";
 import { toast } from "sonner";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import ReviewGate from "@/components/ReviewGate";
@@ -53,6 +54,7 @@ export default function SubjectSelection() {
   const [showGate, setShowGate] = useState(false);
   const [gateWrittenCount, setGateWrittenCount] = useState(0);
   const [gateMcqCount, setGateMcqCount] = useState(0);
+  const [pausedExam, setPausedExam] = useState(null);
 
   useEffect(() => {
     async function calcPhysicsScore() {
@@ -75,11 +77,12 @@ export default function SubjectSelection() {
       setCsLoaded(true);
     }
     async function loadStreakAndGate() {
-      const [sd, gateCheck, writtenBank, mcqBank] = await Promise.all([
+      const [sd, gateCheck, writtenBank, mcqBank, paused] = await Promise.all([
         getStreakData(),
         shouldShowReviewGate(),
         getReviewBank(),
         getGuessReviewBank(),
+        getAnyPausedSession(),
       ]);
       setStreakData(sd);
       if (gateCheck) {
@@ -87,6 +90,7 @@ export default function SubjectSelection() {
         setGateMcqCount(mcqBank.length);
         setShowGate(true);
       }
+      setPausedExam(paused);
       // Record app open (updates last_session_time)
       await recordAppOpen();
     }
@@ -201,6 +205,40 @@ export default function SubjectSelection() {
           <p className="text-[11px] text-muted-foreground/40 text-center leading-relaxed">
             More subjects coming soon — Mathematics, Chemistry, Biology.
           </p>
+
+          {/* Past Paper Mode entry */}
+          <div className="bg-card border border-border border-l-4 border-l-primary/60 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary/80 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">📄 Past Paper Mode</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Attempt a full paper under timed exam conditions.</p>
+              </div>
+            </div>
+
+            {/* Paused session banner */}
+            {pausedExam && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold text-amber-400">Session paused</p>
+                  <p className="text-xs text-foreground/70 font-medium">{pausedExam.paper}</p>
+                </div>
+                <button
+                  onClick={() => navigate("/exam/session", { state: { paperId: pausedExam.paper, fresh: false } })}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:brightness-110 transition-all shrink-0"
+                >
+                  <Play className="w-3.5 h-3.5" /> Resume
+                </button>
+              </div>
+            )}
+
+            <button
+              onClick={() => navigate("/exam/select")}
+              className="w-full bg-primary/15 border border-primary/40 text-primary font-semibold text-sm py-3 rounded-xl hover:bg-primary/25 active:scale-[0.98] transition-all"
+            >
+              Start a Paper →
+            </button>
+          </div>
 
         </div>
       </div>

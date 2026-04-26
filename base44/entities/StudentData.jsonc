@@ -87,6 +87,74 @@
     "last_session_time": {
       "type": "string",
       "description": "ISO timestamp of last app open"
+    },
+    "exam_sessions": {
+      "type": "array",
+      "description": "Past paper exam session records",
+      "items": {
+        "type": "object",
+        "properties": {
+          "paper": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "date_started": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "time_remaining_seconds": {
+            "type": "number"
+          },
+          "current_question_index": {
+            "type": "number"
+          },
+          "answers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "question_id": {
+                  "type": "string"
+                },
+                "answer_text": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "total_marks": {
+                  "type": "number"
+                },
+                "skipped": {
+                  "type": "boolean"
+                },
+                "flagged": {
+                  "type": "boolean"
+                },
+                "ai_feedback": {
+                  "type": "string"
+                },
+                "mark_scheme": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "total_score": {
+            "type": "number"
+          },
+          "total_marks": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": true
+      },
+      "default": []
     }
   },
   "required": [

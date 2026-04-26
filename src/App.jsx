@@ -59,6 +59,9 @@ import MCQSession from './pages/MCQSession';
 import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
 import Onboarding from './pages/Onboarding';
+import ExamPaperSelect from './pages/ExamPaperSelect';
+import ExamSession from './pages/ExamSession';
+import ExamResults from './pages/ExamResults';
 import GravitationalQuestion1a from './pages/gravitational/Question1a';
 import GravitationalQuestion1bi from './pages/gravitational/Question1bi';
 import ThermalQuestion2a from './pages/thermal/Question2a';
@@ -196,6 +199,9 @@ const AuthenticatedApp = () => {
         <Route path="/cs/review-session" element={<CSReviewSession />} />
         <Route path="/cs/end-of-bank" element={<CSEndOfBank />} />
         <Route path="/cs/feedback" element={<CSFeedback />} />
+        <Route path="/exam/select" element={<ExamPaperSelect />} />
+        <Route path="/exam/session" element={<ExamSession />} />
+        <Route path="/exam/results" element={<ExamResults />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>

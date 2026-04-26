@@ -460,6 +460,42 @@ Student's answer: ${answer}
 Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
 { "marks_earned": [number out of 3], "mark_1": { "earned": true or false, "keyword": "encryption identified", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "encodes or scrambles data so it cannot be understood if intercepted", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "algorithm or key required to decode the data", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
   },
+  {
+    id: "Q_9618_13_N25_005",
+    label: "Question 5(d)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Data Security",
+    topic_key: "data_security",
+    text: "Describe two ways in which a Database Management System (DBMS) can be used to ensure the security of customer data.",
+    total_marks: 4,
+    response_schema: {
+      type: "object",
+      properties: {
+        marks_earned: { type: "number" },
+        mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_3: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_4: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+      },
+      required: ["marks_earned","mark_1","cambridge_insight","next_step"],
+    },
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Describe two ways in which a Database Management System (DBMS) can be used to ensure the security of customer data.
+
+Mark scheme — 2 marks per way (method + justification):
+- B1 mark 1: authentication methods / passwords / biometrics / 2-factor authentication can be implemented
+- B1 mark 2: ...which prevents unauthorised access to the customer data
+- B1 mark 3: second method — access rights can be set / data encrypted / backups scheduled / different views created
+- B1 mark 4: ...corresponding justification for the second method chosen
+
+Student's answer: ${answer}
+
+Award 1 mark for each valid method and 1 mark for each corresponding security justification, maximum 4 total. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 4], "mark_1": { "earned": true or false, "keyword": "first DBMS security method — authentication / passwords / biometrics / 2FA", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "justification — prevents unauthorised access to customer data", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "second DBMS security method — access rights / encryption / backups / views", "found": true or false, "feedback": "one sentence explanation" }, "mark_4": { "earned": true or false, "keyword": "corresponding justification for second method", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
 ];
 
 const INDEX_KEY = "cs_data_security_question_index";

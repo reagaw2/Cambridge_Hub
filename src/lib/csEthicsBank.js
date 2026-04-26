@@ -250,6 +250,28 @@ Student's answer: ${answer}
 Award 1 mark for each distinct valid point up to 2. Respond in the following JSON format only, no extra text:
 { "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "any valid shareware benefit — constructive feedback / more users try it / bugs found / income from purchases / copyright protection", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "a second different valid shareware benefit", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
   },
+  {
+    id: "Q_9618_13_N25_007",
+    label: "Question 7(a)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Ethics and Ownership",
+    topic_key: "ethics_and_ownership",
+    text: "A digital video camera uses AI to analyse footage and identify when students are interacting with a lesson. Describe one ethical impact of this use of AI in the classroom.",
+    total_marks: 2,
+    response_schema: SCHEMA_2,
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: A digital video camera uses AI to analyse footage and identify when students are interacting with a lesson. Describe one ethical impact of this use of AI in the classroom.
+
+Mark scheme — any one impact plus elaboration:
+- B1 mark 1: any one from — privacy concerns as students/teachers uncomfortable with surveillance / mental health concerns due to constant monitoring / learning could be improved by identifying struggling students
+- B1 mark 2: corresponding elaboration of the chosen impact and its consequence
+
+Student's answer: ${answer}
+
+Both a negative and a positive ethical impact are acceptable. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "valid ethical impact stated — privacy concerns / mental health concerns / improved learning / surveillance discomfort", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "elaboration connecting the impact to a real consequence", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
 ];
 
 const INDEX_KEY = "cs_ethics_question_index";

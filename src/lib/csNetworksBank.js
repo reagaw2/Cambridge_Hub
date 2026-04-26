@@ -982,6 +982,50 @@ Student's answer: ${answer}
 Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
 { "marks_earned": [number out of 1], "mark_1": { "earned": true or false, "keyword": "static means IP does not change AND private means only accessible within the LAN", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
   },
+  {
+    id: "Q_9618_13_N25_003",
+    label: "Question 4(a)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Networks and the Internet",
+    topic_key: "networks_and_the_internet",
+    text: "Give three advantages of a wireless network compared to a wired network.",
+    total_marks: 3,
+    response_schema: SCHEMA_3,
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Give three advantages of a wireless network compared to a wired network.
+
+Mark scheme — any three of the following:
+- B1: devices can be more mobile as no physical connection is required
+- B1: no cabling is needed so easier to set up
+- B1: any one from — easier to add additional devices / multiple different device types can be connected
+
+Student's answer: ${answer}
+
+Each advantage must be framed as comparative — a feature of wireless over wired. Award 1 mark for each distinct valid advantage up to 3. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 3], "mark_1": { "earned": true or false, "keyword": "devices can be more mobile / no physical connection required", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "no cabling needed / easier to set up", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "easier to add devices / multiple device types can connect", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
+  {
+    id: "Q_9618_13_N25_004",
+    label: "Question 4(b)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Networks and the Internet",
+    topic_key: "networks_and_the_internet",
+    text: "Give one drawback of using a wireless network.",
+    total_marks: 1,
+    response_schema: SCHEMA_1,
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Give one drawback of using a wireless network.
+
+Mark scheme — any one of the following:
+- B1: can be less secure / transmission speed can be slow / interference is possible / signal degrades quickly without repeaters
+
+Student's answer: ${answer}
+
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 1], "mark_1": { "earned": true or false, "keyword": "less secure / slower transmission / interference possible / signal degrades without repeaters", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
 ];
 
 const INDEX_KEY = "cs_networks_question_index";

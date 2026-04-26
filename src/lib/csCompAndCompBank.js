@@ -85,6 +85,78 @@ Student's answer: ${answer}
 Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
 { "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "pressure sensor OR infrared sensor", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "pressure — detects weight change / infrared — detects when beam is broken", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
   },
+  {
+    id: "Q_9618_13_N25_006",
+    label: "Question 6(b)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Computers and Components",
+    topic_key: "computers_and_components",
+    text: "Describe the role of the Memory Address Register (MAR) and Memory Data Register (MDR) in the fetch-execute cycle.",
+    total_marks: 4,
+    response_schema: {
+      type: "object",
+      properties: {
+        marks_earned: { type: "number" },
+        mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_3: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_4: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+      },
+      required: ["marks_earned","mark_1","cambridge_insight","next_step"],
+    },
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Describe the role of the Memory Address Register (MAR) and Memory Data Register (MDR) in the fetch-execute cycle.
+
+Mark scheme:
+- B1 mark 1: MAR stores the address of the next instruction/data to be read from or written to memory
+- B1 mark 2: the address is received from the Program Counter (PC)
+- B1 mark 3: the MDR stores the data/instruction at the address stored in the MAR which has been read/written
+- B1 mark 4: the instruction passes to the CIR for decoding and executing
+
+Student's answer: ${answer}
+
+Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 4], "mark_1": { "earned": true or false, "keyword": "MAR stores address of next instruction or data to be read from or written to memory", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "address received from the Program Counter (PC)", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "MDR stores data/instruction at the address in MAR", "found": true or false, "feedback": "one sentence explanation" }, "mark_4": { "earned": true or false, "keyword": "instruction passes to CIR for decoding and executing", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
+  {
+    id: "Q_9618_13_N25_009",
+    label: "Question 7(d)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Computers and Components",
+    topic_key: "computers_and_components",
+    text: "Describe two reasons why a server that stores large numbers of video files uses magnetic hard disks instead of solid state (flash) memory.",
+    total_marks: 4,
+    response_schema: {
+      type: "object",
+      properties: {
+        marks_earned: { type: "number" },
+        mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_3: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_4: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+      },
+      required: ["marks_earned","mark_1","cambridge_insight","next_step"],
+    },
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Describe two reasons why a server that stores large numbers of video files uses magnetic hard disks instead of solid state (flash) memory.
+
+Mark scheme — 2 marks per reason (statement + context-linked justification):
+- B1 mark 1: lower cost per unit of storage
+- B1 mark 2: ...so the high capacity required for large numbers of video files will be less costly
+- B1 mark 3: a large number of read/write operations are performed continuously
+- B1 mark 4: ...and magnetic storage is likely to have a longer lifespan compared with solid state under heavy continuous use
+
+Student's answer: ${answer}
+
+Each reason requires a statement plus a justification tied to the context of storing large numbers of video files. Award 1 mark per point up to 4. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 4], "mark_1": { "earned": true or false, "keyword": "lower cost per unit of storage", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "so high capacity for large numbers of video files will be less costly", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "large number of read/write operations performed continuously", "found": true or false, "feedback": "one sentence explanation" }, "mark_4": { "earned": true or false, "keyword": "magnetic storage has longer lifespan under heavy continuous use compared to solid state", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
 ];
 
 const INDEX_KEY = "cs_comp_question_index";

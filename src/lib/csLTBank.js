@@ -119,6 +119,64 @@ Student's answer: ${answer}
 Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
 { "marks_earned": [number out of 1], "mark_1": { "earned": true or false, "keyword": "to create a symbol table", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
   },
+  {
+    id: "Q_9618_13_N25_010",
+    label: "Question 8(a)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Language Translators",
+    topic_key: "language_translators",
+    text: "State two disadvantages of using a compiler compared to an interpreter during program development.",
+    total_marks: 2,
+    response_schema: MARK_SCHEMA_2,
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: State two disadvantages of using a compiler compared to an interpreter during program development.
+
+Mark scheme — any two of the following:
+- B1: large amounts of source code take time to compile
+- B1: code must be recompiled when changed
+- B1: program cannot run if there are errors
+- B1: sections of code cannot easily be tested
+
+Student's answer: ${answer}
+
+Award 1 mark for each distinct valid disadvantage up to 2. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 2], "mark_1": { "earned": true or false, "keyword": "any valid compiler disadvantage — slow compilation / must recompile after changes / cannot run with errors / cannot test sections", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "a second different valid compiler disadvantage", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
+  {
+    id: "Q_9618_13_N25_011",
+    label: "Question 8(b)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Language Translators",
+    topic_key: "language_translators",
+    text: "Explain how a programmer benefits from using program libraries during program development.",
+    total_marks: 3,
+    response_schema: {
+      type: "object",
+      properties: {
+        marks_earned: { type: "number" },
+        mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        mark_3: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } }, required: ["earned","keyword","found","feedback"] },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+      },
+      required: ["marks_earned","mark_1","cambridge_insight","next_step"],
+    },
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Explain how a programmer benefits from using program libraries during program development.
+
+Mark scheme — any three of the following:
+- B1 mark 1: programming time is saved as code does not have to be written from scratch
+- B1 mark 2: testing time is saved as library code is already tested and documented
+- B1 mark 3: any one from — library routines automatically update if changed / programmer can use routines for complex functions they may not be able to write themselves
+
+Student's answer: ${answer}
+
+Award 1 mark for each distinct valid benefit up to 3. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 3], "mark_1": { "earned": true or false, "keyword": "programming time saved as code does not have to be written from scratch", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "testing time saved as library code is already tested and documented", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "library routines update automatically / programmer can use complex routines they could not write themselves", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
 ];
 
 const INDEX_KEY = "cs_lt_question_index";

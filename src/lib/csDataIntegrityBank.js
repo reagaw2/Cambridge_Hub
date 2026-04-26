@@ -366,6 +366,29 @@ Student's answer: ${answer}
 Award 1 mark for each distinct valid point up to 4. Respond in the following JSON format only, no extra text:
 { "marks_earned": [number out of 4], "mark_1": { "earned": true or false, "keyword": "administrator completes a visual check", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "input matched against original document", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "double entry check / data entered a second time", "found": true or false, "feedback": "one sentence explanation" }, "mark_4": { "earned": true or false, "keyword": "system compares second entry with first entry", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
   },
+  {
+    id: "Q_9618_13_N25_008",
+    label: "Question 7(c)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Data Integrity",
+    topic_key: "data_integrity",
+    text: "Identify and describe one method of data verification that can be used when transferring data from a digital video camera to a server.",
+    total_marks: 3,
+    response_schema: SCHEMA_3,
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Identify and describe one method of data verification that can be used when transferring data from a digital video camera to a server.
+
+Mark scheme:
+- B1 mark 1: correct name — Parity Byte Check / Parity Block Check / Checksum
+- B1 mark 2: first part of description — e.g. for Checksum: a calculation is made from the data and transmitted with it
+- B1 mark 3: second part of description — e.g. the receiver performs the same calculation and compares with the received checksum to verify a match
+
+Student's answer: ${answer}
+
+Three marks means the name plus a two-part description. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 3], "mark_1": { "earned": true or false, "keyword": "Parity Byte Check / Parity Block Check / Checksum named", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "calculation made from data and transmitted with it / parity bit added to each byte", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "receiver performs same calculation and compares to verify match / each byte checked on receipt", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
 ];
 
 const INDEX_KEY = "cs_data_integrity_question_index";

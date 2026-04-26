@@ -251,6 +251,29 @@ Student's answer: ${answer}
 Award 1 mark for each distinct valid point up to 4 total with maximum 3 from each management task. Respond in the following JSON format only, no extra text:
 { "marks_earned": [number out of 4], "mark_1": { "earned": true or false, "keyword": "memory management point — stores concurrent program data in RAM / prevents overwriting / decides which processes in memory / efficient use of memory", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "second memory management point", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "process management point — pauses processes / decides next process / switches between processes / scheduling", "found": true or false, "feedback": "one sentence explanation" }, "mark_4": { "earned": true or false, "keyword": "second process management point", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
   },
+  {
+    id: "Q_9618_13_N25_012",
+    label: "Question 8(d)",
+    paper_ref: "9618/13 · Oct/Nov 2025",
+    topic: "Operating Systems",
+    topic_key: "operating_systems",
+    text: "Memory management is one key management task performed by an Operating System. Give three other key management tasks that are performed by an OS.",
+    total_marks: 3,
+    response_schema: MARK_SCHEMA_3,
+    prompt: (answer) => `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
+
+Question: Memory management is one key management task performed by an Operating System. Give three other key management tasks that are performed by an OS.
+
+Mark scheme — any three of the following (memory management must not be repeated):
+- B1: file management
+- B1: security management
+- B1: any one from — hardware/peripheral management / process management
+
+Student's answer: ${answer}
+
+Award 1 mark for each distinct valid OS management task up to 3. Repeating memory management earns no credit. Respond in the following JSON format only, no extra text:
+{ "marks_earned": [number out of 3], "mark_1": { "earned": true or false, "keyword": "file management", "found": true or false, "feedback": "one sentence explanation" }, "mark_2": { "earned": true or false, "keyword": "security management", "found": true or false, "feedback": "one sentence explanation" }, "mark_3": { "earned": true or false, "keyword": "hardware/peripheral management OR process management", "found": true or false, "feedback": "one sentence explanation" }, "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone", "next_step": "one sentence telling the student exactly what to focus on in their next attempt" }`,
+  },
 ];
 
 const INDEX_KEY = "cs_os_question_index";

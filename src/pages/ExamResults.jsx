@@ -2,7 +2,7 @@
  * ExamResults — end of paper screen with AI feedback revealed.
  * Automatically adds imperfect answers to the written_review_bank.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CheckCircle2, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { base44 } from "@/api/base44Client";
@@ -29,7 +29,7 @@ function QuestionResult({ q, answer, idx, onFeedbackReady }) {
       // Skipped — no AI call needed
       setFeedback({ marks_earned: 0, cambridge_insight: "This question was skipped.", examiner_comment: "Try this question again in the review bank.", mark_breakdown: [] });
       setScore(0);
-      onFeedbackReady(idx, 0, "Skipped — no answer provided.", q.mark_scheme);
+      onFeedbackReady(idx, 0, "Skipped — no answer provided.");
       return;
     }
     setLoading(true);
@@ -41,7 +41,7 @@ function QuestionResult({ q, answer, idx, onFeedbackReady }) {
       const fb = res?.response ?? res;
       setFeedback(fb);
       setScore(fb.marks_earned ?? 0);
-      onFeedbackReady(idx, fb.marks_earned ?? 0, fb.cambridge_insight ?? "", q.mark_scheme);
+      onFeedbackReady(idx, fb.marks_earned ?? 0, fb.cambridge_insight ?? "");
       setLoading(false);
     }).catch(() => {
       setFeedback({ marks_earned: 0, cambridge_insight: "Could not retrieve feedback.", examiner_comment: "", mark_breakdown: [] });
@@ -136,23 +136,40 @@ export default function ExamResults() {
   const { paperId, answers = [], questions = [], timeTaken = 0, paper, displayName } = location.state ?? {};
 
   const [scoreboard, setScoreboard] = useState({}); // { idx: score }
-  const [reviewLogged, setReviewLogged] = useState(false);
+  const loggedRef = useRef(new Set()); // track question IDs already sent to review bank
 
   const totalAttempted = answers.filter(a => a.answer_text).length;
   const totalSkipped = answers.filter(a => !a.answer_text).length;
   const totalMarks = questions.reduce((s, q) => s + q.total_marks, 0);
   const totalEarned = Object.values(scoreboard).reduce((s, v) => s + (v ?? 0), 0);
 
-  function handleFeedbackReady(idx, score, insight, markScheme) {
-    setScoreboard(prev => {
-      const updated = { ...prev, [idx]: score };
-      return updated;
+  // Auto-log skipped questions to review bank immediately on mount (no card expansion needed)
+  useEffect(() => {
+    questions.forEach((q, i) => {
+      const a = answers[i];
+      if (!a?.answer_text && !loggedRef.current.has(q.id)) {
+        loggedRef.current.add(q.id);
+        addToReviewBank({
+          question_id: q.id,
+          topic: q.topic,
+          question_text: q.text,
+          mark_scheme: q.mark_scheme,
+          total_marks: q.total_marks,
+          first_attempt_score: 0,
+          first_attempt_feedback: "Skipped during exam.",
+        });
+      }
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    // Log to review bank if not perfect
+  function handleFeedbackReady(idx, score, insight) {
+    setScoreboard(prev => ({ ...prev, [idx]: score }));
+
+    // Log to review bank if not perfect — deduplicated by loggedRef
     const q = questions[idx];
-    const a = answers[idx];
-    if (!reviewLogged && score < q.total_marks) {
+    if (score < q.total_marks && !loggedRef.current.has(q.id)) {
+      loggedRef.current.add(q.id);
       addToReviewBank({
         question_id: q.id,
         topic: q.topic,
@@ -164,13 +181,6 @@ export default function ExamResults() {
       });
     }
   }
-
-  // After all scores in, mark review as logged to avoid duplicates
-  useEffect(() => {
-    if (Object.keys(scoreboard).length === questions.length) {
-      setReviewLogged(true);
-    }
-  }, [scoreboard, questions.length]);
 
   if (!paperId || questions.length === 0) {
     return (

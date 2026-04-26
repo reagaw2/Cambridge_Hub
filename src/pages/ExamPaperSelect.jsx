@@ -149,13 +149,25 @@ export default function ExamPaperSelect() {
                 <FileText className="w-4 h-4 text-primary" />
                 <p className="font-bold text-foreground">{selectedPaper.id}</p>
               </div>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{selectedPaper.questions.length} question{selectedPaper.questions.length !== 1 ? "s" : ""} available</span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {selectedPaper.estimatedHours}h suggested
-                </span>
-              </div>
+              {(() => {
+                const totalMarks = selectedPaper.questions.reduce((s, q) => s + q.total_marks, 0);
+                const allocatedSecs = totalMarks * 105;
+                const h = Math.floor(allocatedSecs / 3600);
+                const m = Math.floor((allocatedSecs % 3600) / 60);
+                const timeStr = h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+                return (
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between">
+                      <span>{selectedPaper.questions.length} question{selectedPaper.questions.length !== 1 ? "s" : ""} available</span>
+                      <span>{totalMarks} marks total</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-primary/80">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Allocated time: {timeStr} (based on {totalMarks} marks)</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Paused session for this paper */}
               {pausedSession ? (
@@ -192,7 +204,7 @@ export default function ExamPaperSelect() {
             </div>
           ) : (
             <div className="bg-card border border-border border-dashed rounded-xl p-5 text-center text-sm text-muted-foreground">
-              No paper available for that combination yet. Try a different variant or session.
+              No questions available for this paper yet — check back soon.
             </div>
           )}
 

@@ -5,8 +5,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Flag, LogOut } from "lucide-react";
-import { getPaper, EXAM_DURATION_SECONDS } from "@/lib/examPapers";
+import { getPaper } from "@/lib/examPapers";
 import { getPausedSession, startExamSession, saveExamSession, completeExamSession, invalidateExamCache } from "@/lib/examStore";
+import { recordGlobalQuestionAnswered } from "@/lib/topicStore";
 import VoiceInput from "@/components/VoiceInput";
 
 function formatTime(s) {
@@ -30,7 +31,9 @@ export default function ExamSession() {
     questions.map(q => ({ question_id: q.id, answer_text: "", score: 0, total_marks: q.total_marks, skipped: false, flagged: false, ai_feedback: "", mark_scheme: q.mark_scheme }))
   );
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(EXAM_DURATION_SECONDS);
+  const totalMarks = questions.reduce((s, q) => s + q.total_marks, 0);
+  const timeAllocated = totalMarks * 105;
+  const [timeLeft, setTimeLeft] = useState(timeAllocated);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [phase, setPhase] = useState("exam"); // "exam" | "flagged" | "done"
   const [flaggedQueue, setFlaggedQueue] = useState([]); // indices of flagged questions yet to answer
@@ -41,10 +44,12 @@ export default function ExamSession() {
   const answersRef = useRef(answers);
   const timeRef = useRef(timeLeft);
   const currentIdxRef = useRef(currentIdx);
+  const currentAnswerRef = useRef("");
 
   useEffect(() => { answersRef.current = answers; }, [answers]);
   useEffect(() => { timeRef.current = timeLeft; }, [timeLeft]);
   useEffect(() => { currentIdxRef.current = currentIdx; }, [currentIdx]);
+  useEffect(() => { currentAnswerRef.current = currentAnswer; }, [currentAnswer]);
 
   // Load session on mount
   useEffect(() => {
@@ -52,11 +57,11 @@ export default function ExamSession() {
     async function init() {
       invalidateExamCache();
       if (fresh) {
-        const s = await startExamSession(paperId, paper.subject, N, questions.reduce((s, q) => s + q.total_marks, 0));
+        const s = await startExamSession(paperId, paper.subject, N, totalMarks);
         if (s) {
           setAnswers(questions.map(q => ({ question_id: q.id, answer_text: "", score: 0, total_marks: q.total_marks, skipped: false, flagged: false, ai_feedback: "", mark_scheme: q.mark_scheme })));
           setCurrentIdx(0);
-          setTimeLeft(EXAM_DURATION_SECONDS);
+          setTimeLeft(totalMarks * 105);
         }
       } else {
         const s = await getPausedSession(paperId);
@@ -67,7 +72,7 @@ export default function ExamSession() {
             mark_scheme: questions[i]?.mark_scheme ?? a.mark_scheme,
           })));
           setCurrentIdx(s.current_question_index ?? 0);
-          setTimeLeft(s.time_remaining_seconds ?? EXAM_DURATION_SECONDS);
+          setTimeLeft(s.time_remaining_seconds ?? timeAllocated);
         }
       }
       setLoading(false);
@@ -110,11 +115,12 @@ export default function ExamSession() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function persistSession(silent = true) {
+  function persistSession() {
     const updatedAnswers = [...answersRef.current];
     const cur = currentIdxRef.current;
-    if (updatedAnswers[cur]) {
-      updatedAnswers[cur] = { ...updatedAnswers[cur], answer_text: currentAnswer };
+    const liveAnswer = currentAnswerRef.current;
+    if (updatedAnswers[cur] && liveAnswer) {
+      updatedAnswers[cur] = { ...updatedAnswers[cur], answer_text: liveAnswer };
     }
     saveExamSession(paperId, {
       time_remaining_seconds: timeRef.current,
@@ -170,6 +176,8 @@ export default function ExamSession() {
     setAnswers(updated);
     answersRef.current = updated;
     setCurrentAnswer("");
+    // Count toward daily streak (fire-and-forget)
+    recordGlobalQuestionAnswered();
 
     if (phase === "flagged") {
       const remaining = flaggedQueue.filter(i => i !== currentIdx);
@@ -231,7 +239,7 @@ export default function ExamSession() {
 
   function finishExam(finalAnswers) {
     clearInterval(timerRef.current);
-    const timeTaken = EXAM_DURATION_SECONDS - timeRef.current;
+    const timeTaken = timeAllocated - timeRef.current;
     completeExamSession(paperId, {
       answers: finalAnswers,
       time_remaining_seconds: timeRef.current,

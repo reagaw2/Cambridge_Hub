@@ -54,14 +54,17 @@ export async function startExamSession(paperId, subject, totalQuestions, totalMa
   // Remove old paused session for this paper
   const filtered = record.exam_sessions.filter(s => !(s.paper === paperId && s.status === "paused"));
 
+  const timeAllocated = totalMarks * 105; // spec: total_marks × 105 seconds
+
   const newSession = {
     paper: paperId,
     subject,
     date_started: new Date().toISOString(),
     status: "paused", // will become "completed" on finish
-    time_remaining_seconds: 7200,
+    time_remaining_seconds: timeAllocated,
+    time_allocated_seconds: timeAllocated,
     current_question_index: 0,
-    answers: Array.from({ length: totalQuestions }, (_, i) => ({
+    answers: Array.from({ length: totalQuestions }, () => ({
       question_id: "",
       answer_text: "",
       score: 0,

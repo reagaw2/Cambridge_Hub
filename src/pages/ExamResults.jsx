@@ -4,10 +4,12 @@
  */
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { CheckCircle2, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { addToReviewBank } from "@/lib/topicStore";
 import { buildExamPrompt, buildExamResponseSchema } from "@/lib/examPapers";
+import { generateExamResultsPdf } from "@/lib/generatePdf";
+import { useAuth } from "@/lib/AuthContext";
 
 function formatTime(s) {
   const h = Math.floor(s / 3600);
@@ -133,10 +135,13 @@ function QuestionResult({ q, answer, idx, onFeedbackReady }) {
 export default function ExamResults() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { paperId, answers = [], questions = [], timeTaken = 0, paper, displayName } = location.state ?? {};
 
   const [scoreboard, setScoreboard] = useState({}); // { idx: score }
+  const insightRef = useRef({}); // { idx: insight string }
   const loggedRef = useRef(new Set()); // track question IDs already sent to review bank
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const totalAttempted = answers.filter(a => a.answer_text).length;
   const totalSkipped = answers.filter(a => !a.answer_text).length;
@@ -163,7 +168,22 @@ export default function ExamResults() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function handleDownloadPdf() {
+    setPdfLoading(true);
+    await generateExamResultsPdf({
+      paper,
+      displayName,
+      userEmail: user?.email ?? "",
+      timeTaken,
+      answers: answers.map((a, i) => ({ ...a, _pdf_insight: insightRef.current[i] ?? "" })),
+      questions,
+      scoreboard,
+    });
+    setPdfLoading(false);
+  }
+
   function handleFeedbackReady(idx, score, insight) {
+    insightRef.current[idx] = insight;
     setScoreboard(prev => ({ ...prev, [idx]: score }));
 
     // Log to review bank if not perfect — deduplicated by loggedRef
@@ -243,6 +263,15 @@ export default function ExamResults() {
               />
             ))}
           </div>
+
+          <button
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading}
+            className="w-full flex items-center justify-center gap-2 bg-secondary border border-border text-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            {pdfLoading ? "Generating PDF..." : "Download Feedback Report"}
+          </button>
 
           <button
             onClick={() => navigate("/")}

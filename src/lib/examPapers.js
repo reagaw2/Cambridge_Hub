@@ -102,6 +102,7 @@ export function getPapersForSubjectAndSession(subject, session) {
 
 export const SESSIONS = ["Nov 2025", "Nov 2024", "Nov 2023", "Nov 2022", "Nov 2021"];
 export const PHYSICS_VARIANTS = ["41", "42", "43"];
+// CS variants are managed dynamically in csPapers.js — this legacy export is kept for compatibility
 export const CS_VARIANTS = ["21", "22", "23"];
 
 // Generate a generic AI prompt for exam mode questions

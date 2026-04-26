@@ -35,10 +35,13 @@ function QuestionResult({ q, answer, idx, onFeedbackReady }) {
       return;
     }
     setLoading(true);
+    // CS questions have their own prompt/schema; Physics questions use the generic builder
+    const prompt = q.prompt ? q.prompt(answer.answer_text) : buildExamPrompt(q, answer.answer_text);
+    const schema = q.response_schema ?? buildExamResponseSchema(q.total_marks);
     base44.integrations.Core.InvokeLLM({
-      prompt: buildExamPrompt(q, answer.answer_text),
+      prompt,
       model: "claude_sonnet_4_6",
-      response_json_schema: buildExamResponseSchema(q.total_marks),
+      response_json_schema: schema,
     }).then(res => {
       const fb = res?.response ?? res;
       setFeedback(fb);
@@ -96,7 +99,7 @@ function QuestionResult({ q, answer, idx, onFeedbackReady }) {
 
           {feedback && (
             <>
-              {/* Mark breakdown */}
+              {/* Mark breakdown — Physics format (mark_breakdown array) */}
               {feedback.mark_breakdown?.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Mark breakdown</p>
@@ -108,6 +111,24 @@ function QuestionResult({ q, answer, idx, onFeedbackReady }) {
                   ))}
                 </div>
               )}
+              {/* Mark breakdown — CS format (mark_1, mark_2, ...) */}
+              {!feedback.mark_breakdown?.length && (() => {
+                const csMarks = Object.entries(feedback)
+                  .filter(([k]) => /^mark_\d+$/.test(k))
+                  .sort(([a], [b]) => parseInt(a.split("_")[1]) - parseInt(b.split("_")[1]));
+                if (!csMarks.length) return null;
+                return (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Mark breakdown</p>
+                    {csMarks.map(([key, mb]) => (
+                      <div key={key} className={`flex items-start gap-2 text-xs p-2 rounded-lg ${mb.earned ? "bg-green-500/8 text-green-300" : "bg-red-500/8 text-red-300"}`}>
+                        <span className="shrink-0">{mb.earned ? "✓" : "✗"}</span>
+                        <span className="leading-relaxed">{mb.keyword} — {mb.feedback}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {/* Examiner insight */}
               <div className="bg-primary/8 border border-primary/20 rounded-xl p-3 space-y-1">

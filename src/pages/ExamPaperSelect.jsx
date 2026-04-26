@@ -5,7 +5,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Clock, FileText, Play, RotateCcw } from "lucide-react";
-import { PAPERS, SESSIONS, PHYSICS_VARIANTS, CS_VARIANTS, getPapersForSubjectAndSession } from "@/lib/examPapers";
+import { PAPERS, SESSIONS, PHYSICS_VARIANTS } from "@/lib/examPapers";
+import { CS_PAPERS, CS_EXAM_SESSIONS, CS_EXAM_VARIANTS } from "@/lib/csPapers";
 import { getPausedSession, getAnyPausedSession } from "@/lib/examStore";
 
 function formatSeconds(s) {
@@ -24,10 +25,13 @@ export default function ExamPaperSelect() {
   const [anyPaused, setAnyPaused] = useState(null);
   const [loadingPaused, setLoadingPaused] = useState(true);
 
-  const variants = subject === "physics" ? PHYSICS_VARIANTS : CS_VARIANTS;
-  const selectedPaper = PAPERS.find(
-    p => p.subject === subject && p.session === session && p.variant === variant
-  ) ?? null;
+  const isCS = subject === "cs";
+  const variants = isCS ? CS_EXAM_VARIANTS : PHYSICS_VARIANTS;
+  const sessions = isCS ? CS_EXAM_SESSIONS : SESSIONS;
+
+  const selectedPaper = isCS
+    ? (CS_PAPERS.find(p => p.session === session && p.variant === variant) ?? null)
+    : (PAPERS.find(p => p.subject === subject && p.session === session && p.variant === variant) ?? null);
 
   // Check for paused sessions
   useEffect(() => {
@@ -43,9 +47,15 @@ export default function ExamPaperSelect() {
     getPausedSession(selectedPaper.id).then(setPausedSession);
   }, [selectedPaper?.id]);
 
-  // Reset variant when subject changes
+  // Reset variant and session when subject changes
   useEffect(() => {
-    setVariant(subject === "physics" ? "41" : "21");
+    if (subject === "cs") {
+      setVariant(CS_EXAM_VARIANTS[0]);
+      setSession(CS_EXAM_SESSIONS[0]);
+    } else {
+      setVariant("41");
+      setSession("Nov 2025");
+    }
   }, [subject]);
 
   function handleBegin(fresh = false) {
@@ -118,7 +128,7 @@ export default function ExamPaperSelect() {
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Session</label>
             <select value={session} onChange={e => setSession(e.target.value)} className={selectClass}>
-              {SESSIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              {sessions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
@@ -151,19 +161,23 @@ export default function ExamPaperSelect() {
               </div>
               {(() => {
                 const totalMarks = selectedPaper.questions.reduce((s, q) => s + q.total_marks, 0);
-                const allocatedSecs = totalMarks * 105;
+                const secsPerMark = selectedPaper.secondsPerMark ?? 105;
+                const allocatedSecs = totalMarks * secsPerMark;
                 const h = Math.floor(allocatedSecs / 3600);
                 const m = Math.floor((allocatedSecs % 3600) / 60);
                 const timeStr = h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
                 return (
                   <div className="space-y-1 text-sm text-muted-foreground">
+                    {selectedPaper.paperLabel && (
+                      <p className="text-xs font-semibold text-foreground/80">{selectedPaper.paperLabel}</p>
+                    )}
                     <div className="flex items-center justify-between">
                       <span>{selectedPaper.questions.length} question{selectedPaper.questions.length !== 1 ? "s" : ""} available</span>
                       <span>{totalMarks} marks total</span>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-primary/80">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>Allocated time: {timeStr} (based on {totalMarks} marks)</span>
+                      <span>Allocated time: {timeStr} (based on {totalMarks} marks × {secsPerMark}s)</span>
                     </div>
                   </div>
                 );
@@ -203,8 +217,13 @@ export default function ExamPaperSelect() {
               )}
             </div>
           ) : (
-            <div className="bg-card border border-border border-dashed rounded-xl p-5 text-center text-sm text-muted-foreground">
-              No questions available for this paper yet — check back soon.
+            <div className="bg-card border border-border border-dashed rounded-xl p-5 text-center space-y-1">
+              <p className="text-sm text-muted-foreground">
+                {isCS ? "More CS papers coming soon." : "No questions available for this paper yet — check back soon."}
+              </p>
+              {isCS && (
+                <p className="text-[11px] text-muted-foreground/50">Currently available: 9618/13 · Nov 2025</p>
+              )}
             </div>
           )}
 

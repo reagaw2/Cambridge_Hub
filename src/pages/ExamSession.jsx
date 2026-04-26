@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Flag, LogOut } from "lucide-react";
 import { getPaper } from "@/lib/examPapers";
+import { getCSPaper } from "@/lib/csPapers";
 import { getPausedSession, startExamSession, saveExamSession, completeExamSession, invalidateExamCache } from "@/lib/examStore";
 import { recordGlobalQuestionAnswered } from "@/lib/topicStore";
 import VoiceInput from "@/components/VoiceInput";
@@ -22,7 +23,7 @@ export default function ExamSession() {
   const location = useLocation();
   const { paperId, fresh } = location.state ?? {};
 
-  const paper = getPaper(paperId);
+  const paper = getPaper(paperId) ?? getCSPaper(paperId);
   const questions = paper?.questions ?? [];
   const N = questions.length;
 
@@ -32,7 +33,8 @@ export default function ExamSession() {
   );
   const [currentIdx, setCurrentIdx] = useState(0);
   const totalMarks = questions.reduce((s, q) => s + q.total_marks, 0);
-  const timeAllocated = totalMarks * 105;
+  const secsPerMark = paper?.secondsPerMark ?? 105;
+  const timeAllocated = totalMarks * secsPerMark;
   const [timeLeft, setTimeLeft] = useState(timeAllocated);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [phase, setPhase] = useState("exam"); // "exam" | "flagged" | "done"

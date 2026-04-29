@@ -5,7 +5,7 @@ import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, getMCQOnlyTopicNames, getStreakData, recordAppOpen, shouldShowReviewGate, getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { csGetTopicData } from "@/lib/csTopicStore";
 import { getAnyPausedSession } from "@/lib/examStore";
-import { Atom, Lock, Code2, FileText, Play } from "lucide-react";
+import { Atom, Lock, Code2, FileText, Play, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import ReviewGate from "@/components/ReviewGate";
@@ -237,6 +237,23 @@ export default function SubjectSelection() {
               className="w-full bg-primary/15 border border-primary/40 text-primary font-semibold text-sm py-3 rounded-xl hover:bg-primary/25 active:scale-[0.98] transition-all"
             >
               Start a Paper →
+            </button>
+          </div>
+
+          {/* Mock Exam Mode entry */}
+          <div className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-amber-400/80 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">📝 Mock Exam Mode</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Full timed mock exams with self-marking and diagrams.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate("/mock/select")}
+              className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold text-sm py-3 rounded-xl hover:bg-amber-500/20 active:scale-[0.98] transition-all"
+            >
+              Start a Mock Exam →
             </button>
           </div>
 

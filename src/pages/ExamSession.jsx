@@ -10,6 +10,7 @@ import { getCSPaper } from "@/lib/csPapers";
 import { getPausedSession, startExamSession, saveExamSession, completeExamSession, invalidateExamCache } from "@/lib/examStore";
 import { recordGlobalQuestionAnswered } from "@/lib/topicStore";
 import VoiceInput from "@/components/VoiceInput";
+import QuestionMedia from "@/components/QuestionMedia";
 
 function formatTime(s) {
   const h = Math.floor(s / 3600);
@@ -339,6 +340,7 @@ export default function ExamSession() {
             <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
               {q.topic}
             </span>
+            <QuestionMedia question={q} />
             <p className="text-[15px] leading-relaxed text-foreground/90">{q.text}</p>
           </div>
 

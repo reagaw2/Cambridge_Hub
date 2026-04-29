@@ -10,6 +10,7 @@ import { addToReviewBank } from "@/lib/topicStore";
 import { buildExamPrompt, buildExamResponseSchema } from "@/lib/examPapers";
 import { generateExamResultsPdf } from "@/lib/generatePdf";
 import { useAuth } from "@/lib/AuthContext";
+import QuestionMedia from "@/components/QuestionMedia";
 
 function formatTime(s) {
   const h = Math.floor(s / 3600);
@@ -82,6 +83,9 @@ function QuestionResult({ q, answer, idx, onFeedbackReady }) {
 
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t border-border/30 pt-3">
+          {/* Question media */}
+          <QuestionMedia question={q} />
+
           {/* Student's answer */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Your answer</p>

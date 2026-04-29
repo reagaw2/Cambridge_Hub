@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Flame } from "lucide-react";
 import AnswerInput from "../components/AnswerInput";
+import QuestionMedia from "../components/QuestionMedia";
 import SubmitButton from "../components/SubmitButton";
 import { getReviewBank, recordAttempt, removeFromReviewBank, incrementReviewBankClears, resetReviewBankLock } from "../lib/topicStore";
 
@@ -154,6 +155,7 @@ Analyse the student's answer against the mark scheme. Respond in the following J
             <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
               {current.topic}
             </span>
+            <QuestionMedia question={current} />
             <p className="text-[15px] leading-relaxed text-foreground/90">{current.question_text}</p>
             <div className="flex justify-end">
               <span className="font-mono text-xs text-muted-foreground">[{current.total_marks} mark{current.total_marks !== 1 ? "s" : ""}]</span>

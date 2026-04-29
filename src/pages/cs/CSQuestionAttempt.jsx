@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import { csRecordAttempt, csAddToReviewBank } from "@/lib/csTopicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
+import QuestionMedia from "@/components/QuestionMedia";
 import TeachMeHow from "@/components/TeachMeHow";
 
 // Maps topic_key → the registered route path
@@ -161,6 +162,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
             <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
               {question.topic}
             </span>
+            <QuestionMedia question={question} />
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
             <div className="flex justify-end">
               <span className="font-mono text-xs text-muted-foreground">

@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
+import QuestionMedia from "@/components/QuestionMedia";
 import SubmitButton from "@/components/SubmitButton";
 import { csGetReviewBank, csRemoveFromReviewBank, csResetReviewBankLock } from "@/lib/csTopicStore";
 
@@ -161,6 +162,7 @@ export default function CSReviewSession() {
             <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
               {question.topic}
             </span>
+            <QuestionMedia question={question} />
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
             <div className="flex justify-end">
               <span className="font-mono text-xs text-muted-foreground">

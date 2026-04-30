@@ -2,7 +2,7 @@
  * ExamStartModal — pre-start warning shown before entering Exam Mode.
  */
 export default function ExamStartModal({ paper, onConfirm, onCancel }) {
-  const duration = paper?.duration_minutes ?? 120;
+  const duration = paper?.duration_minutes;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
@@ -25,7 +25,7 @@ export default function ExamStartModal({ paper, onConfirm, onCancel }) {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 shrink-0 mt-0.5">•</span>
-              <span>Find a quiet place where you won't be interrupted for the full <strong>{duration} minutes</strong>.</span>
+              <span>Find a quiet place where you won't be interrupted for the full <strong>{duration ? `${duration} minutes` : "full duration"}</strong>.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-amber-400 shrink-0 mt-0.5">•</span>

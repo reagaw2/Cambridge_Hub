@@ -156,70 +156,97 @@ function TableFillInput({ question, value, onChange }) {
 }
 
 // ─── Matching ─────────────────────────────────────────────────────────────
+// Supports up to 2 connections per left item.
+// matches: array of {from: leftIdx, to: rightIdx}
 function MatchingInput({ question, value, onChange }) {
   const [selectedLeft, setSelectedLeft] = useState(null);
   const { matching_data } = question;
 
   if (!matching_data) return <WrittenInput value={value} onChange={onChange} />;
 
-  const { from_items = [], to_items = [] } = matching_data;
-  // value: array of [leftIdx, rightIdx]
-  const matches = value && Array.isArray(value) ? value : [];
+  // Support both {left, right} and legacy {from_items, to_items}
+  const leftItems = matching_data.left ?? matching_data.from_items ?? [];
+  const rightItems = matching_data.right ?? matching_data.to_items ?? [];
+  const leftLabel = matching_data.left_label ?? "Changes";
+  const rightLabel = matching_data.right_label ?? "Impacts";
+
+  // matches: array of {from, to}
+  const matches = Array.isArray(value) ? value : [];
+
+  const colors = ["#4ade80", "#60a5fa", "#f472b6", "#fb923c", "#a78bfa", "#34d399", "#fbbf24", "#f87171"];
+
+  function getMatchesForLeft(li) {
+    return matches.filter(m => m.from === li);
+  }
+  function getMatchesForRight(ri) {
+    return matches.filter(m => m.to === ri);
+  }
 
   function handleLeftClick(i) {
-    // If already matched, remove match
-    const existing = matches.find(([l]) => l === i);
-    if (existing) {
-      onChange(matches.filter(([l]) => l !== i));
-      return;
+    if (selectedLeft === i) {
+      setSelectedLeft(null); // deselect
+    } else {
+      setSelectedLeft(i);
     }
-    setSelectedLeft(i);
   }
 
   function handleRightClick(j) {
     if (selectedLeft === null) return;
-    // Remove any existing match involving this right item or this left item
-    const cleaned = matches.filter(([l, r]) => l !== selectedLeft && r !== j);
-    onChange([...cleaned, [selectedLeft, j]]);
-    setSelectedLeft(null);
+
+    const alreadyMatched = matches.find(m => m.from === selectedLeft && m.to === j);
+    if (alreadyMatched) {
+      // Remove this specific connection
+      onChange(matches.filter(m => !(m.from === selectedLeft && m.to === j)));
+      setSelectedLeft(null);
+      return;
+    }
+
+    // Allow up to 2 connections per left item
+    const leftConns = getMatchesForLeft(selectedLeft);
+    if (leftConns.length >= 2) return; // already at max
+
+    onChange([...matches, { from: selectedLeft, to: j }]);
+    // Keep selectedLeft active if < 2 connections
+    if (leftConns.length + 1 >= 2) setSelectedLeft(null);
   }
 
-  function getMatchedRight(li) {
-    return matches.find(([l]) => l === li)?.[1] ?? null;
+  function removeMatch(from, to) {
+    onChange(matches.filter(m => !(m.from === from && m.to === to)));
   }
-
-  function getMatchedLeft(ri) {
-    return matches.find(([, r]) => r === ri)?.[0] ?? null;
-  }
-
-  const colors = ["#4ade80", "#60a5fa", "#f472b6", "#fb923c", "#a78bfa", "#34d399", "#fbbf24", "#f87171"];
 
   return (
-    <div className="space-y-3">
-      <p className="text-[11px] text-muted-foreground">Click a left item, then a right item to match them. Click again to unmatch.</p>
-      <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-4">
+      <p className="text-[11px] text-muted-foreground/80">
+        Click a <strong>left item</strong> to select it (highlighted blue), then click a <strong>right item</strong> to connect them.
+        Each left item can have up to 2 connections. Click a matched pair again to remove it.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3">
         {/* Left column */}
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Items</p>
-          {from_items.map((item, i) => {
-            const matchedTo = getMatchedRight(i);
-            const color = matchedTo !== null ? colors[matchedTo % colors.length] : undefined;
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{leftLabel}</p>
+          {leftItems.map((item, i) => {
+            const conns = getMatchesForLeft(i);
             const isSelected = selectedLeft === i;
+            const isMatched = conns.length > 0;
             return (
               <button
                 key={i}
                 onClick={() => handleLeftClick(i)}
-                style={{ borderColor: color ?? undefined, color: color ?? undefined }}
-                className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm leading-snug transition-all ${
                   isSelected
-                    ? "bg-primary/20 border-primary text-primary"
-                    : matchedTo !== null
-                      ? "bg-card"
+                    ? "bg-primary/20 border-primary text-primary ring-1 ring-primary/40"
+                    : isMatched
+                      ? "bg-green-500/10 border-green-500/40 text-foreground"
                       : "bg-card border-border text-foreground hover:brightness-110"
                 }`}
               >
                 {item}
-                {matchedTo !== null && <span className="ml-2 text-[10px] opacity-70">→ {to_items[matchedTo]?.slice(0, 12)}</span>}
+                {isMatched && (
+                  <span className="block text-[10px] text-green-400 mt-0.5">
+                    {conns.map(c => `→ ${rightItems[c.to]}`).join(" | ")}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -227,35 +254,53 @@ function MatchingInput({ question, value, onChange }) {
 
         {/* Right column */}
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Match to</p>
-          {to_items.map((item, j) => {
-            const matchedFrom = getMatchedLeft(j);
-            const color = matchedFrom !== null ? colors[j % colors.length] : undefined;
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{rightLabel}</p>
+          {rightItems.map((item, j) => {
+            const conns = getMatchesForRight(j);
+            const isMatched = conns.length > 0;
+            const isTarget = selectedLeft !== null;
             return (
               <button
                 key={j}
                 onClick={() => handleRightClick(j)}
-                style={{ borderColor: color ?? undefined, color: color ?? undefined }}
-                className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                  matchedFrom !== null
-                    ? "bg-card"
-                    : selectedLeft !== null
-                      ? "bg-primary/5 border-border text-foreground hover:border-primary/40 hover:brightness-110"
+                className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm leading-snug transition-all ${
+                  isMatched
+                    ? "bg-green-500/10 border-green-500/40 text-foreground"
+                    : isTarget
+                      ? "bg-card border-primary/30 text-foreground hover:border-primary hover:bg-primary/10"
                       : "bg-card border-border text-foreground"
                 }`}
               >
                 {item}
+                {isMatched && (
+                  <span className="block text-[10px] text-green-400 mt-0.5">
+                    {conns.map(c => `← ${leftItems[c.from]}`).join(" | ")}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
+      {/* Matched pairs summary with remove buttons */}
       {matches.length > 0 && (
-        <div className="bg-secondary/50 rounded-lg p-3 space-y-1">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Your matches</p>
-          {matches.map(([l, r], i) => (
-            <p key={i} className="text-xs text-foreground/80">{from_items[l]} → {to_items[r]}</p>
+        <div className="bg-secondary/40 border border-border rounded-xl p-3 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Your connections ({matches.length})</p>
+          {matches.map((m, i) => (
+            <div key={i} className="flex items-center justify-between gap-2">
+              <p className="text-xs text-foreground/80 flex-1">
+                <span className="text-primary font-medium">{leftItems[m.from]}</span>
+                <span className="text-muted-foreground mx-1">→</span>
+                <span className="text-green-400 font-medium">{rightItems[m.to]}</span>
+              </p>
+              <button
+                onClick={() => removeMatch(m.from, m.to)}
+                className="text-[10px] text-red-400 hover:text-red-300 transition-colors px-1.5 py-0.5 rounded border border-red-400/30 hover:bg-red-500/10"
+              >
+                ✕
+              </button>
+            </div>
           ))}
         </div>
       )}

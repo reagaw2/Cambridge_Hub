@@ -79,7 +79,7 @@ export default function MockExamSession() {
 
   const questions = paper?.questions ?? [];
   const N = questions.length;
-  const durationSecs = (paper?.duration_minutes ?? 120) * 60;
+  const durationSecs = (paper?.duration_minutes > 0 ? paper.duration_minutes : 120) * 60;
 
   const [answers, setAnswers] = useState(() => initAnswers(questions, resumeSession));
   const [currentIdx, setCurrentIdx] = useState(resumeSession?.current_question_index ?? 0);

@@ -1,14 +1,134 @@
 /**
- * MockQuestionDisplay — renders a single question's content:
- * question_number, question_text (with markdown table support),
- * diagram_description box, and graph_data chart.
+ * MockQuestionDisplay — renders a single question's content.
+ * Fixes:
+ *   1. Markdown pipe tables parsed into real HTML tables
+ *   2. Diagram SVGs rendered from hardcoded lookup by question_id
  */
-import ReactMarkdown from "react-markdown";
 import MockGraphRenderer from "./MockGraphRenderer";
 
+// ─── Hardcoded SVG diagrams keyed by question_id ───────────────────────────
+const DIAGRAM_SVGS = {
+  "ala-mock-2026-p4-Q2ci1": `<svg width="100%" viewBox="0 0 500 140" role="img"><title>Cylinder heating diagram</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect x="20" y="30" width="160" height="80" rx="8" fill="none" stroke="#888" stroke-width="1.5"/><text x="100" y="62" text-anchor="middle" font-size="13" fill="currentColor">4.7 × 10⁴ cm³</text><text x="100" y="80" text-anchor="middle" font-size="13" fill="currentColor">2.6 × 10⁵ Pa</text><text x="100" y="98" text-anchor="middle" font-size="13" fill="currentColor">173 °C</text><line x1="180" y1="70" x2="310" y2="70" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/><text x="245" y="60" text-anchor="middle" font-size="13" fill="currentColor">2900 J</text><rect x="320" y="30" width="160" height="80" rx="8" fill="none" stroke="#888" stroke-width="1.5"/><text x="400" y="62" text-anchor="middle" font-size="13" fill="currentColor">4.7 × 10⁴ cm³</text><text x="400" y="80" text-anchor="middle" font-size="13" fill="currentColor">p</text><text x="400" y="98" text-anchor="middle" font-size="13" fill="currentColor">T</text></svg>`,
+  "ala-mock-2026-p4-Q3bi": `<svg width="100%" viewBox="0 0 420 220" role="img"><title>Specific latent heat apparatus</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect x="120" y="80" width="100" height="80" rx="4" fill="none" stroke="#888" stroke-width="1.5"/><rect x="140" y="95" width="60" height="50" rx="2" fill="none" stroke="#aaa" stroke-width="1" stroke-dasharray="4 2"/><text x="170" y="125" text-anchor="middle" font-size="11" fill="currentColor">liquid</text><rect x="125" y="130" width="90" height="20" rx="2" fill="none" stroke="#888" stroke-width="1"/><text x="170" y="143" text-anchor="middle" font-size="10" fill="currentColor">heater</text><rect x="100" y="168" width="140" height="8" rx="2" fill="none" stroke="#888" stroke-width="1"/><text x="170" y="194" text-anchor="middle" font-size="11" fill="currentColor">pan of balance</text><circle cx="240" cy="70" r="14" fill="none" stroke="#888" stroke-width="1.5"/><text x="240" y="74" text-anchor="middle" font-size="11" font-weight="500" fill="currentColor">V</text><line x1="220" y1="70" x2="195" y2="90" stroke="#888" stroke-width="1.2"/><circle cx="300" cy="70" r="14" fill="none" stroke="#888" stroke-width="1.5"/><text x="300" y="74" text-anchor="middle" font-size="11" font-weight="500" fill="currentColor">A</text><line x1="285" y1="70" x2="260" y2="70" stroke="#888" stroke-width="1"/><line x1="195" y1="55" x2="195" y2="90" stroke="#555" stroke-width="1.5"/><line x1="170" y1="42" x2="310" y2="42" stroke="#555" stroke-width="1.5"/><line x1="310" y1="42" x2="310" y2="75" stroke="#555" stroke-width="1.5"/><text x="175" y="36" font-size="11" fill="currentColor">+</text><text x="305" y="36" font-size="11" fill="currentColor">−</text></svg>`,
+  "ala-mock-2026-p4-Q4bi": `<svg width="100%" viewBox="0 0 440 200" role="img"><title>Metal strip SHM diagram</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect x="20" y="55" width="40" height="50" rx="3" fill="none" stroke="#888" stroke-width="1.5"/><text x="40" y="84" text-anchor="middle" font-size="10" fill="currentColor">clamp</text><path d="M60 78 Q180 78 300 108" fill="none" stroke="#555" stroke-width="2"/><path d="M60 78 Q180 78 300 78" fill="none" stroke="#aaa" stroke-width="1" stroke-dasharray="5 3"/><rect x="292" y="95" width="30" height="30" rx="3" fill="none" stroke="#888" stroke-width="1.5"/><text x="307" y="114" text-anchor="middle" font-size="10" fill="currentColor">M</text><line x1="330" y1="79" x2="330" y2="110" stroke="#888" stroke-width="1" stroke-dasharray="3 2"/><line x1="325" y1="79" x2="335" y2="79" stroke="#888" stroke-width="1"/><line x1="325" y1="110" x2="335" y2="110" stroke="#888" stroke-width="1"/><text x="340" y="96" font-size="11" fill="currentColor">s</text><text x="150" y="145" text-anchor="middle" font-size="11" fill="currentColor">metal strip</text></svg>`,
+  "ala-mock-2026-p4-Q5b": `<svg width="100%" viewBox="0 0 400 130" role="img"><title>Two charged spheres X and Y with point P</title><circle cx="80" cy="65" r="40" fill="none" stroke="#888" stroke-width="1.5"/><text x="80" y="60" text-anchor="middle" font-size="14" font-weight="500" fill="currentColor">X</text><circle cx="320" cy="65" r="40" fill="none" stroke="#888" stroke-width="1.5"/><text x="320" y="60" text-anchor="middle" font-size="14" font-weight="500" fill="currentColor">Y</text><line x1="120" y1="65" x2="280" y2="65" stroke="#aaa" stroke-width="1" stroke-dasharray="4 3"/><circle cx="190" cy="65" r="4" fill="#555"/><text x="190" y="55" text-anchor="middle" font-size="12" fill="currentColor">P</text></svg>`,
+  "ala-mock-2026-p4-Q6bi": `<svg width="100%" viewBox="0 0 360 90" role="img"><title>Three capacitors in series: 4uF, 4uF, 8uF</title><line x1="20" y1="45" x2="60" y2="45" stroke="#888" stroke-width="1.5"/><line x1="60" y1="30" x2="60" y2="60" stroke="#555" stroke-width="2.5"/><line x1="70" y1="30" x2="70" y2="60" stroke="#555" stroke-width="2.5"/><text x="65" y="22" text-anchor="middle" font-size="11" fill="currentColor">4 μF</text><line x1="70" y1="45" x2="150" y2="45" stroke="#888" stroke-width="1.5"/><line x1="150" y1="30" x2="150" y2="60" stroke="#555" stroke-width="2.5"/><line x1="160" y1="30" x2="160" y2="60" stroke="#555" stroke-width="2.5"/><text x="155" y="22" text-anchor="middle" font-size="11" fill="currentColor">4 μF</text><line x1="160" y1="45" x2="240" y2="45" stroke="#888" stroke-width="1.5"/><line x1="240" y1="30" x2="240" y2="60" stroke="#555" stroke-width="2.5"/><line x1="250" y1="30" x2="250" y2="60" stroke="#555" stroke-width="2.5"/><text x="245" y="22" text-anchor="middle" font-size="11" fill="currentColor">8 μF</text><line x1="250" y1="45" x2="340" y2="45" stroke="#888" stroke-width="1.5"/><text x="180" y="78" text-anchor="middle" font-size="11" fill="currentColor">Total = 1.6 μF (all in series)</text></svg>`,
+  "ala-mock-2026-p4-Q6bii": `<svg width="100%" viewBox="0 0 360 160" role="img"><title>Capacitor circuit: 8uF parallel with two 4uF in series</title><line x1="20" y1="40" x2="60" y2="40" stroke="#888" stroke-width="1.5"/><line x1="60" y1="40" x2="60" y2="120" stroke="#888" stroke-width="1.5"/><line x1="60" y1="40" x2="180" y2="40" stroke="#888" stroke-width="1.5"/><line x1="60" y1="120" x2="180" y2="120" stroke="#888" stroke-width="1.5"/><line x1="100" y1="25" x2="100" y2="55" stroke="#555" stroke-width="2.5"/><line x1="110" y1="25" x2="110" y2="55" stroke="#555" stroke-width="2.5"/><text x="105" y="17" text-anchor="middle" font-size="11" fill="currentColor">8 μF</text><line x1="100" y1="40" x2="60" y2="40" stroke="#888" stroke-width="1.5"/><line x1="110" y1="40" x2="180" y2="40" stroke="#888" stroke-width="1.5"/><line x1="180" y1="40" x2="180" y2="80" stroke="#888" stroke-width="1.5"/><line x1="165" y1="80" x2="165" y2="110" stroke="#555" stroke-width="2.5"/><line x1="175" y1="80" x2="175" y2="110" stroke="#555" stroke-width="2.5"/><text x="195" y="98" font-size="11" fill="currentColor">4 μF</text><line x1="180" y1="120" x2="180" y2="110" stroke="#888" stroke-width="1.5"/><line x1="230" y1="80" x2="230" y2="110" stroke="#555" stroke-width="2.5"/><line x1="220" y1="80" x2="220" y2="110" stroke="#555" stroke-width="2.5"/><text x="245" y="98" font-size="11" fill="currentColor">4 μF</text><line x1="200" y1="95" x2="218" y2="95" stroke="#888" stroke-width="1.5"/><line x1="180" y1="80" x2="200" y2="80" stroke="#888" stroke-width="1.5"/><line x1="230" y1="80" x2="300" y2="80" stroke="#888" stroke-width="1.5"/><line x1="300" y1="80" x2="300" y2="120" stroke="#888" stroke-width="1.5"/><line x1="180" y1="120" x2="340" y2="120" stroke="#888" stroke-width="1.5"/><line x1="340" y1="40" x2="340" y2="120" stroke="#888" stroke-width="1.5"/><line x1="180" y1="40" x2="340" y2="40" stroke="#888" stroke-width="1.5"/><text x="180" y="150" text-anchor="middle" font-size="11" fill="currentColor">Total = 10 μF (8μF ∥ series 4+4)</text></svg>`,
+  "ala-mock-2026-p4-Q6c": `<svg width="100%" viewBox="0 0 400 130" role="img"><title>Bridge rectifier circuit with capacitor C and resistor R</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><circle cx="50" cy="65" r="22" fill="none" stroke="#888" stroke-width="1.5"/><text x="44" y="62" font-size="10" fill="currentColor">~</text><line x1="28" y1="58" x2="10" y2="58" stroke="#888" stroke-width="1.2"/><line x1="28" y1="72" x2="10" y2="72" stroke="#888" stroke-width="1.2"/><rect x="100" y="40" width="90" height="50" rx="6" fill="none" stroke="#888" stroke-width="1.5" stroke-dasharray="5 3"/><text x="145" y="68" text-anchor="middle" font-size="11" fill="currentColor">bridge</text><text x="145" y="82" text-anchor="middle" font-size="11" fill="currentColor">rectifier</text><line x1="72" y1="58" x2="100" y2="58" stroke="#888" stroke-width="1.2"/><line x1="72" y1="72" x2="100" y2="72" stroke="#888" stroke-width="1.2"/><line x1="190" y1="40" x2="250" y2="40" stroke="#888" stroke-width="1.2"/><line x1="190" y1="90" x2="250" y2="90" stroke="#888" stroke-width="1.2"/><line x1="250" y1="30" x2="250" y2="55" stroke="#555" stroke-width="2.5"/><line x1="260" y1="30" x2="260" y2="55" stroke="#555" stroke-width="2.5"/><text x="255" y="22" text-anchor="middle" font-size="11" fill="currentColor">C  47μF</text><line x1="255" y1="55" x2="255" y2="90" stroke="#888" stroke-width="1.2"/><line x1="255" y1="30" x2="255" y2="40" stroke="#888" stroke-width="1.2"/><line x1="310" y1="40" x2="310" y2="90" stroke="#555" stroke-width="2.5"/><line x1="270" y1="40" x2="310" y2="40" stroke="#888" stroke-width="1.2"/><line x1="270" y1="90" x2="310" y2="90" stroke="#888" stroke-width="1.2"/><text x="318" y="70" font-size="12" fill="currentColor">R</text></svg>`,
+  "ala-mock-2026-p4-Q7a": `<svg width="100%" viewBox="0 0 400 200" role="img"><title>Electron path in magnetic field into page</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect x="180" y="40" width="120" height="120" rx="4" fill="#f0f0f0" stroke="#888" stroke-width="1.5"/><text x="240" y="80" text-anchor="middle" font-size="10" fill="#555">× × × × ×</text><text x="240" y="95" text-anchor="middle" font-size="10" fill="#555">× × × × ×</text><text x="240" y="110" text-anchor="middle" font-size="10" fill="#555">× × × × ×</text><text x="240" y="125" text-anchor="middle" font-size="10" fill="#555">× × × × ×</text><text x="240" y="145" text-anchor="middle" font-size="9" fill="#777">B into page</text><line x1="40" y1="100" x2="178" y2="100" stroke="#333" stroke-width="1.5" marker-end="url(#a)"/><text x="100" y="92" text-anchor="middle" font-size="11" fill="currentColor">path of electron</text><path d="M180 100 Q240 100 300 160" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#a)"/></svg>`,
+  "ala-mock-2026-p4-Q8ai": `<svg width="100%" viewBox="0 0 400 100" role="img"><title>Hydrogen emission spectrum with three lines</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect x="40" y="35" width="300" height="35" rx="3" fill="#e8e8e8" stroke="#aaa" stroke-width="1"/><line x1="120" y1="35" x2="120" y2="70" stroke="#333" stroke-width="3"/><line x1="200" y1="35" x2="200" y2="70" stroke="#333" stroke-width="2.5"/><line x1="290" y1="35" x2="290" y2="70" stroke="#333" stroke-width="2"/><line x1="300" y1="20" x2="380" y2="20" stroke="#555" stroke-width="1" marker-end="url(#a)"/><text x="310" y="15" font-size="11" fill="currentColor">increasing frequency</text><text x="190" y="90" text-anchor="middle" font-size="11" fill="currentColor">Fig. 8.1 — emission spectrum (as seen from star)</text></svg>`,
+  "ala-mock-2026-p4-Q8aii": `<svg width="100%" viewBox="0 0 400 120" role="img"><title>Redshifted hydrogen emission lines</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect x="40" y="30" width="300" height="35" rx="3" fill="#e8e8e8" stroke="#aaa" stroke-width="1"/><line x1="120" y1="30" x2="120" y2="65" stroke="#999" stroke-width="2" stroke-dasharray="4 2"/><line x1="200" y1="30" x2="200" y2="65" stroke="#999" stroke-width="2" stroke-dasharray="4 2"/><line x1="290" y1="30" x2="290" y2="65" stroke="#999" stroke-width="2" stroke-dasharray="4 2"/><line x1="95" y1="30" x2="95" y2="65" stroke="#c0392b" stroke-width="3"/><line x1="175" y1="30" x2="175" y2="65" stroke="#c0392b" stroke-width="2.5"/><line x1="265" y1="30" x2="265" y2="65" stroke="#c0392b" stroke-width="2"/><text x="190" y="22" text-anchor="middle" font-size="10" fill="#c0392b">← shifted left (redshift)</text><text x="190" y="90" text-anchor="middle" font-size="10" fill="#888">dashed = original positions, red = observed by Earth</text><line x1="300" y1="10" x2="380" y2="10" stroke="#555" stroke-width="1" marker-end="url(#a)"/><text x="305" y="8" font-size="10" fill="currentColor">increasing frequency</text></svg>`,
+  "ala-mock-2026-p4-Q9biii": `<svg width="100%" viewBox="0 0 400 200" role="img"><title>Polonium decay and lead growth curves</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><line x1="50" y1="170" x2="380" y2="170" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="50" y1="170" x2="50" y2="20" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><text x="380" y="182" font-size="11" fill="currentColor">t / s</text><text x="30" y="18" font-size="11" fill="currentColor">N</text><path d="M50 30 C100 35 180 80 250 120 S340 155 360 160" fill="none" stroke="#2980b9" stroke-width="2"/><path d="M50 160 C100 155 180 120 250 80 S340 45 360 40" fill="none" stroke="#c0392b" stroke-width="2"/><text x="270" y="55" font-size="11" fill="#c0392b">Po-211 (decay)</text><text x="270" y="150" font-size="11" fill="#2980b9">Pb-207 (growth)</text><text x="130" y="183" text-anchor="middle" font-size="10" fill="#888">0.52 s (half-life)</text><line x1="130" y1="170" x2="130" y2="95" stroke="#888" stroke-width="1" stroke-dasharray="3 2"/><circle cx="130" cy="95" r="3" fill="#888"/></svg>`,
+  "ala-mock-2026-p4-Q9bi": `<svg width="100%" viewBox="0 0 400 200" role="img"><title>Polonium-211 exponential decay curve</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><line x1="50" y1="170" x2="380" y2="170" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="50" y1="170" x2="50" y2="20" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><text x="370" y="182" font-size="11" fill="currentColor">t / s</text><text x="20" y="18" font-size="10" fill="currentColor">N/10¹²</text><text x="42" y="35" text-anchor="end" font-size="10" fill="currentColor">24</text><text x="42" y="101" text-anchor="end" font-size="10" fill="currentColor">12</text><text x="42" y="170" text-anchor="end" font-size="10" fill="currentColor">0</text><line x1="47" y1="33" x2="53" y2="33" stroke="#888" stroke-width="1"/><line x1="47" y1="100" x2="53" y2="100" stroke="#888" stroke-width="1"/><text x="50" y="183" text-anchor="middle" font-size="10" fill="currentColor">0</text><text x="180" y="183" text-anchor="middle" font-size="10" fill="currentColor">0.52</text><text x="340" y="183" text-anchor="middle" font-size="10" fill="currentColor">1.2</text><line x1="180" y1="170" x2="180" y2="100" stroke="#aaa" stroke-width="1" stroke-dasharray="3 2"/><path d="M50 33 C90 40 140 65 180 100 S280 145 340 158" fill="none" stroke="#c0392b" stroke-width="2.5"/><circle cx="180" cy="100" r="4" fill="#c0392b"/><text x="185" y="95" font-size="10" fill="#c0392b">(0.52, 12×10¹²)</text></svg>`,
+};
+
+// ─── Table parser ───────────────────────────────────────────────────────────
+function parseMarkdownTables(text) {
+  if (!text) return [];
+
+  const lines = text.split("\n");
+  const segments = []; // array of { type: 'text'|'table', content }
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    const isTableLine = (l) => l.startsWith("|") && l.endsWith("|");
+
+    if (isTableLine(line)) {
+      // Collect contiguous table lines
+      const tableLines = [];
+      while (i < lines.length && isTableLine(lines[i].trim())) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+      segments.push({ type: "table", lines: tableLines });
+    } else {
+      // Collect contiguous non-table lines
+      const textLines = [];
+      while (i < lines.length && !isTableLine(lines[i].trim())) {
+        textLines.push(lines[i]);
+        i++;
+      }
+      const joined = textLines.join("\n").trim();
+      if (joined) segments.push({ type: "text", content: joined });
+    }
+  }
+
+  return segments;
+}
+
+function parseTableLines(tableLines) {
+  const isSeparator = (row) => row.every((cell) => /^[-: ]+$/.test(cell.trim()));
+  const splitRow = (line) =>
+    line
+      .slice(1, -1) // remove leading/trailing |
+      .split("|")
+      .map((c) => c.trim());
+
+  const rows = tableLines.map(splitRow);
+  if (rows.length < 2) return null;
+
+  const header = rows[0];
+  const body = rows.slice(1).filter((r) => !isSeparator(r));
+  return { header, body };
+}
+
+const TABLE_STYLE = {
+  borderCollapse: "collapse",
+  width: "auto",
+  margin: "10px 0",
+  fontSize: 14,
+  borderRadius: 4,
+  overflow: "hidden",
+};
+const TH_STYLE = {
+  border: "1px solid #aaa",
+  padding: "6px 14px",
+  textAlign: "center",
+  background: "rgba(255,255,255,0.08)",
+  fontWeight: 600,
+};
+const TD_STYLE = {
+  border: "1px solid #aaa",
+  padding: "6px 14px",
+  textAlign: "center",
+};
+
+function RenderedTable({ lines }) {
+  const parsed = parseTableLines(lines);
+  if (!parsed) return null;
+  const { header, body } = parsed;
+  return (
+    <div style={{ overflowX: "auto", margin: "10px 0" }}>
+      <table style={TABLE_STYLE}>
+        <thead>
+          <tr>
+            {header.map((cell, i) => (
+              <th key={i} style={TH_STYLE}>{cell}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, ri) => (
+            <tr key={ri}>
+              {row.map((cell, ci) => (
+                <td key={ci} style={TD_STYLE}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Main component ─────────────────────────────────────────────────────────
 export default function MockQuestionDisplay({ question }) {
   if (!question) return null;
-  const { question_number, question_text, diagram_description, graph_data, image_url } = question;
+  const { question_id, question_number, question_text, diagram_description, graph_data, image_url } = question;
+
+  const svgDiagram = question_id ? DIAGRAM_SVGS[question_id] : null;
+  const segments = parseMarkdownTables(question_text);
 
   return (
     <div className="space-y-4">
@@ -19,8 +139,20 @@ export default function MockQuestionDisplay({ question }) {
         </span>
       )}
 
-      {/* Diagram description box */}
-      {diagram_description && (
+      {/* SVG diagram (hardcoded) — takes priority over text description */}
+      {svgDiagram ? (
+        <div
+          dangerouslySetInnerHTML={{ __html: svgDiagram }}
+          style={{
+            margin: "12px 0",
+            border: "1px solid #ddd",
+            borderRadius: 8,
+            padding: 8,
+            background: "var(--color-background-secondary, rgba(255,255,255,0.04))",
+          }}
+        />
+      ) : diagram_description ? (
+        /* Fallback: text description box */
         <div className="bg-blue-950/40 border border-blue-500/25 rounded-xl px-4 py-3 flex items-start gap-3">
           <span className="text-xl shrink-0 mt-0.5">📊</span>
           <p className="text-sm text-blue-200/85 leading-relaxed italic">
@@ -28,7 +160,7 @@ export default function MockQuestionDisplay({ question }) {
             {diagram_description}
           </p>
         </div>
-      )}
+      ) : null}
 
       {/* Image */}
       {image_url && (
@@ -47,27 +179,16 @@ export default function MockQuestionDisplay({ question }) {
         </div>
       )}
 
-      {/* Question text — supports markdown tables */}
-      {question_text && (
-        <div className="prose prose-sm prose-invert max-w-none text-[15px] leading-relaxed text-foreground/90">
-          <ReactMarkdown
-            components={{
-              table: ({ children }) => (
-                <div className="overflow-x-auto my-3">
-                  <table className="w-full text-sm border-collapse border border-border/50">{children}</table>
-                </div>
-              ),
-              th: ({ children }) => (
-                <th className="border border-border/50 px-3 py-2 bg-secondary text-foreground text-left font-semibold">{children}</th>
-              ),
-              td: ({ children }) => (
-                <td className="border border-border/50 px-3 py-2 text-foreground/80">{children}</td>
-              ),
-              p: ({ children }) => <p className="my-1 leading-relaxed">{children}</p>,
-            }}
-          >
-            {question_text}
-          </ReactMarkdown>
+      {/* Question text — table-aware renderer */}
+      {segments.length > 0 && (
+        <div className="text-[15px] leading-relaxed text-foreground/90 space-y-2">
+          {segments.map((seg, i) =>
+            seg.type === "table" ? (
+              <RenderedTable key={i} lines={seg.lines} />
+            ) : (
+              <p key={i} className="leading-relaxed whitespace-pre-wrap">{seg.content}</p>
+            )
+          )}
         </div>
       )}
     </div>

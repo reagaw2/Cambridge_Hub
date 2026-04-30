@@ -74,20 +74,24 @@ function RenderedTable({ lines }) {
   );
 }
 
-// ─── Inline renderer: bold, inline code ────────────────────────────────────
+// ─── Inline renderer: **bold**, *italic*, `code`, $$math$$ ────────────────
 function InlineText({ text }) {
   if (!text) return null;
-  // Split on **bold** and `code`
   const parts = [];
-  const regex = /(\*\*(.+?)\*\*|`(.+?)`)/g;
+  // Order: $$math$$, **bold**, *italic*, `code`
+  const regex = /(\$\$(.+?)\$\$|\*\*(.+?)\*\*|\*([^*]+?)\*|`(.+?)`)/g;
   let last = 0;
   let match;
   while ((match = regex.exec(text)) !== null) {
     if (match.index > last) parts.push({ type: "text", content: text.slice(last, match.index) });
-    if (match[0].startsWith("**")) {
-      parts.push({ type: "bold", content: match[2] });
+    if (match[0].startsWith("$$")) {
+      parts.push({ type: "math", content: match[2] });
+    } else if (match[0].startsWith("**")) {
+      parts.push({ type: "bold", content: match[3] });
+    } else if (match[0].startsWith("*")) {
+      parts.push({ type: "italic", content: match[4] });
     } else {
-      parts.push({ type: "code", content: match[3] });
+      parts.push({ type: "code", content: match[5] });
     }
     last = match.index + match[0].length;
   }
@@ -97,6 +101,12 @@ function InlineText({ text }) {
     <>
       {parts.map((p, i) => {
         if (p.type === "bold") return <strong key={i}>{p.content}</strong>;
+        if (p.type === "italic") return <em key={i}>{p.content}</em>;
+        if (p.type === "math") return (
+          <span key={i} style={{ fontFamily: "serif", fontStyle: "italic", letterSpacing: "0.02em", padding: "0 2px" }}>
+            {p.content}
+          </span>
+        );
         if (p.type === "code") return (
           <code key={i} style={{ fontFamily: "monospace", background: "rgba(255,255,255,0.1)", padding: "1px 5px", borderRadius: 4, fontSize: "0.9em" }}>
             {p.content}

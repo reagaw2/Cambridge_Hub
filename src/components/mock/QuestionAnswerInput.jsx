@@ -3,6 +3,7 @@
  * Types: written, code, table_fill, matching, drawing (basic), default → written
  */
 import { useState, useRef, useEffect, useCallback } from "react";
+import LogicCircuitCanvas from "./LogicCircuitCanvas";
 
 // ─── Written ──────────────────────────────────────────────────────────────
 function WrittenInput({ value, onChange }) {
@@ -308,8 +309,17 @@ function MatchingInput({ question, value, onChange }) {
   );
 }
 
-// ─── Drawing (basic freehand fallback) ────────────────────────────────────
+// ─── Drawing ──────────────────────────────────────────────────────────────
 function DrawingInput({ question, value, onChange }) {
+  // Logic circuit gets a dedicated interactive canvas
+  if (question?.drawing_config?.type === "logic_circuit") {
+    return <LogicCircuitCanvas question={question} value={value} onChange={onChange} />;
+  }
+  // Fallback: freehand canvas for ER diagrams etc.
+  return <FreehandDrawing question={question} value={value} onChange={onChange} />;
+}
+
+function FreehandDrawing({ question, value, onChange }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [tool, setTool] = useState("pen");

@@ -5,6 +5,7 @@
  *   2. Diagram SVGs rendered from hardcoded lookup by question_id
  */
 import MockGraphRenderer from "./MockGraphRenderer";
+import MarkdownText from "./MarkdownText";
 
 // ─── Hardcoded SVG diagrams keyed by question_id ───────────────────────────
 const DIAGRAM_SVGS = {
@@ -22,113 +23,12 @@ const DIAGRAM_SVGS = {
   "ala-mock-2026-p4-Q9bi": `<svg width="100%" viewBox="0 0 400 200" role="img"><title>Polonium-211 exponential decay curve</title><defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><line x1="50" y1="170" x2="380" y2="170" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="50" y1="170" x2="50" y2="20" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><text x="370" y="182" font-size="11" fill="currentColor">t / s</text><text x="20" y="18" font-size="10" fill="currentColor">N/10¹²</text><text x="42" y="35" text-anchor="end" font-size="10" fill="currentColor">24</text><text x="42" y="101" text-anchor="end" font-size="10" fill="currentColor">12</text><text x="42" y="170" text-anchor="end" font-size="10" fill="currentColor">0</text><line x1="47" y1="33" x2="53" y2="33" stroke="#888" stroke-width="1"/><line x1="47" y1="100" x2="53" y2="100" stroke="#888" stroke-width="1"/><text x="50" y="183" text-anchor="middle" font-size="10" fill="currentColor">0</text><text x="180" y="183" text-anchor="middle" font-size="10" fill="currentColor">0.52</text><text x="340" y="183" text-anchor="middle" font-size="10" fill="currentColor">1.2</text><line x1="180" y1="170" x2="180" y2="100" stroke="#aaa" stroke-width="1" stroke-dasharray="3 2"/><path d="M50 33 C90 40 140 65 180 100 S280 145 340 158" fill="none" stroke="#c0392b" stroke-width="2.5"/><circle cx="180" cy="100" r="4" fill="#c0392b"/><text x="185" y="95" font-size="10" fill="#c0392b">(0.52, 12×10¹²)</text></svg>`,
 };
 
-// ─── Table parser ───────────────────────────────────────────────────────────
-function parseMarkdownTables(text) {
-  if (!text) return [];
-
-  const lines = text.split("\n");
-  const segments = []; // array of { type: 'text'|'table', content }
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i].trim();
-    const isTableLine = (l) => l.startsWith("|") && l.endsWith("|");
-
-    if (isTableLine(line)) {
-      // Collect contiguous table lines
-      const tableLines = [];
-      while (i < lines.length && isTableLine(lines[i].trim())) {
-        tableLines.push(lines[i].trim());
-        i++;
-      }
-      segments.push({ type: "table", lines: tableLines });
-    } else {
-      // Collect contiguous non-table lines
-      const textLines = [];
-      while (i < lines.length && !isTableLine(lines[i].trim())) {
-        textLines.push(lines[i]);
-        i++;
-      }
-      const joined = textLines.join("\n").trim();
-      if (joined) segments.push({ type: "text", content: joined });
-    }
-  }
-
-  return segments;
-}
-
-function parseTableLines(tableLines) {
-  const isSeparator = (row) => row.every((cell) => /^[-: ]+$/.test(cell.trim()));
-  const splitRow = (line) =>
-    line
-      .slice(1, -1) // remove leading/trailing |
-      .split("|")
-      .map((c) => c.trim());
-
-  const rows = tableLines.map(splitRow);
-  if (rows.length < 2) return null;
-
-  const header = rows[0];
-  const body = rows.slice(1).filter((r) => !isSeparator(r));
-  return { header, body };
-}
-
-const TABLE_STYLE = {
-  borderCollapse: "collapse",
-  width: "auto",
-  margin: "10px 0",
-  fontSize: 14,
-  borderRadius: 4,
-  overflow: "hidden",
-};
-const TH_STYLE = {
-  border: "1px solid #aaa",
-  padding: "6px 14px",
-  textAlign: "center",
-  background: "rgba(255,255,255,0.08)",
-  fontWeight: 600,
-};
-const TD_STYLE = {
-  border: "1px solid #aaa",
-  padding: "6px 14px",
-  textAlign: "center",
-};
-
-function RenderedTable({ lines }) {
-  const parsed = parseTableLines(lines);
-  if (!parsed) return null;
-  const { header, body } = parsed;
-  return (
-    <div style={{ overflowX: "auto", margin: "10px 0" }}>
-      <table style={TABLE_STYLE}>
-        <thead>
-          <tr>
-            {header.map((cell, i) => (
-              <th key={i} style={TH_STYLE}>{cell}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {body.map((row, ri) => (
-            <tr key={ri}>
-              {row.map((cell, ci) => (
-                <td key={ci} style={TD_STYLE}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 // ─── Main component ─────────────────────────────────────────────────────────
 export default function MockQuestionDisplay({ question }) {
   if (!question) return null;
   const { question_id, question_number, question_text, diagram_description, graph_data, image_url } = question;
 
   const svgDiagram = question_id ? DIAGRAM_SVGS[question_id] : null;
-  const segments = parseMarkdownTables(question_text);
 
   return (
     <div className="space-y-4">
@@ -179,17 +79,9 @@ export default function MockQuestionDisplay({ question }) {
         </div>
       )}
 
-      {/* Question text — table-aware renderer */}
-      {segments.length > 0 && (
-        <div className="text-[15px] leading-relaxed text-foreground/90 space-y-2">
-          {segments.map((seg, i) =>
-            seg.type === "table" ? (
-              <RenderedTable key={i} lines={seg.lines} />
-            ) : (
-              <p key={i} className="leading-relaxed whitespace-pre-wrap">{seg.content}</p>
-            )
-          )}
-        </div>
+      {/* Question text — markdown-aware renderer */}
+      {question_text && (
+        <MarkdownText text={question_text} className="text-[15px] leading-relaxed text-foreground/90" />
       )}
     </div>
   );

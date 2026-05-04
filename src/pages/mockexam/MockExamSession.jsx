@@ -26,42 +26,44 @@ function FeedbackPanel({ feedback, question, onNext, isLast }) {
           : <XCircle className="w-8 h-8 text-amber-400 shrink-0" />}
         <div>
           <p className="font-bold text-foreground text-lg">{marks_earned} / {total} marks</p>
-          <p className="text-xs text-muted-foreground">{perfect ? "Full marks!" : "Keep going — every attempt builds understanding."}</p>
+          <p className="text-xs text-muted-foreground">{perfect ? "Full marks! Well done." : "Keep going — every attempt builds understanding."}</p>
         </div>
       </div>
 
-      {/* Mark breakdown */}
-      {mark_breakdown.length > 0 && (
-        <div className="bg-card border border-border rounded-xl p-4 space-y-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mark Breakdown</p>
-          {mark_breakdown.map((mb, i) => (
-            <div key={i} className={`flex items-start gap-2.5 text-sm p-2.5 rounded-lg ${mb.awarded ? "bg-green-500/8 border border-green-500/20" : "bg-red-500/8 border border-red-500/20"}`}>
-              <span className={`shrink-0 font-bold mt-0.5 ${mb.awarded ? "text-green-400" : "text-red-400"}`}>{mb.awarded ? "✓" : "✗"}</span>
-              <div>
-                <p className={`text-xs font-semibold mb-0.5 ${mb.awarded ? "text-green-300" : "text-red-300"}`}>{mb.point}</p>
-                <p className="text-xs text-foreground/70 leading-relaxed">{mb.comment}</p>
-              </div>
+      {/* If wrong: show full breakdown, mark scheme, insight */}
+      {!perfect && (
+        <>
+          {mark_breakdown.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mark Breakdown</p>
+              {mark_breakdown.map((mb, i) => (
+                <div key={i} className={`flex items-start gap-2.5 text-sm p-2.5 rounded-lg ${mb.awarded ? "bg-green-500/8 border border-green-500/20" : "bg-red-500/8 border border-red-500/20"}`}>
+                  <span className={`shrink-0 font-bold mt-0.5 ${mb.awarded ? "text-green-400" : "text-red-400"}`}>{mb.awarded ? "✓" : "✗"}</span>
+                  <div>
+                    <p className={`text-xs font-semibold mb-0.5 ${mb.awarded ? "text-green-300" : "text-red-300"}`}>{mb.point}</p>
+                    <p className="text-xs text-foreground/70 leading-relaxed">{mb.comment}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Mark scheme */}
-      <div className="bg-secondary/60 border border-border rounded-xl p-4 space-y-1.5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Official Mark Scheme</p>
-        <p className="text-xs text-foreground/80 leading-relaxed">{question.mark_scheme}</p>
-      </div>
+          <div className="bg-secondary/60 border border-border rounded-xl p-4 space-y-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Official Mark Scheme</p>
+            <p className="text-xs text-foreground/80 leading-relaxed">{question.mark_scheme}</p>
+          </div>
 
-      {/* Cambridge insight */}
-      {cambridge_insight && (
-        <div className="bg-primary/8 border border-primary/25 rounded-xl p-4 space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Cambridge Insight</p>
-          <p className="text-sm text-foreground/80 leading-relaxed">{cambridge_insight}</p>
-        </div>
-      )}
+          {cambridge_insight && (
+            <div className="bg-primary/8 border border-primary/25 rounded-xl p-4 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Cambridge Insight</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{cambridge_insight}</p>
+            </div>
+          )}
 
-      {examiner_comment && (
-        <p className="text-[11px] text-muted-foreground/60 italic px-1">{examiner_comment}</p>
+          {examiner_comment && (
+            <p className="text-[11px] text-muted-foreground/60 italic px-1">{examiner_comment}</p>
+          )}
+        </>
       )}
 
       {/* Next button */}

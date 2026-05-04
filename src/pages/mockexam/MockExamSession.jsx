@@ -113,7 +113,8 @@ export default function MockExamSession() {
   const handleSubmit = useCallback(async () => {
     if (!answer.trim() || loading || !q) return;
     setLoading(true);
-    const prompt = buildExamPrompt(q, answer);
+    // Mock exam questions use question_text; buildExamPrompt expects .text
+    const prompt = buildExamPrompt({ ...q, text: q.question_text ?? q.text }, answer);
     const schema = buildExamResponseSchema(q.total_marks);
     const result = await base44.integrations.Core.InvokeLLM({
       prompt,

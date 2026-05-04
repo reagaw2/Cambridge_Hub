@@ -60,6 +60,9 @@ import MCQFeedback from './pages/MCQFeedback';
 import Welcome from './pages/Welcome';
 import Onboarding from './pages/Onboarding';
 import ExamPaperSelect from './pages/ExamPaperSelect';
+import MockExamList from './pages/mockexam/MockExamList';
+import InteractiveMockExamSession from './pages/mockexam/MockExamSession';
+import MockExamSummary from './pages/mockexam/MockExamSummary';
 import MockExamSelect from './pages/mock/MockExamSelect';
 import MockExamSession from './pages/mock/MockExamSession';
 import MockExamResults from './pages/mock/MockExamResults';
@@ -203,6 +206,9 @@ const AuthenticatedApp = () => {
         <Route path="/cs/end-of-bank" element={<CSEndOfBank />} />
         <Route path="/cs/feedback" element={<CSFeedback />} />
         <Route path="/exam/select" element={<ExamPaperSelect />} />
+        <Route path="/mock-exam" element={<MockExamList />} />
+        <Route path="/mock-exam/session" element={<InteractiveMockExamSession />} />
+        <Route path="/mock-exam/summary" element={<MockExamSummary />} />
         <Route path="/mock/select" element={<MockExamSelect />} />
         <Route path="/mock/session" element={<MockExamSession />} />
         <Route path="/mock/results" element={<MockExamResults />} />

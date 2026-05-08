@@ -2,13 +2,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
-import { csGetTopicData, csGetReviewBank, csGetGuessReviewBank, normaliseTopicKey } from "@/lib/csTopicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock } from "lucide-react";
+import { csGetTopicData, csGetReviewBank, csGetGuessReviewBank } from "@/lib/csTopicStore";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Code2 } from "lucide-react";
 import { toast } from "sonner";
-
-const CS_BLUE = "border-l-blue-500";
-const CS_BLUE_TEXT = "text-blue-400";
-const CS_BLUE_BG = "bg-blue-500/10";
 
 function getLockStatus(locked_until) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -26,7 +22,7 @@ function formatCountdown(ms) {
 
 function TrendBadge({ trend }) {
   if (trend === "improving") return (
-    <span className={`flex items-center gap-1 text-xs font-medium ${CS_BLUE_TEXT}`}>
+    <span className="flex items-center gap-1 text-xs font-medium text-blue-400">
       <ArrowUp className="w-3 h-3" /> Improving
     </span>);
   if (trend === "steady") return (
@@ -48,9 +44,9 @@ function trendToScore(trend) {
 
 function OverallConfidence({ topicData }) {
   const allData = Object.values(topicData).filter(Boolean);
-  if (allData.length === 0) return <span className="text-xs text-muted-foreground/60">No data yet</span>;
+  if (allData.length === 0) return <span className="text-xs text-white/30">No data yet</span>;
   const avg = Math.round(allData.reduce((sum, d) => sum + trendToScore(d.trend), 0) / allData.length);
-  const color = avg >= 70 ? "text-green-400" : avg >= 50 ? "text-amber-400" : "text-red-400";
+  const color = avg >= 70 ? "text-blue-400" : avg >= 50 ? "text-amber-400" : "text-red-400";
   return <span className={`text-sm font-bold ${color}`}>{avg}%</span>;
 }
 
@@ -106,8 +102,6 @@ function usePullToRefresh(onRefresh) {
 
   return { containerRef, pullY, refreshing, onTouchStart, onTouchMove, onTouchEnd };
 }
-
-// ── Chapter / Topic structure ──────────────────────────────────────────────
 
 const CHAPTERS = [
   {
@@ -236,8 +230,7 @@ const ACTIVE_KEYS = CHAPTERS.flatMap(c => c.topics.filter(t => t.active).map(t =
 export default function CSDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isLoadingProgress, isLoadingAuth } = useAuth();
-  console.log("[csDashboard] rendering — isLoadingProgress:", isLoadingProgress, "isLoadingAuth:", isLoadingAuth);
+  const { user, isLoadingProgress } = useAuth();
   const { avatarLetter } = useDisplayName();
   const [topicData, setTopicData] = useState({});
   const [reviewBank, setReviewBank] = useState([]);
@@ -245,15 +238,8 @@ export default function CSDashboard() {
   const [loading, setLoading] = useState(true);
 
   async function loadDashboardData() {
-    console.log("[csDashboard] loadDashboardData called — isLoadingProgress:", isLoadingProgress);
     setLoading(true);
-    const topicResults = await Promise.all(
-      ACTIVE_KEYS.map(async (k) => {
-        const result = await csGetTopicData(k);
-        console.log("[csStore] csGetTopicData called for:", k, "result:", result);
-        return result;
-      })
-    );
+    const topicResults = await Promise.all(ACTIVE_KEYS.map(k => csGetTopicData(k)));
     const [rb, grb] = await Promise.all([csGetReviewBank(), csGetGuessReviewBank()]);
     setReviewBank(rb);
     setGuessReviewBank(grb);
@@ -264,9 +250,7 @@ export default function CSDashboard() {
   }
 
   useEffect(() => {
-    if (!isLoadingProgress) {
-      loadDashboardData();
-    }
+    if (!isLoadingProgress) loadDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoadingProgress]);
 
@@ -278,7 +262,6 @@ export default function CSDashboard() {
 
   const { containerRef, pullY, refreshing, onTouchStart, onTouchMove, onTouchEnd } = usePullToRefresh(handleRefresh);
 
-  // Today's focus: weakest active topic that has been attempted
   const focusTopic = ACTIVE_KEYS
     .map(k => ({ key: k, data: topicData[k] }))
     .filter(t => t.data)
@@ -292,10 +275,16 @@ export default function CSDashboard() {
     : "/cs/operating-systems/question";
 
   return (
-    <div className="min-h-screen bg-background flex justify-center">
+    <div className="min-h-screen bg-[#0d0d1a] text-white">
+      {/* Ambient glow */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute top-[-5%] right-[-5%] w-[400px] h-[400px] rounded-full bg-blue-600/10 blur-[120px]" />
+        <div className="absolute bottom-[-5%] left-[-5%] w-[400px] h-[400px] rounded-full bg-purple-600/10 blur-[120px]" />
+      </div>
+
       <div
         ref={containerRef}
-        className="w-full max-w-[480px] flex flex-col overflow-y-auto"
+        className="relative z-10 w-full max-w-[540px] mx-auto flex flex-col overflow-y-auto"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -309,133 +298,114 @@ export default function CSDashboard() {
         </div>
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate("/")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02] backdrop-blur-sm">
+          <button onClick={() => navigate("/")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-white/5 transition-colors">
+            <ArrowLeft className="w-5 h-5 text-white/70" />
           </button>
-          <span className="text-base font-bold tracking-wide text-foreground">Computer Science</span>
+          <div className="flex items-center gap-2">
+            <Code2 className="w-4 h-4 text-blue-400" />
+            <span className="text-sm font-bold text-white">Computer Science</span>
+            <span className="text-[10px] text-white/30">9618</span>
+          </div>
           <button onClick={() => navigate("/profile")}
-            className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
+            className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
             <span className="text-xs font-bold text-blue-400">{avatarLetter}</span>
           </button>
         </div>
 
         {/* Overall confidence */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30 bg-card/40">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Overall confidence</span>
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-white/[0.02]">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-white/30">Overall confidence</span>
           {!loading && <OverallConfidence topicData={topicData} />}
         </div>
 
-        <div className="flex-1 flex flex-col gap-6 p-4 pt-6">
-
-          {/* Greeting */}
-          <p className="text-2xl font-serif font-semibold text-foreground leading-snug">
-            Let's build your CS skills.
-          </p>
+        <div className="flex-1 flex flex-col gap-5 p-4 pt-6 pb-8">
 
           {/* Today's focus */}
-          <div className={`bg-card border border-border border-l-4 ${CS_BLUE} rounded-xl p-5 space-y-3`}>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Today's Focus</p>
-            <p className="text-sm text-foreground/85 leading-relaxed">
+          <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-900/30 to-transparent p-5 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">Today's Focus</p>
+            <p className="text-sm text-white/80 leading-relaxed">
               {focusTopic
-                ? `${focusLabel} is your weakest active topic right now — push further today.`
+                ? `${focusLabel} is your weakest active topic — push further today.`
                 : `Start with ${focusLabel} — it's a core topic and a great place to build momentum.`}
             </p>
             <button onClick={() => navigate(focusRoute ?? "/cs/operating-systems/question")}
-              className={`inline-flex items-center gap-1.5 text-sm font-semibold ${CS_BLUE_TEXT} hover:brightness-110 transition-all`}>
+              className="text-sm font-semibold text-blue-400 hover:brightness-110 transition-all">
               Start session →
             </button>
           </div>
 
-          {/* Review Bank */}
+          {/* Review Banks */}
           {reviewBank.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Review Bank</p>
-              <div className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
-                onClick={() => navigate("/cs/review-bank")}>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Bookmark className="w-4 h-4 text-amber-400/80 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">
-                      {reviewBank.length} question{reviewBank.length !== 1 ? "s" : ""} in review bank
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{reviewBankSubtitle(reviewBank)}</p>
-                  </div>
+            <div onClick={() => navigate("/cs/review-bank")}
+              className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Bookmark className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white">{reviewBank.length} question{reviewBank.length !== 1 ? "s" : ""} in review bank</p>
+                  <p className="text-[11px] text-white/40 mt-0.5 truncate">{reviewBankSubtitle(reviewBank)}</p>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); navigate("/cs/review-bank"); }}
-                  className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all">
-                  View →
-                </button>
               </div>
+              <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
             </div>
           )}
 
-          {/* Guess Review Bank */}
           {guessReviewBank.length > 0 && (
-            <div className="bg-card border border-border border-l-4 border-l-amber-500/60 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:brightness-110 transition-all"
-              onClick={() => navigate("/cs/guess-review-bank")}>
+            <div onClick={() => navigate("/cs/guess-review-bank")}
+              className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <span className="text-base shrink-0">🎲</span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
-                    {guessReviewBank.length} MCQ question{guessReviewBank.length !== 1 ? "s" : ""} flagged as guesses
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{guessBankSubtitle(guessReviewBank)}</p>
+                  <p className="text-sm font-semibold text-white">{guessReviewBank.length} MCQ flagged as guesses</p>
+                  <p className="text-[11px] text-white/40 mt-0.5">{guessBankSubtitle(guessReviewBank)}</p>
                 </div>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); navigate("/cs/guess-review-bank"); }}
-                className="text-xs font-semibold text-amber-400 shrink-0 hover:brightness-110 transition-all">
-                View →
-              </button>
+              <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
             </div>
           )}
 
-          {/* Chapters & Topics */}
+          {/* Chapters */}
           {CHAPTERS.map(({ chapter, topics }) => (
             <div key={chapter} className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{chapter}</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-white/30 pt-1">{chapter}</p>
               {topics.map(({ label, key, active, route }) => {
                 const data = topicData[key];
                 if (!active) {
                   return (
                     <div key={key}
-                      onClick={() => toast("This topic is coming soon. Focus on the active topics for now.", { duration: 2000, position: "bottom-center", style: { background: "#92400e", color: "#fef3c7", border: "none" } })}
-                      className="bg-card border border-border rounded-xl p-4 opacity-40 cursor-pointer">
+                      onClick={() => toast("This topic is coming soon.", { duration: 2000, position: "bottom-center", style: { background: "#1e1b4b", color: "#c7d2fe", border: "none" } })}
+                      className="rounded-xl border border-white/5 bg-white/[0.02] p-4 opacity-40 cursor-pointer">
                       <div className="flex items-center justify-between">
-                        <p className="font-semibold text-muted-foreground text-sm">{label}</p>
-                        <Lock className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                        <p className="font-medium text-white/50 text-sm">{label}</p>
+                        <Lock className="w-3.5 h-3.5 text-white/20 shrink-0" />
                       </div>
-                      <p className="text-[11px] text-amber-500/70 mt-1 font-medium">Coming soon</p>
+                      <p className="text-[11px] text-blue-400/40 mt-1">Coming soon</p>
                     </div>
                   );
                 }
                 return (
-                  <div key={key}
-                    onClick={() => navigate(route)}
-                    className={`bg-card border border-border border-l-4 ${CS_BLUE} rounded-xl p-4 cursor-pointer hover:brightness-110 transition-all`}>
+                  <div key={key} onClick={() => navigate(route)}
+                    className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-blue-500/5 hover:border-blue-500/25 p-4 cursor-pointer transition-all">
                     <div className="flex items-start justify-between">
-                      <div className="space-y-2 flex-1">
-                        <p className="font-semibold text-foreground text-sm">{label}</p>
+                      <div className="space-y-1.5 flex-1">
+                        <p className="font-semibold text-white text-sm">{label}</p>
                         {data ? (
                           <>
                             <TrendBadge trend={data.trend} />
-                            <div className="flex items-center gap-4 pt-1">
-                              {data.lastLabel && (
-                                <span className="text-[11px] text-muted-foreground">Last attempt: {data.lastLabel}</span>
-                              )}
+                            <div className="flex items-center gap-4">
+                              {data.lastLabel && <span className="text-[11px] text-white/30">Last: {data.lastLabel}</span>}
                               {data.streak > 0 && (
-                                <span className={`flex items-center gap-1 text-[11px] text-muted-foreground`}>
-                                  <Flame className="w-3 h-3 text-orange-400/80" />
-                                  {data.streak} day streak
+                                <span className="flex items-center gap-1 text-[11px] text-white/30">
+                                  <Flame className="w-3 h-3 text-orange-400/70" /> {data.streak}d streak
                                 </span>
                               )}
                             </div>
                           </>
                         ) : (
-                          <span className={`text-xs ${CS_BLUE_TEXT} font-medium opacity-70`}>Ready to start</span>
+                          <span className="text-xs text-blue-400/60 font-medium">Ready to start</span>
                         )}
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
                     </div>
                   </div>
                 );

@@ -49,7 +49,7 @@ export default function AppLayout() {
 
   return (
     <div
-      className="flex flex-col min-h-screen bg-background"
+      className="flex flex-col min-h-screen bg-[#0d0d1a]"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: hideNav ? "env(safe-area-inset-bottom)" : "calc(env(safe-area-inset-bottom) + 64px)",
@@ -71,7 +71,7 @@ export default function AppLayout() {
 
       {!hideNav && (
         <div
-          className="fixed bottom-0 left-0 right-0 bg-background border-t border-border flex justify-around items-center px-4 z-50"
+          className="fixed bottom-0 left-0 right-0 bg-[#0d0d1a]/95 backdrop-blur border-t border-white/5 flex justify-around items-center px-4 z-50"
           style={{ height: "calc(env(safe-area-inset-bottom) + 56px)", paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           {/* Home tab — navigates to "/" but preserves scroll position via browser history */}

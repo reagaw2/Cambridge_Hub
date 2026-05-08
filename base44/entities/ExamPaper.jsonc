@@ -1,0 +1,42 @@
+{
+  "name": "ExamPaper",
+  "type": "object",
+  "properties": {
+    "paper_id": {
+      "type": "string",
+      "description": "Unique identifier for this paper"
+    },
+    "paper_title": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    },
+    "examiner": {
+      "type": "string"
+    },
+    "total_marks": {
+      "type": "number"
+    },
+    "duration_minutes": {
+      "type": "number"
+    },
+    "questions": {
+      "type": "array",
+      "description": "All questions in this paper. Each question may have question_text, total_marks, mark_scheme, diagram_description (text), graph_data (recharts-compatible JSON), topic, question_number.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "paper_id",
+    "paper_title",
+    "subject",
+    "questions"
+  ]
+}

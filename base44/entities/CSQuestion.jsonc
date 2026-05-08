@@ -1,0 +1,52 @@
+{
+  "name": "CSQuestion",
+  "type": "object",
+  "properties": {
+    "question_number": {
+      "type": "number",
+      "description": "Sequential question number (1-162)"
+    },
+    "paper_ref": {
+      "type": "string",
+      "description": "Cambridge paper reference e.g. 9608/Oct/Nov/21/13 Q9"
+    },
+    "topic": {
+      "type": "string",
+      "description": "Cambridge 9608 syllabus topic"
+    },
+    "year": {
+      "type": "string",
+      "description": "Exam year e.g. 2021"
+    },
+    "session": {
+      "type": "string",
+      "description": "Oct/Nov or May/Jun"
+    },
+    "cs_image_file": {
+      "type": "string",
+      "description": "Filename of the question image e.g. q001_cs.jpg"
+    },
+    "ms_image_file": {
+      "type": "string",
+      "description": "Filename of the mark scheme image e.g. q001_ms.jpg"
+    },
+    "cs_image_url": {
+      "type": "string",
+      "description": "Full URL to question image (set after static asset upload)"
+    },
+    "ms_image_url": {
+      "type": "string",
+      "description": "Full URL to mark scheme image (set after static asset upload)"
+    },
+    "is_free": {
+      "type": "boolean",
+      "description": "Whether this question is accessible on the free tier",
+      "default": true
+    }
+  },
+  "required": [
+    "question_number",
+    "paper_ref",
+    "topic"
+  ]
+}

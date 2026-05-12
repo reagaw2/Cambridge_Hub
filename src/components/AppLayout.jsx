@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Routes where bottom nav should be hidden (question/answer flows)
 const NO_NAV_PATTERNS = [
-  /^\/$/,
   /\/question$/,
   /\/similar-question$/,
   /\/familiarity-check$/,
@@ -75,16 +74,18 @@ export default function AppLayout() {
           className="fixed bottom-0 left-0 right-0 bg-[#0d0d1a]/95 backdrop-blur border-t border-white/5 flex justify-around items-center px-4 z-50"
           style={{ height: "calc(env(safe-area-inset-bottom) + 56px)", paddingBottom: "env(safe-area-inset-bottom)" }}
         >
-          {/* Home tab — navigates to "/" but preserves scroll position via browser history */}
-          <button
-            onClick={() => navigate("/")}
-            className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
-          >
-            <Home className={`w-5 h-5 ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`} />
-            <span className={`text-[10px] font-medium ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`}>
-              Home
-            </span>
-          </button>
+          {/* Home tab — hidden when already on home */}
+          {location.pathname !== "/" && (
+            <button
+              onClick={() => navigate("/")}
+              className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
+            >
+              <Home className={`w-5 h-5 ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`} />
+              <span className={`text-[10px] font-medium ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`}>
+                Home
+              </span>
+            </button>
+          )}
 
           <button
             className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"

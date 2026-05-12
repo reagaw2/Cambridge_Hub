@@ -4,43 +4,18 @@
  */
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Send, Atom, Code2, BookOpen } from "lucide-react";
+import { ArrowLeft, Send, PanelRight } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import ReactMarkdown from "react-markdown";
-
-const TUTOR_META = {
-  physics_tutor: {
-    name: "Physics Tutor",
-    subtitle: "Cambridge 9702",
-    Icon: Atom,
-    color: "text-emerald-400",
-    bg: "bg-emerald-500/15",
-    border: "border-emerald-500/25",
-    placeholder: "Ask me anything about A Level Physics...",
-  },
-  cs_problem_solver: {
-    name: "CS Problem Solver",
-    subtitle: "Cambridge 9618",
-    Icon: Code2,
-    color: "text-blue-400",
-    bg: "bg-blue-500/15",
-    border: "border-blue-500/25",
-    placeholder: "Ask me a Computer Science question...",
-  },
-  study_planner: {
-    name: "Study Planner",
-    subtitle: "Personalised revision",
-    Icon: BookOpen,
-    color: "text-purple-400",
-    bg: "bg-purple-500/15",
-    border: "border-purple-500/25",
-    placeholder: "Tell me what you'd like to work on...",
-  },
-};
+import { TUTOR_MAP } from "@/lib/tutorConfig";
+import TutorDrawer from "@/components/TutorDrawer";
 
 function MessageBubble({ message }) {
   const isUser = message.role === "user";
-  const isThinking = message.role === "assistant" && !message.content && (!message.tool_calls || message.tool_calls.length === 0);
+  const isThinking =
+    message.role === "assistant" &&
+    !message.content &&
+    (!message.tool_calls || message.tool_calls.length === 0);
 
   return (
     <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
@@ -49,11 +24,13 @@ function MessageBubble({ message }) {
           <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
         </div>
       )}
-      <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-        isUser
-          ? "bg-white/10 text-white"
-          : "bg-white/5 border border-white/8 text-white/85"
-      }`}>
+      <div
+        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+          isUser
+            ? "bg-white/10 text-white"
+            : "bg-white/5 border border-white/8 text-white/85"
+        }`}
+      >
         {isThinking ? (
           <span className="flex gap-1 items-center h-4">
             <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -69,9 +46,13 @@ function MessageBubble({ message }) {
               ol: ({ children }) => <ol className="my-1 ml-4 list-decimal">{children}</ol>,
               li: ({ children }) => <li className="my-0.5">{children}</li>,
               code: ({ inline, children }) =>
-                inline
-                  ? <code className="px-1 py-0.5 rounded bg-white/10 text-xs">{children}</code>
-                  : <pre className="bg-white/5 rounded-lg p-3 overflow-x-auto my-2 text-xs"><code>{children}</code></pre>,
+                inline ? (
+                  <code className="px-1 py-0.5 rounded bg-white/10 text-xs">{children}</code>
+                ) : (
+                  <pre className="bg-white/5 rounded-lg p-3 overflow-x-auto my-2 text-xs">
+                    <code>{children}</code>
+                  </pre>
+                ),
             }}
           >
             {message.content || ""}
@@ -85,23 +66,26 @@ function MessageBubble({ message }) {
 export default function TutorChat() {
   const { agentId } = useParams();
   const navigate = useNavigate();
-  const meta = TUTOR_META[agentId];
+  const meta = TUTOR_MAP[agentId];
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const bottomRef = useRef(null);
 
-  // Create a new conversation on mount
+  // Create a new conversation whenever agentId changes
   useEffect(() => {
     if (!meta) return;
-    base44.agents.createConversation({ agent_name: agentId })
-      .then((conv) => {
-        setConversation(conv);
-        setLoading(false);
-      });
+    setLoading(true);
+    setMessages([]);
+    setConversation(null);
+    base44.agents.createConversation({ agent_name: agentId }).then((conv) => {
+      setConversation(conv);
+      setLoading(false);
+    });
   }, [agentId]);
 
   // Subscribe to conversation updates
@@ -123,10 +107,7 @@ export default function TutorChat() {
     const text = input.trim();
     setInput("");
     setSending(true);
-
-    // Optimistic user bubble
     setMessages((prev) => [...prev, { role: "user", content: text, id: "optimistic" }]);
-
     await base44.agents.addMessage(conversation, { role: "user", content: text });
     setSending(false);
   }
@@ -146,7 +127,7 @@ export default function TutorChat() {
     );
   }
 
-  const { name, subtitle, Icon, color, bg, border, placeholder } = meta;
+  const { name, subtitle, Icon, iconColor, chatBg, chatBorder, placeholder } = meta;
 
   return (
     <div className="flex flex-col h-screen bg-[#0d0d1a] text-white">
@@ -158,13 +139,24 @@ export default function TutorChat() {
         >
           <ArrowLeft className="w-5 h-5 text-white/60" />
         </button>
-        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center ${bg} ${border}`}>
-          <Icon className={`w-4.5 h-4.5 ${color}`} />
+
+        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${chatBg} ${chatBorder}`}>
+          <Icon className={`w-4 h-4 ${iconColor}`} />
         </div>
-        <div>
-          <p className="font-bold text-white text-sm leading-tight">{name}</p>
-          <p className={`text-[10px] ${color} leading-none`}>{subtitle}</p>
+
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-white text-sm leading-tight truncate">{name}</p>
+          <p className={`text-[10px] ${iconColor} leading-none`}>{subtitle}</p>
         </div>
+
+        {/* My Tutors drawer toggle */}
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white/60 hover:text-white text-xs font-medium"
+        >
+          <PanelRight className="w-3.5 h-3.5" />
+          <span>My Tutors</span>
+        </button>
       </div>
 
       {/* Messages */}
@@ -175,8 +167,8 @@ export default function TutorChat() {
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-6">
-            <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center ${bg} ${border}`}>
-              <Icon className={`w-7 h-7 ${color}`} />
+            <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center ${chatBg} ${chatBorder}`}>
+              <Icon className={`w-7 h-7 ${iconColor}`} />
             </div>
             <p className="text-white font-bold">{name}</p>
             <p className="text-white/40 text-sm max-w-[260px] leading-relaxed">
@@ -207,7 +199,7 @@ export default function TutorChat() {
             disabled={!input.trim() || sending || loading}
             className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
               input.trim() && !sending && !loading
-                ? `${bg} ${color} hover:brightness-125`
+                ? `${chatBg} ${iconColor} hover:brightness-125`
                 : "bg-white/5 text-white/20"
             }`}
           >
@@ -218,6 +210,13 @@ export default function TutorChat() {
           AI can make mistakes — verify with official Cambridge resources.
         </p>
       </div>
+
+      {/* Side drawer */}
+      <TutorDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        activeId={agentId}
+      />
     </div>
   );
 }

@@ -1,0 +1,51 @@
+import { Atom, Code2, BookOpen } from "lucide-react";
+
+export const TUTORS = [
+  {
+    id: "physics_tutor",
+    name: "Physics Tutor",
+    subtitle: "Cambridge 9702",
+    description: "Cambridge 9702 expert — explains concepts, works through problems step-by-step, and highlights exam traps.",
+    Icon: Atom,
+    iconBg: "bg-emerald-500/20 border-emerald-500/30",
+    iconColor: "text-emerald-400",
+    cardBg: "from-emerald-900/30 to-transparent",
+    cardBorder: "border-emerald-500/20 hover:border-emerald-500/40",
+    glowColor: "hover:shadow-[0_0_24px_rgba(16,185,129,0.12)]",
+    chatBg: "bg-emerald-500/15",
+    chatBorder: "border-emerald-500/25",
+    placeholder: "Ask me anything about A Level Physics...",
+  },
+  {
+    id: "cs_problem_solver",
+    name: "CS Problem Solver",
+    subtitle: "Cambridge 9618",
+    description: "Cambridge 9618 Socratic tutor — guides you through problems with questions rather than direct answers.",
+    Icon: Code2,
+    iconBg: "bg-blue-500/20 border-blue-500/30",
+    iconColor: "text-blue-400",
+    cardBg: "from-blue-900/30 to-transparent",
+    cardBorder: "border-blue-500/20 hover:border-blue-500/40",
+    glowColor: "hover:shadow-[0_0_24px_rgba(59,130,246,0.12)]",
+    chatBg: "bg-blue-500/15",
+    chatBorder: "border-blue-500/25",
+    placeholder: "Ask me a Computer Science question...",
+  },
+  {
+    id: "study_planner",
+    name: "Study Planner",
+    subtitle: "Personalised revision",
+    description: "Analyses your weak topics and builds a personalised revision schedule to maximise your marks.",
+    Icon: BookOpen,
+    iconBg: "bg-purple-500/20 border-purple-500/30",
+    iconColor: "text-purple-400",
+    cardBg: "from-purple-900/30 to-transparent",
+    cardBorder: "border-purple-500/20 hover:border-purple-500/40",
+    glowColor: "hover:shadow-[0_0_24px_rgba(168,85,247,0.12)]",
+    chatBg: "bg-purple-500/15",
+    chatBorder: "border-purple-500/25",
+    placeholder: "Tell me what you'd like to work on...",
+  },
+];
+
+export const TUTOR_MAP = Object.fromEntries(TUTORS.map((t) => [t.id, t]));

@@ -2,46 +2,8 @@
  * AITutors — lists all AI tutors the student can chat with.
  */
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Atom, Code2, BookOpen, ChevronRight } from "lucide-react";
-
-const TUTORS = [
-  {
-    id: "physics_tutor",
-    name: "Physics Tutor",
-    description: "Cambridge 9702 expert — explains concepts, works through problems step-by-step, and highlights exam traps.",
-    icon: Atom,
-    color: "emerald",
-    iconBg: "bg-emerald-500/20 border-emerald-500/30",
-    iconColor: "text-emerald-400",
-    cardBg: "from-emerald-900/30 to-transparent",
-    cardBorder: "border-emerald-500/20 hover:border-emerald-500/40",
-    glowColor: "hover:shadow-[0_0_24px_rgba(16,185,129,0.12)]",
-  },
-  {
-    id: "cs_problem_solver",
-    name: "CS Problem Solver",
-    description: "Cambridge 9618 Socratic tutor — guides you through problems with questions rather than direct answers.",
-    icon: Code2,
-    color: "blue",
-    iconBg: "bg-blue-500/20 border-blue-500/30",
-    iconColor: "text-blue-400",
-    cardBg: "from-blue-900/30 to-transparent",
-    cardBorder: "border-blue-500/20 hover:border-blue-500/40",
-    glowColor: "hover:shadow-[0_0_24px_rgba(59,130,246,0.12)]",
-  },
-  {
-    id: "study_planner",
-    name: "Study Planner",
-    description: "Analyses your weak topics and builds a personalised revision schedule to maximise your marks.",
-    icon: BookOpen,
-    color: "purple",
-    iconBg: "bg-purple-500/20 border-purple-500/30",
-    iconColor: "text-purple-400",
-    cardBg: "from-purple-900/30 to-transparent",
-    cardBorder: "border-purple-500/20 hover:border-purple-500/40",
-    glowColor: "hover:shadow-[0_0_24px_rgba(168,85,247,0.12)]",
-  },
-];
+import { ArrowLeft, ChevronRight } from "lucide-react";
+import { TUTORS } from "@/lib/tutorConfig";
 
 export default function AITutors() {
   const navigate = useNavigate();
@@ -72,7 +34,7 @@ export default function AITutors() {
         {/* Tutor cards */}
         <div className="space-y-4">
           {TUTORS.map((tutor) => {
-            const Icon = tutor.icon;
+            const { Icon } = tutor;
             return (
               <button
                 key={tutor.id}
@@ -89,7 +51,7 @@ export default function AITutors() {
                       <p className="text-xs text-white/50 mt-0.5 leading-relaxed max-w-[260px]">{tutor.description}</p>
                     </div>
                   </div>
-                  <ChevronRight className={`w-5 h-5 text-white/20 group-hover:${tutor.iconColor} group-hover:translate-x-0.5 transition-all shrink-0`} />
+                  <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-white/60 group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
               </button>
             );

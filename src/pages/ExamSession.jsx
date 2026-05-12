@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Flag, LogOut } from "lucide-react";
+import { Flag, LogOut, Focus } from "lucide-react";
 import { getPaper } from "@/lib/examPapers";
 import { getCSPaper } from "@/lib/csPapers";
 import { getPausedSession, startExamSession, saveExamSession, completeExamSession, invalidateExamCache } from "@/lib/examStore";
@@ -42,6 +42,7 @@ export default function ExamSession() {
   const [flaggedQueue, setFlaggedQueue] = useState([]); // indices of flagged questions yet to answer
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   const timerRef = useRef(null);
   const answersRef = useRef(answers);
@@ -285,12 +286,24 @@ export default function ExamSession() {
 
         {/* Top bar — always visible */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-card/80 sticky top-0 z-10">
-          <span className="text-xs font-mono text-muted-foreground">{paper.displayName}</span>
-          <span className={`font-mono text-sm font-bold tabular-nums transition-colors
+          {!focusMode && <span className="text-xs font-mono text-muted-foreground">{paper.displayName}</span>}
+          <span className={`font-mono text-sm font-bold tabular-nums transition-colors ${focusMode ? "mx-auto" : ""}
             ${timerPulse ? "text-red-400 animate-pulse" : timerRed ? "text-red-400" : "text-foreground"}`}>
             ⏱ {formatTime(timeLeft)}
           </span>
-          <span className="text-xs font-mono text-muted-foreground">Q{currentIdx + 1} / {N}</span>
+          {!focusMode && <span className="text-xs font-mono text-muted-foreground">Q{currentIdx + 1} / {N}</span>}
+          <button
+            onClick={() => setFocusMode(f => !f)}
+            className={`ml-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+              focusMode
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+            title="Toggle Focus Mode"
+          >
+            <Focus className="w-3 h-3" />
+            {focusMode ? "Exit Focus" : "Focus"}
+          </button>
         </div>
 
         {/* Progress bar */}
@@ -298,28 +311,30 @@ export default function ExamSession() {
           <div className="h-1 bg-primary transition-all duration-300" style={{ width: `${progress * 100}%` }} />
         </div>
 
-        {/* Question pills */}
-        <div className="flex gap-1.5 px-4 py-2.5 overflow-x-auto scrollbar-none border-b border-border/30">
-          {answers.map((a, i) => (
-            <div
-              key={i}
-              className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all
-                ${i === currentIdx
-                  ? "ring-2 ring-primary scale-110"
-                  : a.answer_text && !a.flagged
-                    ? "bg-green-500/20 text-green-400 border border-green-500/40"
-                    : a.flagged
-                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                      : "bg-secondary text-muted-foreground border border-border"
-                }`}
-            >
-              {a.flagged ? "🚩" : i + 1}
-            </div>
-          ))}
-        </div>
+        {/* Question pills — hidden in focus mode */}
+        {!focusMode && (
+          <div className="flex gap-1.5 px-4 py-2.5 overflow-x-auto scrollbar-none border-b border-border/30">
+            {answers.map((a, i) => (
+              <div
+                key={i}
+                className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all
+                  ${i === currentIdx
+                    ? "ring-2 ring-primary scale-110"
+                    : a.answer_text && !a.flagged
+                      ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                      : a.flagged
+                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        : "bg-secondary text-muted-foreground border border-border"
+                  }`}
+              >
+                {a.flagged ? "🚩" : i + 1}
+              </div>
+            ))}
+          </div>
+        )}
 
-        {/* Flagged phase banner */}
-        {phase === "flagged" && (
+        {/* Flagged phase banner — hidden in focus mode */}
+        {phase === "flagged" && !focusMode && (
           <div className="mx-4 mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5">
             <p className="text-xs text-amber-400 font-semibold">
               {flaggedRemaining} flagged question{flaggedRemaining !== 1 ? "s" : ""} remaining — let's go back to them.
@@ -337,9 +352,11 @@ export default function ExamSession() {
               </span>
               <span className="font-mono text-xs text-muted-foreground">[{q.total_marks} mark{q.total_marks !== 1 ? "s" : ""}]</span>
             </div>
-            <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-              {q.topic}
-            </span>
+            {!focusMode && (
+              <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+                {q.topic}
+              </span>
+            )}
             <QuestionMedia question={q} />
             <p className="text-[15px] leading-relaxed text-foreground/90">{q.text}</p>
           </div>
@@ -363,33 +380,45 @@ export default function ExamSession() {
           </div>
 
           {/* Bottom buttons */}
-          <div className="grid grid-cols-3 gap-2 pb-4">
-            <button
-              onClick={handleSaveAndExit}
-              disabled={saving}
-              className="flex flex-col items-center gap-1 border border-border rounded-xl py-3 text-xs font-semibold text-muted-foreground hover:brightness-110 active:scale-[0.98] transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-              Save & Exit
-            </button>
+          {focusMode ? (
+            <div className="pb-4">
+              <button
+                onClick={handleSubmitAndContinue}
+                disabled={!currentAnswer.trim()}
+                className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3.5 text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Submit & Continue →
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 pb-4">
+              <button
+                onClick={handleSaveAndExit}
+                disabled={saving}
+                className="flex flex-col items-center gap-1 border border-border rounded-xl py-3 text-xs font-semibold text-muted-foreground hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+                Save & Exit
+              </button>
 
-            <button
-              onClick={handleSkip}
-              className="flex flex-col items-center gap-1 border border-amber-500/40 bg-amber-500/10 rounded-xl py-3 text-xs font-semibold text-amber-400 hover:brightness-110 active:scale-[0.98] transition-all"
-            >
-              <Flag className="w-4 h-4" />
-              🚩 Skip
-            </button>
+              <button
+                onClick={handleSkip}
+                className="flex flex-col items-center gap-1 border border-amber-500/40 bg-amber-500/10 rounded-xl py-3 text-xs font-semibold text-amber-400 hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                <Flag className="w-4 h-4" />
+                🚩 Skip
+              </button>
 
-            <button
-              onClick={handleSubmitAndContinue}
-              disabled={!currentAnswer.trim()}
-              className="flex flex-col items-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 text-xs font-semibold hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Submit &
-              Continue →
-            </button>
-          </div>
+              <button
+                onClick={handleSubmitAndContinue}
+                disabled={!currentAnswer.trim()}
+                className="flex flex-col items-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 text-xs font-semibold hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Submit &
+                Continue →
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

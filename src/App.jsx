@@ -67,6 +67,8 @@ import MockExamSelect from './pages/mock/MockExamSelect';
 import MockExamSession from './pages/mock/MockExamSession';
 import MockExamResults from './pages/mock/MockExamResults';
 import MockExamShare from './pages/mock/MockExamShare';
+import AITutors from './pages/AITutors';
+import TutorChat from './pages/TutorChat';
 import ExamSession from './pages/ExamSession';
 import ExamResults from './pages/ExamResults';
 import GravitationalQuestion1a from './pages/gravitational/Question1a';
@@ -214,6 +216,8 @@ const AuthenticatedApp = () => {
         <Route path="/mock/session" element={<MockExamSession />} />
         <Route path="/mock/results" element={<MockExamResults />} />
         <Route path="/mock/share" element={<MockExamShare />} />
+        <Route path="/ai-tutors" element={<AITutors />} />
+        <Route path="/ai-tutors/:agentId" element={<TutorChat />} />
         <Route path="/exam/session" element={<ExamSession />} />
         <Route path="/exam/results" element={<ExamResults />} />
         <Route path="/welcome" element={<Welcome />} />

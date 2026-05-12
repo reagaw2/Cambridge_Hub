@@ -1,5 +1,5 @@
-import { useLocation, useNavigate, Outlet, useMatch } from "react-router-dom";
-import { Home, Clock, User } from "lucide-react";
+import { useLocation, useNavigate, Outlet } from "react-router-dom";
+import { Home, BrainCircuit, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Routes where bottom nav should be hidden (question/answer flows)
@@ -17,7 +17,7 @@ const NO_NAV_PATTERNS = [
   /^\/mcq$/,
   /^\/mcq-feedback$/,
   /\/q\d/,
-
+  /^\/ai-tutors\/.+/,
 ];
 
 function shouldHideNav(pathname) {
@@ -44,8 +44,9 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const hideNav = shouldHideNav(location.pathname);
 
-  // Active tab is "/physics" or "/profile"; anything else keeps previous tab highlighted
-  const activeTab = location.pathname === "/profile" ? "/profile" : "/physics";
+  const activeTab =
+    location.pathname === "/profile" ? "/profile" :
+    location.pathname.startsWith("/ai-tutors") ? "/ai-tutors" : "/physics";
 
   return (
     <div
@@ -87,10 +88,10 @@ export default function AppLayout() {
 
           <button
             className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
-            onClick={() => alert("History coming soon")}
+            onClick={() => navigate("/ai-tutors")}
           >
-            <Clock className="w-5 h-5 text-muted-foreground/50" />
-            <span className="text-[10px] font-medium text-muted-foreground/50">History</span>
+            <BrainCircuit className={`w-5 h-5 ${activeTab === "/ai-tutors" ? "text-primary" : "text-muted-foreground/50"}`} />
+            <span className={`text-[10px] font-medium ${activeTab === "/ai-tutors" ? "text-primary" : "text-muted-foreground/50"}`}>AI Tutors</span>
           </button>
 
           <button

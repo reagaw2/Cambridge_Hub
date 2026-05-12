@@ -1,9 +1,9 @@
 /**
  * MockExamResults — self-marking results with PDF download.
  */
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ChevronDown, ChevronUp, CheckCircle2, Circle, Save, Download } from "lucide-react";
+import { ChevronDown, ChevronUp, CheckCircle2, Circle, Save, Download, Share2, Check } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import MockQuestionDisplay from "@/components/mock/MockQuestionDisplay";
 
@@ -157,6 +157,24 @@ export default function MockExamResults() {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  function handleShare() {
+    const summary = {
+      title: paper?.paper_title ?? "Mock Exam",
+      score: totalEarned,
+      total: totalMarks,
+      pct,
+      time: timeTaken,
+      date: new Date().toISOString().split("T")[0],
+    };
+    const encoded = btoa(encodeURIComponent(JSON.stringify(summary)));
+    const url = `${window.location.origin}/mock/share?r=${encoded}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    });
+  }
 
   const totalMarks = questions.reduce((s, q) => s + (q.total_marks ?? 1), 0);
   const totalEarned = scores.reduce((s, v) => s + (v ?? 0), 0);
@@ -342,6 +360,15 @@ export default function MockExamResults() {
               />
             ))}
           </div>
+
+          {/* Share results */}
+          <button
+            onClick={handleShare}
+            className="w-full flex items-center justify-center gap-2 bg-primary/10 border border-primary/30 text-primary font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
+          >
+            {shareCopied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+            {shareCopied ? "Link copied to clipboard!" : "Share Results via Link"}
+          </button>
 
           {/* PDF download */}
           <button

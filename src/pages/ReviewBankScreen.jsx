@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, Download } from "lucide-react";
 import { getReviewBank, getGuessReviewBank, resetReviewBankLock } from "@/lib/topicStore";
+import { generateReviewBankPdf } from "@/lib/generatePdf";
+import { useAuth } from "@/lib/AuthContext";
 
 function getLockStatus(locked_until, now) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -215,10 +217,19 @@ function QuestionCard({ q, now, navigate }) {
 
 export default function ReviewBankScreen() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [bank, setBank] = useState([]);
   const [mcqBank, setMcqBank] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (bank.length === 0) return;
+    setExporting(true);
+    await generateReviewBankPdf({ questions: bank, userEmail: user?.email });
+    setExporting(false);
+  };
 
   useEffect(() => {
     Promise.all([getReviewBank(), getGuessReviewBank()]).then(([rb, grb]) => {
@@ -259,9 +270,21 @@ export default function ReviewBankScreen() {
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">Review Bank</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {bank.length} question{bank.length !== 1 ? "s" : ""}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
+              {bank.length} question{bank.length !== 1 ? "s" : ""}
+            </span>
+            {bank.length > 0 && (
+              <button
+                onClick={handleExportPdf}
+                disabled={exporting}
+                className="flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 border border-primary/25 px-2.5 py-1 rounded-md hover:brightness-110 transition-all disabled:opacity-50"
+              >
+                <Download className="w-3 h-3" />
+                {exporting ? "…" : "PDF"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col gap-5 p-4">

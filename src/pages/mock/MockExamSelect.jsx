@@ -3,9 +3,30 @@
  */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Clock, FileText, Play, User, Calendar, BookOpen, Timer, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Clock, FileText, Play, User, Calendar, BookOpen, Timer, ShieldCheck, CalendarPlus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import ExamStartModal from "@/components/mock/ExamStartModal";
+
+function addToGoogleCalendar(paper) {
+  // Default: schedule for tomorrow at 9am, duration = paper's duration_minutes
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+
+  const durationMs = (paper.duration_minutes ?? 60) * 60 * 1000;
+  const end = new Date(tomorrow.getTime() + durationMs);
+
+  const fmt = (d) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+  const title = encodeURIComponent(`Mock Exam — ${paper.paper_title}`);
+  const details = encodeURIComponent(
+    `Cambridge Hub practice session.\nPaper: ${paper.paper_title}${paper.examiner ? `\nExaminer: ${paper.examiner}` : ""}${paper.total_marks ? `\nTotal marks: ${paper.total_marks}` : ""}\n\nOpen app: ${window.location.origin}`
+  );
+  const dates = `${fmt(tomorrow)}/${fmt(end)}`;
+
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`;
+  window.open(url, "_blank");
+}
 
 export default function MockExamSelect() {
   const navigate = useNavigate();
@@ -125,6 +146,14 @@ export default function MockExamSelect() {
 
           {selected && (
             <div className="mt-auto pb-4 space-y-3">
+              {/* Add to Google Calendar */}
+              <button
+                onClick={() => addToGoogleCalendar(selected)}
+                className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground border border-border rounded-xl py-2.5 hover:bg-secondary hover:text-foreground transition-all"
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+                Schedule in Google Calendar
+              </button>
               {/* Mode cards */}
               <div className="grid grid-cols-2 gap-3">
                 {/* Practice Mode */}

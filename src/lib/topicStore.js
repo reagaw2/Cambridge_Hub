@@ -2,10 +2,6 @@
  * topicStore.js — Student data layer (Physics)
  * Single source of truth: DB. In-memory cache for the session.
  * Always call preloadStore(userEmail) once after login before reading any data.
- *
- * RENAME NOTES (safe migration):
- *   review_bank → written_review_bank  (aliases kept for backward compat)
- *   guess_review_bank → mcq_review_bank (aliases kept for backward compat)
  */
 
 import { base44 } from "@/api/base44Client";
@@ -45,17 +41,14 @@ const DEFAULT_DATA = () => ({
     astrophysics: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
     medical_imaging: { attempts: [], last_attempted: null, streak: 0, last_streak_date: null },
   },
-  // Always use written_review_bank internally; migrate review_bank on load
   written_review_bank: [],
   review_bank_clears: 0,
   mcq_attempts: [],
-  // Always use mcq_review_bank internally; migrate guess_review_bank on load
   mcq_review_bank: [],
-  // Global streak fields
   global_streak: 0,
   global_streak_last_date: null,
   rest_day_passes: 0,
-  daily_question_count: null, // { date: string, count: number }
+  daily_question_count: null, 
   last_session_time: null,
 });
 
@@ -101,7 +94,14 @@ async function loadFromDB() {
 
   _loadPromise = (async () => {
     try {
-      const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
+      // Direct, optimized native Supabase fetch
+      const { data: records, error } = await base44
+        .from('StudentData')
+        .select('*')
+        .eq('user_email', _userEmail);
+
+      if (error) throw error;
+
       if (records && records.length > 0) {
         const record = records.sort((a, b) => {
           const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
@@ -110,15 +110,8 @@ async function loadFromDB() {
         })[0];
         _recordId = record.id;
 
-        // ── SAFE MIGRATION: review_bank → written_review_bank ──
-        const writtenReviewBank = record.written_review_bank
-          || record.review_bank  // migrate old field name
-          || [];
-
-        // ── SAFE MIGRATION: guess_review_bank → mcq_review_bank ──
-        const mcqReviewBank = record.mcq_review_bank
-          || record.guess_review_bank // migrate old field name
-          || [];
+        const writtenReviewBank = record.written_review_bank || record.review_bank || [];
+        const mcqReviewBank = record.mcq_review_bank || record.guess_review_bank || [];
 
         _cache = {
           topics: record.topics || DEFAULT_DATA().topics,
@@ -136,7 +129,7 @@ async function loadFromDB() {
         _cache = DEFAULT_DATA();
       }
     } catch (e) {
-      console.warn("topicStore: failed to load from DB", e);
+      console.warn("topicStore: failed to load from DB via Supabase direct channel", e);
       _cache = DEFAULT_DATA();
     }
     _loadPromise = null;
@@ -153,7 +146,6 @@ async function saveToDB(data) {
   const payload = {
     user_email: _userEmail,
     topics: data.topics,
-    // Save under new field names
     written_review_bank: data.written_review_bank,
     review_bank_clears: data.review_bank_clears,
     mcq_attempts: data.mcq_attempts,
@@ -167,28 +159,28 @@ async function saveToDB(data) {
 
   try {
     if (_recordId) {
-      await base44.entities.StudentData.update(_recordId, payload);
+      // Direct native Supabase data update row sync
+      await base44.from('StudentData').update(payload).eq('id', _recordId);
     } else {
-      const created = await base44.entities.StudentData.create(payload);
-      _recordId = created.id;
+      // Direct native Supabase insertion fallback
+      const { data: created, error } = await base44.from('StudentData').insert([payload]).select();
+      if (error) throw error;
+      if (created && created[0]) {
+        _recordId = created[0].id;
+      }
     }
   } catch (e) {
-    console.warn("topicStore: failed to save to DB", e);
+    console.warn("topicStore: failed to save to DB via Supabase direct channel", e);
   }
 }
 
 // ── Global Streak + Daily Count ────────────────────────────────────────────
 
-/**
- * Call once per question submitted (written or MCQ, Physics or CS).
- * Handles daily count, global streak, rest day passes, and streak warning.
- */
 export async function recordGlobalQuestionAnswered() {
   const data = await loadFromDB();
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
-  // ── Daily count ──
   let dqc = data.daily_question_count;
   if (!dqc || dqc.date !== today) {
     dqc = { date: today, count: 0 };
@@ -196,39 +188,32 @@ export async function recordGlobalQuestionAnswered() {
   dqc.count += 1;
   data.daily_question_count = dqc;
 
-  // ── Streak logic (only fire once per day when 3rd question is answered) ──
   if (dqc.count === 3) {
-    // Increment streak
     if (data.global_streak_last_date === today) {
-      // already incremented today — no-op
+      // no-op
     } else if (data.global_streak_last_date === yesterday) {
       data.global_streak = (data.global_streak || 0) + 1;
     } else if (!data.global_streak_last_date) {
       data.global_streak = 1;
     } else {
-      // Missed days — check for rest day pass
       const lastDate = data.global_streak_last_date;
       const parts = lastDate.split("/");
       const lastDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
       const daysMissed = Math.floor((new Date() - lastDateObj) / 86400000) - 1;
       if (daysMissed >= 1 && (data.rest_day_passes || 0) > 0) {
-        // Use pass
         data.rest_day_passes = 0;
         data.global_streak = (data.global_streak || 0) + 1;
       } else {
-        data.global_streak = 1; // reset
+        data.global_streak = 1;
       }
     }
     data.global_streak_last_date = today;
 
-    // After 5 consecutive days, award 1 rest day pass (max 1)
     if ((data.global_streak || 0) >= 5 && (data.rest_day_passes || 0) < 1) {
       data.rest_day_passes = 1;
     }
   }
 
-  // ── Check for missed day on app open (handled here too when first question is answered) ──
-  // If streak was last updated before yesterday and no pass, reset streak
   if (data.global_streak_last_date && data.global_streak_last_date !== today && data.global_streak_last_date !== yesterday && dqc.count === 1) {
     const lastDate = data.global_streak_last_date;
     const parts = lastDate.split("/");
@@ -246,10 +231,6 @@ export async function recordGlobalQuestionAnswered() {
   await saveToDB(data);
 }
 
-/**
- * Called on app open to record last_session_time and check if streak needs resetting.
- * Returns the current streak data for display.
- */
 export async function recordAppOpen() {
   const data = await loadFromDB();
   const today = toDateString(new Date());
@@ -257,7 +238,6 @@ export async function recordAppOpen() {
 
   data.last_session_time = new Date().toISOString();
 
-  // Check for missed day streak reset
   if (data.global_streak_last_date && data.global_streak_last_date !== today && data.global_streak_last_date !== yesterday) {
     const parts = data.global_streak_last_date.split("/");
     const lastDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -265,7 +245,6 @@ export async function recordAppOpen() {
     if (daysMissed > 1) {
       if ((data.rest_day_passes || 0) > 0) {
         data.rest_day_passes = 0;
-        // streak protected, no reset
       } else {
         data.global_streak = 0;
       }
@@ -319,22 +298,8 @@ export async function recordAttempt(topicKey, score, { total_marks = 1, question
   }
   topic.last_streak_date = today;
   await saveToDB(data);
-
-  // Also update global daily count
   await recordGlobalQuestionAnswered();
 }
-
-const TOPIC_KEY_TO_DISPLAY = {
-  gravitational_fields: "Gravitational Fields",
-  nuclear_physics: "Nuclear Physics",
-  thermal_physics: "Thermal Physics",
-  oscillations: "Oscillations",
-  electric_fields: "Electric Fields",
-  capacitance: "Capacitance",
-  electromagnetic_induction: "Electromagnetic Induction",
-  quantum_physics: "Quantum Physics",
-  astrophysics: "Astrophysics",
-};
 
 export async function getTopicData(topicKey) {
   const normKey = normaliseTopicKey(topicKey);
@@ -362,7 +327,6 @@ export async function getTopicData(topicKey) {
   }
 
   if (hasMCQ) {
-    const today = toDateString(new Date());
     const lastMCQ = mcqAttempts[mcqAttempts.length - 1];
     const lastWrittenDate = last_attempted;
     const mcqIsMoreRecent = !lastWrittenDate || lastMCQ.date >= lastWrittenDate;
@@ -426,7 +390,7 @@ export async function getTopicData(topicKey) {
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
-// ── Written Review Bank (formerly review_bank) ─────────────────────────────
+// ── Written Review Bank ────────────────────────────────────────────────────
 
 export async function addToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
@@ -471,7 +435,7 @@ export async function incrementReviewBankClears() {
   await saveToDB(data);
 }
 
-// ── MCQ Review Bank (formerly guess_review_bank) ───────────────────────────
+// ── MCQ Review Bank ────────────────────────────────────────────────────────
 
 export async function getGuessReviewBank() {
   const data = await loadFromDB();
@@ -530,7 +494,6 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
   }
   topicEntry.last_streak_date = today;
 
-  // MCQ review bank logic: wrong confident OR any guess → mcq_review_bank
   if (flagged_as_guess || !correct) {
     const existing = data.mcq_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
     if (!existing) {
@@ -570,12 +533,6 @@ export async function getMCQStats(topic) {
   return { total_attempted, reasoned_correct, guessed, reasoned_correct_percentage };
 }
 
-// ── Review Gate check ──────────────────────────────────────────────────────
-
-/**
- * Returns true if the review gate should be shown on home screen.
- * Condition: (written >= 5 OR mcq >= 5) AND (time since last_session >= 18h)
- */
 export async function shouldShowReviewGate() {
   const data = await loadFromDB();
   const writtenCount = (data.written_review_bank || []).length;
@@ -592,10 +549,10 @@ export async function resetData() {
   _cache = DEFAULT_DATA();
   if (_recordId && _userEmail) {
     try {
-      await base44.entities.StudentData.update(_recordId, {
+      await base44.from('StudentData').update({
         ..._cache,
         user_email: _userEmail,
-      });
+      }).eq('id', _recordId);
     } catch (e) {
       console.warn("topicStore: failed to reset data", e);
     }

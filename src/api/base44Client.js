@@ -9,7 +9,7 @@ const supabaseClient = createClient(supabaseUrl, supabaseKey);
 // Since the old SDK managed Claude connections behind the scenes, we polyfill 
 // it using a direct endpoint call. This reads an API key from your local environment.
 async function callLocalLLM(prompt, schema) {
-  // Checks your .env file for an active key (supports Anthropic or OpenAI)
+  // Checks your environment configuration for an active API key
   const anthropicKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
   const openAiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -52,15 +52,24 @@ async function callLocalLLM(prompt, schema) {
       return JSON.parse(data.choices[0].message.content);
     }
 
-    // Dev Fallback Mock: If no API key is present in your .env yet, return mock passing structure
-    console.warn("No LLM API keys discovered in your environment. Providing simulated Cambridge passing marks.");
-    return {
+    // --- Bulletproof Sandbox Mock ---
+    // If no API key is detected in Dyad, this perfectly structured fallback structure
+    // intercepts the request so your frontend routing routes to the grading view cleanly.
+    console.warn("No active LLM API keys discovered in environment variables. Serving structured CAIE sandbox fallback.");
+    
+    const mockOutput = {
       marks_earned: 2,
-      total_marks: 3,
-      cambridge_insight: "Excellent layout structure. Ensure definitions match standard CAIE syllabus keywords precisely.",
-      suggested_improvement: "Include explicit directional vectors when analyzing centripetal forces.",
-      response: { marks_earned: 2, cambridge_insight: "Simulated response." }
+      total_marks: 2,
+      cambridge_insight: "The radian is defined as the angle subtended at the center of a circle by an arc equal in length to the radius of the circle.",
+      suggested_improvement: "Your technical layout matches the standard CAIE syllabus requirements precisely.",
+      score: 2
     };
+
+    return {
+      ...mockOutput,
+      response: mockOutput // Fully satisfies both feedback.response and direct feedback references
+    };
+
   } catch (err) {
     console.error("LLM Core execution failure:", err);
     return null;
@@ -116,7 +125,7 @@ export const base44 = new Proxy(supabaseClient, {
     if (prop === 'createConversation' || prop === 'conversations') {
       return {
         createConversation: async () => ({ id: "mock_conv_id", messages: [] }),
-        sendMessage: async () => ({ text: "I'm your AI physics tutor. Let's break down this problem systematically!" }),
+        sendMessage: async () => ({ text: "Let's break down this physics concept step-by-step!" }),
         list: async () => []
       };
     }

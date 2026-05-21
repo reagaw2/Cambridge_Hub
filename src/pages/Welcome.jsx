@@ -6,6 +6,7 @@ export default function Welcome() {
   const [mode, setMode] = useState("welcome");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState(""); // Track password confirmation
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -24,14 +25,25 @@ export default function Welcome() {
       setErrorMsg(error.message);
       setLoading(false);
     }
-    // If successful, Supabase auth state changes automatically,
-    // and App.jsx will automatically route the student inward!
   }
 
   // Handle User Signup
   async function handleSignup(e) {
     e.preventDefault();
     setErrorMsg("");
+
+    // 1. Instantly validate that the passwords match locally
+    if (password !== confirmPassword) {
+      setErrorMsg("Passwords do not match. Please try again.");
+      return;
+    }
+
+    // 2. Validate a safe minimum length for student passwords
+    if (password.length < 6) {
+      setErrorMsg("Password must be at least 6 characters long.");
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await base44.auth.signUp({
@@ -43,8 +55,9 @@ export default function Welcome() {
       setErrorMsg(error.message);
       setLoading(false);
     } else {
-      alert("Signup successful! Check your email for the confirmation link.");
+      alert("Signup successful! Please check your email for the verification link.");
       setMode("login");
+      setConfirmPassword("");
       setLoading(false);
     }
   }
@@ -71,17 +84,17 @@ export default function Welcome() {
         {/* Divider */}
         <div className="w-px h-8 bg-border/40" />
 
-        {/* Dynamic Form Interface based on State */}
+        {/* Welcome Mode Options */}
         {mode === "welcome" && (
           <div className="w-full flex flex-col gap-3">
             <button
-              onClick={() => setMode("signup")}
+              onClick={() => { setMode("signup"); setErrorMsg(""); }}
               className="w-full bg-primary text-primary-foreground font-semibold text-sm py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
             >
               Get started
             </button>
             <button
-              onClick={() => setMode("login")}
+              onClick={() => { setMode("login"); setErrorMsg(""); }}
               className="w-full bg-transparent border border-border text-foreground/70 font-medium text-sm py-4 rounded-xl hover:bg-secondary transition-all"
             >
               I already have an account
@@ -89,18 +102,30 @@ export default function Welcome() {
           </div>
         )}
 
+        {/* Form Mode (Handles both Login and Signup with structural variations) */}
         {(mode === "login" || mode === "signup") && (
           <form onSubmit={mode === "login" ? handleLogin : handleSignup} className="w-full flex flex-col gap-4">
-            <h2 className="text-lg font-medium text-foreground text-center capitalize">
-              {mode} to your account
-            </h2>
             
+            {/* Context Heading Structure */}
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-serif font-medium text-foreground capitalize">
+                {mode === "login" ? "Welcome Back" : "Create Account"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {mode === "login" 
+                  ? "Enter your credentials to access your dashboard" 
+                  : "Sign up with your student email to get started"}
+              </p>
+            </div>
+            
+            {/* Visual Error Callout box */}
             {errorMsg && (
-              <p className="text-xs text-destructive text-center bg-destructive/10 py-2 rounded-lg border border-destructive/20">
+              <p className="text-xs text-destructive text-center bg-destructive/10 py-2.5 px-3 rounded-lg border border-destructive/20 leading-relaxed">
                 {errorMsg}
               </p>
             )}
 
+            {/* Form Fields Container */}
             <div className="space-y-3">
               <input
                 type="email"
@@ -110,31 +135,66 @@ export default function Welcome() {
                 required
                 className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
               />
+              
               <input
                 type="password"
-                placeholder="Password"
+                placeholder={mode === "login" ? "Password" : "Choose a secure password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
               />
+
+              {/* Dynamic Field: Rendered exclusively during Signup Mode */}
+              {mode === "signup" && (
+                <input
+                  type="password"
+                  placeholder="Confirm password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                />
+              )}
             </div>
 
+            {/* Primary CTA Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary text-primary-foreground font-semibold text-sm py-4 rounded-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 transition-all"
+              className="w-full bg-primary text-primary-foreground font-semibold text-sm py-4 rounded-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 transition-all shadow-sm"
             >
-              {loading ? "Processing..." : mode === "login" ? "Log In" : "Sign Up"}
+              {loading ? "Processing..." : mode === "login" ? "Log In" : "Register Account"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => { setMode("welcome"); setErrorMsg(""); }}
-              className="text-xs text-muted-foreground hover:text-foreground text-center transition-colors pt-2"
-            >
-              ← Back
-            </button>
+            {/* Alternate Toggle Footer Links */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 px-1">
+              <button
+                type="button"
+                onClick={() => { setMode("welcome"); setErrorMsg(""); }}
+                className="hover:text-foreground transition-colors"
+              >
+                ← Cancel
+              </button>
+              
+              {mode === "login" ? (
+                <button
+                  type="button"
+                  onClick={() => { setMode("signup"); setErrorMsg(""); }}
+                  className="text-primary hover:underline transition-all"
+                >
+                  Create an account instead
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setMode("login"); setErrorMsg(""); }}
+                  className="text-primary hover:underline transition-all"
+                >
+                  Sign in instead
+                </button>
+              )}
+            </div>
           </form>
         )}
 

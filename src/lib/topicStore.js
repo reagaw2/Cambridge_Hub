@@ -159,18 +159,33 @@ async function saveToDB(data) {
 
   try {
     if (_recordId) {
-      // Direct native Supabase data update row sync
-      await base44.from('StudentData').update(payload).eq('id', _recordId);
+      // Upgraded safe update pipeline
+      const { data: updated, error } = await base44
+        .from('StudentData')
+        .update(payload)
+        .eq('id', _recordId)
+        .select();
+
+      if (error) {
+        console.warn("Supabase Row Update Error:", error.message);
+      } else if (updated && updated[0]) {
+        _recordId = updated[0].id;
+      }
     } else {
-      // Direct native Supabase insertion fallback
-      const { data: created, error } = await base44.from('StudentData').insert([payload]).select();
-      if (error) throw error;
-      if (created && created[0]) {
+      // Clean upsert configuration fallback
+      const { data: created, error } = await base44
+        .from('StudentData')
+        .upsert(payload, { onConflict: 'user_email' })
+        .select();
+
+      if (error) {
+        console.warn("Supabase Row Upsert Fallback Error:", error.message);
+      } else if (created && created[0]) {
         _recordId = created[0].id;
       }
     }
   } catch (e) {
-    console.warn("topicStore: failed to save to DB via Supabase direct channel", e);
+    console.warn("topicStore: structural catch hit in saveToDB channel", e);
   }
 }
 

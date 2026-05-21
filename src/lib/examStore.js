@@ -17,39 +17,47 @@ async function loadRecord() {
     return null;
   }
 
-  // 2. Query your Supabase 'StudentData' table using the user's email
-  const { data: records, error: fetchError } = await base44
-    .from('StudentData')
-    .select('id, exam_sessions')
-    .eq('user_email', user.email);
-
-  if (fetchError) {
-    console.error("Error loading record from Supabase StudentData:", fetchError);
-    return null;
-  }
-
-  if (records && records.length > 0) {
-    _cachedRecord = { 
-      id: records[0].id, 
-      exam_sessions: records[0].exam_sessions ?? [] 
-    };
-  } else {
-    // If no row exists yet for this student, create a fresh one in Supabase
-    const { data: created, error: createError } = await base44
+  try {
+    // 2. Query your Supabase 'StudentData' table using the user's email
+    const { data: records, error: fetchError } = await base44
       .from('StudentData')
-      .insert([{ user_email: user.email, exam_sessions: [] }])
-      .select();
+      .select('id, exam_sessions')
+      .eq('user_email', user.email);
 
-    if (createError) {
-      console.error("Error creating student record row in Supabase:", createError);
+    if (fetchError) {
+      console.error("Error loading record from Supabase StudentData:", fetchError);
       return null;
     }
 
-    _cachedRecord = { 
-      id: created[0].id, 
-      exam_sessions: [] 
-    };
+    if (records && records.length > 0) {
+      _cachedRecord = { 
+        id: records[0].id, 
+        exam_sessions: records[0].exam_sessions ?? [] 
+      };
+    } else {
+      // If no row exists yet for this student, create a fresh one using safe upsert logic
+      const { data: created, error: createError } = await base44
+        .from('StudentData')
+        .upsert({ user_email: user.email, exam_sessions: [] }, { onConflict: 'user_email' })
+        .select();
+
+      if (createError) {
+        console.error("Error creating student record row in Supabase:", createError);
+        return null;
+      }
+
+      if (created && created[0]) {
+        _cachedRecord = { 
+          id: created[0].id, 
+          exam_sessions: [] 
+        };
+      }
+    }
+  } catch (err) {
+    console.error("Caught unexpected structural exception in loadRecord:", err);
+    return null;
   }
+
   return _cachedRecord;
 }
 
@@ -57,18 +65,22 @@ async function saveExamSessions(sessions) {
   const record = await loadRecord();
   if (!record) return;
 
-  // Update the row inside your Supabase 'StudentData' table
-  const { error: updateError } = await base44
-    .from('StudentData')
-    .update({ exam_sessions: sessions })
-    .eq('id', record.id);
+  try {
+    // Update the row inside your Supabase 'StudentData' table safely
+    const { error: updateError } = await base44
+      .from('StudentData')
+      .update({ exam_sessions: sessions })
+      .eq('id', record.id);
 
-  if (updateError) {
-    console.error("Error updating exam sessions in Supabase:", updateError);
-    return;
+    if (updateError) {
+      console.error("Error updating exam sessions in Supabase:", updateError);
+      return;
+    }
+
+    record.exam_sessions = sessions;
+  } catch (err) {
+    console.error("Caught unexpected exception in saveExamSessions:", err);
   }
-
-  record.exam_sessions = sessions;
 }
 
 export function invalidateExamCache() {

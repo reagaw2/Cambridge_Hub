@@ -15,10 +15,8 @@ export default function Welcome() {
   const hasLowercase = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
 
-  // Count how many criteria are satisfied
   const strengthPoints = [hasMinLength, hasUppercase, hasLowercase, hasNumber].filter(Boolean).length;
 
-  // Determine label, color, and bar width based on points scored
   let strengthLabel = "";
   let strengthColor = "bg-border";
   let strengthWidth = "w-0";
@@ -26,26 +24,39 @@ export default function Welcome() {
   if (password.length > 0) {
     if (strengthPoints <= 2) {
       strengthLabel = "Weak password";
-      strengthColor = "bg-destructive"; // Red
+      strengthColor = "bg-destructive";
       strengthWidth = "w-1/3";
     } else if (strengthPoints === 3) {
       strengthLabel = "Strong password";
-      strengthColor = "bg-amber-500"; // Yellow/Amber
+      strengthColor = "bg-amber-500";
       strengthWidth = "w-2/3";
     } else if (strengthPoints === 4) {
       strengthLabel = "Secure password";
-      strengthColor = "bg-emerald-500"; // Green
+      strengthColor = "bg-emerald-500";
       strengthWidth = "w-full";
     }
   }
 
-  // Determine if confirm password field should visually glow red
   const isMismatched = confirmPassword.length > 0 && password !== confirmPassword;
+
+  // --- Helper Function to Validate Email Format Structure ---
+  function isValidEmail(emailStr) {
+    // This standard pattern checks for: characters + @ + domain name + extension (.com, .org, etc)
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailPattern.test(emailStr);
+  }
 
   // Handle Sign In Submit
   async function handleLogin(e) {
     e.preventDefault();
     setErrorMsg("");
+
+    // Validate email layout before hitting the backend
+    if (!isValidEmail(email)) {
+      setErrorMsg("Please enter a valid email address (e.g., user@domain.com).");
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await base44.auth.signInWithPassword({
@@ -64,11 +75,19 @@ export default function Welcome() {
     e.preventDefault();
     setErrorMsg("");
 
+    // 1. Validate email syntax format
+    if (!isValidEmail(email)) {
+      setErrorMsg("Please enter a valid email address structure (e.g., name@gmail.com).");
+      return;
+    }
+
+    // 2. Validate password match
     if (password !== confirmPassword) {
       setErrorMsg("Passwords must match before registering.");
       return;
     }
 
+    // 3. Validate password complexity rules
     if (strengthPoints < 4) {
       setErrorMsg("Please satisfy all rules to create a secure password.");
       return;
@@ -149,7 +168,7 @@ export default function Welcome() {
             )}
 
             <div className="space-y-3">
-              {/* Email Input */}
+              {/* Email Input with HTML5 type validation */}
               <input
                 type="email"
                 placeholder="Email address"
@@ -169,7 +188,7 @@ export default function Welcome() {
                 className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
               />
 
-              {/* Dynamic Strength Meter (Only shows during signup when typing) */}
+              {/* Dynamic Strength Meter */}
               {mode === "signup" && password.length > 0 && (
                 <div className="space-y-1.5 px-1 pb-1">
                   <div className="w-full h-1 bg-secondary rounded-full overflow-hidden">
@@ -186,7 +205,7 @@ export default function Welcome() {
                 </div>
               )}
 
-              {/* Confirm Password Input with Conditional Red Glow */}
+              {/* Confirm Password Input */}
               {mode === "signup" && (
                 <input
                   type="password"
@@ -196,7 +215,7 @@ export default function Welcome() {
                   required
                   className={`w-full px-4 py-3 bg-secondary/50 border rounded-xl text-sm focus:outline-none transition-all duration-200
                     ${isMismatched 
-                      ? "border-destructive focus:border-destructive shadow-[0_0_10px_rgba(239,68,68,0.15)] animate-pulse-slow" 
+                      ? "border-destructive focus:border-destructive shadow-[0_0_10px_rgba(239,68,68,0.15)]" 
                       : "border-border focus:border-primary/50"
                     }`}
                 />

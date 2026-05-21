@@ -2,23 +2,55 @@ import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 
 export default function Welcome() {
-  // Mode can be: 'welcome', 'login', or 'signup'
   const [mode, setMode] = useState("welcome");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState(""); // Track password confirmation
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Handle User Login
+  // --- Real-Time Password Strength Assessment ---
+  const hasMinLength = password.length >= 6;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+
+  // Count how many criteria are satisfied
+  const strengthPoints = [hasMinLength, hasUppercase, hasLowercase, hasNumber].filter(Boolean).length;
+
+  // Determine label, color, and bar width based on points scored
+  let strengthLabel = "";
+  let strengthColor = "bg-border";
+  let strengthWidth = "w-0";
+
+  if (password.length > 0) {
+    if (strengthPoints <= 2) {
+      strengthLabel = "Weak password";
+      strengthColor = "bg-destructive"; // Red
+      strengthWidth = "w-1/3";
+    } else if (strengthPoints === 3) {
+      strengthLabel = "Strong password";
+      strengthColor = "bg-amber-500"; // Yellow/Amber
+      strengthWidth = "w-2/3";
+    } else if (strengthPoints === 4) {
+      strengthLabel = "Secure password";
+      strengthColor = "bg-emerald-500"; // Green
+      strengthWidth = "w-full";
+    }
+  }
+
+  // Determine if confirm password field should visually glow red
+  const isMismatched = confirmPassword.length > 0 && password !== confirmPassword;
+
+  // Handle Sign In Submit
   async function handleLogin(e) {
     e.preventDefault();
     setErrorMsg("");
     setLoading(true);
 
     const { error } = await base44.auth.signInWithPassword({
-      email: email,
-      password: password,
+      email,
+      password,
     });
 
     if (error) {
@@ -27,35 +59,33 @@ export default function Welcome() {
     }
   }
 
-  // Handle User Signup
+  // Handle Sign Up Submit
   async function handleSignup(e) {
     e.preventDefault();
     setErrorMsg("");
 
-    // 1. Instantly validate that the passwords match locally
     if (password !== confirmPassword) {
-      setErrorMsg("Passwords do not match. Please try again.");
+      setErrorMsg("Passwords must match before registering.");
       return;
     }
 
-    // 2. Validate a safe minimum length for student passwords
-    if (password.length < 6) {
-      setErrorMsg("Password must be at least 6 characters long.");
+    if (strengthPoints < 4) {
+      setErrorMsg("Please satisfy all rules to create a secure password.");
       return;
     }
 
     setLoading(true);
 
     const { error } = await base44.auth.signUp({
-      email: email,
-      password: password,
+      email,
+      password,
     });
 
     if (error) {
       setErrorMsg(error.message);
       setLoading(false);
     } else {
-      alert("Signup successful! Please check your email for the verification link.");
+      alert("Registration successful! Check your email for the activation link.");
       setMode("login");
       setConfirmPassword("");
       setLoading(false);
@@ -81,10 +111,8 @@ export default function Welcome() {
           </div>
         </div>
 
-        {/* Divider */}
         <div className="w-px h-8 bg-border/40" />
 
-        {/* Welcome Mode Options */}
         {mode === "welcome" && (
           <div className="w-full flex flex-col gap-3">
             <button
@@ -102,31 +130,26 @@ export default function Welcome() {
           </div>
         )}
 
-        {/* Form Mode (Handles both Login and Signup with structural variations) */}
         {(mode === "login" || mode === "signup") && (
           <form onSubmit={mode === "login" ? handleLogin : handleSignup} className="w-full flex flex-col gap-4">
             
-            {/* Context Heading Structure */}
             <div className="text-center space-y-1">
               <h2 className="text-xl font-serif font-medium text-foreground capitalize">
                 {mode === "login" ? "Welcome Back" : "Create Account"}
               </h2>
               <p className="text-xs text-muted-foreground">
-                {mode === "login" 
-                  ? "Enter your credentials to access your dashboard" 
-                  : "Sign up with your student email to get started"}
+                {mode === "login" ? "Enter your credentials to log in" : "Sign up below to access your quizzes"}
               </p>
             </div>
             
-            {/* Visual Error Callout box */}
             {errorMsg && (
-              <p className="text-xs text-destructive text-center bg-destructive/10 py-2.5 px-3 rounded-lg border border-destructive/20 leading-relaxed">
+              <p className="text-xs text-destructive text-center bg-destructive/10 py-2.5 px-3 rounded-lg border border-destructive/20">
                 {errorMsg}
               </p>
             )}
 
-            {/* Form Fields Container */}
             <div className="space-y-3">
+              {/* Email Input */}
               <input
                 type="email"
                 placeholder="Email address"
@@ -136,6 +159,7 @@ export default function Welcome() {
                 className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
               />
               
+              {/* Main Password Input */}
               <input
                 type="password"
                 placeholder={mode === "login" ? "Password" : "Choose a secure password"}
@@ -145,7 +169,24 @@ export default function Welcome() {
                 className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
               />
 
-              {/* Dynamic Field: Rendered exclusively during Signup Mode */}
+              {/* Dynamic Strength Meter (Only shows during signup when typing) */}
+              {mode === "signup" && password.length > 0 && (
+                <div className="space-y-1.5 px-1 pb-1">
+                  <div className="w-full h-1 bg-secondary rounded-full overflow-hidden">
+                    <div className={`h-full ${strengthColor} ${strengthWidth} transition-all duration-300`} />
+                  </div>
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-muted-foreground font-light">
+                      Reqs: 6+ chars, A-Z, a-z, 0-9
+                    </span>
+                    <span className="font-medium capitalize" style={{ color: strengthPoints <= 2 ? '#ef4444' : strengthPoints === 3 ? '#f59e0b' : '#10b981' }}>
+                      {strengthLabel}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirm Password Input with Conditional Red Glow */}
               {mode === "signup" && (
                 <input
                   type="password"
@@ -153,25 +194,27 @@ export default function Welcome() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                  className={`w-full px-4 py-3 bg-secondary/50 border rounded-xl text-sm focus:outline-none transition-all duration-200
+                    ${isMismatched 
+                      ? "border-destructive focus:border-destructive shadow-[0_0_10px_rgba(239,68,68,0.15)] animate-pulse-slow" 
+                      : "border-border focus:border-primary/50"
+                    }`}
                 />
               )}
             </div>
 
-            {/* Primary CTA Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary text-primary-foreground font-semibold text-sm py-4 rounded-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 transition-all shadow-sm"
+              className="w-full bg-primary text-primary-foreground font-semibold text-sm py-4 rounded-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-50 transition-all shadow-sm"
             >
               {loading ? "Processing..." : mode === "login" ? "Log In" : "Register Account"}
             </button>
 
-            {/* Alternate Toggle Footer Links */}
             <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 px-1">
               <button
                 type="button"
-                onClick={() => { setMode("welcome"); setErrorMsg(""); }}
+                onClick={() => { setMode("welcome"); setPassword(""); setConfirmPassword(""); setErrorMsg(""); }}
                 className="hover:text-foreground transition-colors"
               >
                 ← Cancel
@@ -180,16 +223,16 @@ export default function Welcome() {
               {mode === "login" ? (
                 <button
                   type="button"
-                  onClick={() => { setMode("signup"); setErrorMsg(""); }}
-                  className="text-primary hover:underline transition-all"
+                  onClick={() => { setMode("signup"); setPassword(""); setConfirmPassword(""); setErrorMsg(""); }}
+                  className="text-primary hover:underline"
                 >
                   Create an account instead
                 </button>
               ) : (
                 <button
                   type="button"
-                  onClick={() => { setMode("login"); setErrorMsg(""); }}
-                  className="text-primary hover:underline transition-all"
+                  onClick={() => { setMode("login"); setPassword(""); setConfirmPassword(""); setErrorMsg(""); }}
+                  className="text-primary hover:underline"
                 >
                   Sign in instead
                 </button>
@@ -198,7 +241,6 @@ export default function Welcome() {
           </form>
         )}
 
-        {/* Google OAuth Notice */}
         <p className="text-xs text-amber-500/70 text-center leading-relaxed">
           Please use email and password to sign up or log in.<br />
           Google login is not available yet.

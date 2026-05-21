@@ -1,7 +1,7 @@
 /**
  * examStore.js — persistence layer for Exam Mode sessions.
- * Reads/writes to StudentData.exam_sessions.
- * Does NOT touch any existing StudentData fields.
+ * Reads/writes to the Supabase 'StudentData' table.
+ * Does NOT touch any existing fields.
  */
 import { base44 } from "@/api/base44Client";
 
@@ -9,14 +9,46 @@ let _cachedRecord = null; // { id, exam_sessions }
 
 async function loadRecord() {
   if (_cachedRecord) return _cachedRecord;
-  const user = await base44.auth.me();
-  if (!user) return null;
-  const records = await base44.entities.StudentData.filter({ user_email: user.email });
-  if (records.length > 0) {
-    _cachedRecord = { id: records[0].id, exam_sessions: records[0].exam_sessions ?? [] };
+
+  // 1. Get the current active user session the Supabase way
+  const { data: { user }, error: authError } = await base44.auth.getUser();
+  if (authError || !user) {
+    console.error("No active user found for exam session matching:", authError);
+    return null;
+  }
+
+  // 2. Query your Supabase 'StudentData' table using the user's email
+  const { data: records, error: fetchError } = await base44
+    .from('StudentData')
+    .select('id, exam_sessions')
+    .eq('user_email', user.email);
+
+  if (fetchError) {
+    console.error("Error loading record from Supabase StudentData:", fetchError);
+    return null;
+  }
+
+  if (records && records.length > 0) {
+    _cachedRecord = { 
+      id: records[0].id, 
+      exam_sessions: records[0].exam_sessions ?? [] 
+    };
   } else {
-    const created = await base44.entities.StudentData.create({ user_email: user.email, exam_sessions: [] });
-    _cachedRecord = { id: created.id, exam_sessions: [] };
+    // If no row exists yet for this student, create a fresh one in Supabase
+    const { data: created, error: createError } = await base44
+      .from('StudentData')
+      .insert([{ user_email: user.email, exam_sessions: [] }])
+      .select();
+
+    if (createError) {
+      console.error("Error creating student record row in Supabase:", createError);
+      return null;
+    }
+
+    _cachedRecord = { 
+      id: created[0].id, 
+      exam_sessions: [] 
+    };
   }
   return _cachedRecord;
 }
@@ -24,7 +56,18 @@ async function loadRecord() {
 async function saveExamSessions(sessions) {
   const record = await loadRecord();
   if (!record) return;
-  await base44.entities.StudentData.update(record.id, { exam_sessions: sessions });
+
+  // Update the row inside your Supabase 'StudentData' table
+  const { error: updateError } = await base44
+    .from('StudentData')
+    .update({ exam_sessions: sessions })
+    .eq('id', record.id);
+
+  if (updateError) {
+    console.error("Error updating exam sessions in Supabase:", updateError);
+    return;
+  }
+
   record.exam_sessions = sessions;
 }
 

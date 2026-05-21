@@ -2,7 +2,7 @@
 
 ## Tech Stack
 
-- **Framework:** React 18 with Vite. No SSR. All source code lives in `src/`.
+- **Framework:** React 18 with Vite (standard `@vitejs/plugin-react` setup — no proprietary build plugins). No SSR. All source code lives in `src/`. Path alias `@/` maps to `src/` via `vite.config.js`.
 - **Language:** JavaScript (`.jsx` / `.js`). TypeScript is present but only used in `src/utils/index.ts` and type-checking via `jsconfig.json`; new files should use `.jsx`/`.js` to match the existing codebase.
 - **Routing:** React Router v6 (`react-router-dom`). All routes are declared in `src/App.jsx`. Pages go in `src/pages/`, sub-topic pages in `src/pages/<topic>/`.
 - **Styling:** Tailwind CSS v3 with CSS variables for theming (dark `#0d0d1a` base). Use Tailwind classes for all layout, spacing, color, and typography. Never use inline styles except for dynamic values (e.g. animated transforms).

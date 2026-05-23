@@ -7,6 +7,14 @@ const supabaseClient = createClient(supabaseUrl, supabaseKey);
 async function invokeLLM({ prompt, response_json_schema }) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
+  console.log('[LLM] invokeLLM called');
+  console.log('[LLM] API key present:', !!apiKey, apiKey ? `(starts with ${apiKey.slice(0, 8)}...)` : '(MISSING)');
+
+  if (!apiKey) {
+    console.error('[LLM] VITE_ANTHROPIC_API_KEY environment variable is not set!');
+    throw new Error('VITE_ANTHROPIC_API_KEY is not configured. Please add it in the Dyad environment settings.');
+  }
+
   const requestBody = {
     model: 'claude-sonnet-4-5',
     max_tokens: 4000,
@@ -18,27 +26,39 @@ async function invokeLLM({ prompt, response_json_schema }) {
     ],
   };
 
-  // Call via Vite proxy (dev) — proxy adds the auth headers server-side
-  const response = await fetch('/api/llm', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      // Include key in header for environments where proxy doesn't inject it
-      ...(apiKey ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' } : {}),
-    },
-    body: JSON.stringify(requestBody),
-  });
+  console.log('[LLM] Calling Anthropic API...');
+
+  let response;
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(requestBody),
+    });
+  } catch (networkErr) {
+    console.error('[LLM] Network error calling Anthropic:', networkErr);
+    throw networkErr;
+  }
+
+  console.log('[LLM] Response status:', response.status);
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`LLM API error ${response.status}: ${err}`);
+    console.error('[LLM] Anthropic API error:', response.status, err);
+    throw new Error(`Anthropic API error ${response.status}: ${err}`);
   }
 
   const data = await response.json();
   const text = data.content?.[0]?.text;
 
   if (!text) {
-    throw new Error('No text content in response');
+    console.error('[LLM] No text in response:', data);
+    throw new Error('No text content in Anthropic response');
   }
 
   // Strip markdown code blocks if present
@@ -48,6 +68,7 @@ async function invokeLLM({ prompt, response_json_schema }) {
     jsonText = jsonMatch[1].trim();
   }
 
+  console.log('[LLM] Success, parsing JSON response...');
   return JSON.parse(jsonText);
 }
 

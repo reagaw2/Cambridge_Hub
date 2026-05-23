@@ -12,7 +12,7 @@ export const supabaseClient = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
-async function invokeLLM({ prompt, response_json_schema }) {
+async function invokeLLM({ prompt, response_json_schema, model }) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -55,79 +55,79 @@ async function invokeLLM({ prompt, response_json_schema }) {
   return JSON.parse(jsonText);
 }
 
-export const base44 = new Proxy(supabaseClient, {
-  get(target, prop) {
-    if (prop === 'from' || prop === 'auth' || prop === 'channel' ||
-        prop === 'removeChannel' || prop === 'rpc' || prop === 'storage') {
-      return target[prop].bind(target);
-    }
+export const base44 = {
+  // Direct Supabase passthrough
+  from: (...args) => supabaseClient.from(...args),
+  rpc: (...args) => supabaseClient.rpc(...args),
+  storage: supabaseClient.storage,
+  channel: (...args) => supabaseClient.channel(...args),
+  removeChannel: (...args) => supabaseClient.removeChannel(...args),
 
-    if (prop === 'integrations') {
-      return { Core: { InvokeLLM: invokeLLM } };
-    }
+  // Auth — expose Supabase auth directly
+  auth: supabaseClient.auth,
 
-    if (prop === 'agents') {
+  // AI integrations
+  integrations: {
+    Core: {
+      InvokeLLM: invokeLLM,
+    },
+  },
+
+  // Agent conversations
+  agents: {
+    createConversation: async ({ agent_name }) => {
+      const { data, error } = await supabaseClient
+        .from('agent_conversations')
+        .insert([{ agent_name, messages: [] }])
+        .select();
+      if (error) throw error;
+      return data[0];
+    },
+    addMessage: async (conversation, message) => {
+      const updatedMessages = [...(conversation.messages || []), message];
+      const { error } = await supabaseClient
+        .from('agent_conversations')
+        .update({ messages: updatedMessages })
+        .eq('id', conversation.id);
+      if (error) throw error;
+    },
+    subscribeToConversation: (conversationId, callback) => {
+      const channel = supabaseClient
+        .channel(`conversation-${conversationId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_conversations',
+          filter: `id=eq.${conversationId}`,
+        }, (payload) => {
+          callback(payload.new);
+        })
+        .subscribe();
+      return () => supabaseClient.removeChannel(channel);
+    },
+  },
+
+  // Entity CRUD helpers
+  entities: new Proxy({}, {
+    get(_, tableName) {
       return {
-        createConversation: async ({ agent_name }) => {
-          const { data, error } = await supabaseClient
-            .from('agent_conversations')
-            .insert([{ agent_name, messages: [] }])
-            .select();
-          if (error) throw error;
-          return data[0];
+        list: async () => {
+          const { data } = await supabaseClient.from(tableName).select('*');
+          return data ?? [];
         },
-        addMessage: async (conversation, message) => {
-          const messages = [...(conversation.messages || []), message];
-          const { error } = await supabaseClient
-            .from('agent_conversations')
-            .update({ messages })
-            .eq('id', conversation.id);
-          if (error) throw error;
+        filter: async (matchCriteria) => {
+          const { data } = await supabaseClient.from(tableName).select('*').match(matchCriteria);
+          return data ?? [];
         },
-        subscribeToConversation: (conversationId, callback) => {
-          const channel = supabaseClient
-            .channel(`conversation-${conversationId}`)
-            .on('postgres_changes', {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'agent_conversations',
-              filter: `id=eq.${conversationId}`,
-            }, (payload) => {
-              callback(payload.new);
-            })
-            .subscribe();
-          return () => supabaseClient.removeChannel(channel);
+        create: async (rowData) => {
+          const { data } = await supabaseClient.from(tableName).insert([rowData]).select();
+          return data ? data[0] : null;
+        },
+        update: async (id, rowData) => {
+          const { data } = await supabaseClient.from(tableName).update(rowData).eq('id', id).select();
+          return data ? data[0] : null;
         },
       };
-    }
-
-    if (prop === 'entities') {
-      return new Proxy({}, {
-        get(_, tableName) {
-          return {
-            list: async () => {
-              const { data } = await supabaseClient.from(tableName).select('*');
-              return data ?? [];
-            },
-            filter: async (matchCriteria) => {
-              const { data } = await supabaseClient.from(tableName).select('*').match(matchCriteria);
-              return data ?? [];
-            },
-            create: async (rowData) => {
-              const { data } = await supabaseClient.from(tableName).insert([rowData]).select();
-              return data ? data[0] : null;
-            },
-            update: async (id, rowData) => {
-              const { data } = await supabaseClient.from(tableName).update(rowData).eq('id', id).select();
-              return data ? data[0] : null;
-            },
-          };
-        },
-      });
-    }
-
-    const val = target[prop];
-    if (typeof val === 'function') return val.bind(target);
-    return val;
-  },
-});
+    },
+  }),
+};

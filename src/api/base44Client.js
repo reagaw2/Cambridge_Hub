@@ -15,47 +15,54 @@ export const base44 = new Proxy(supabaseClient, {
         Core: {
           InvokeLLM: async ({ prompt, response_json_schema }) => {
             const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
             if (!apiKey) {
-              console.error('VITE_ANTHROPIC_API_KEY not set');
-              return null;
+              console.error('[LLM] VITE_ANTHROPIC_API_KEY is not set. Please add it to your .env.local file.');
+              throw new Error('VITE_ANTHROPIC_API_KEY is not configured. Please add it to your environment variables.');
             }
+
+            console.log('[LLM] Calling Anthropic via proxy...');
+
+            const response = await fetch('/anthropic/v1/messages', {
+              method: 'POST',
+              headers: {
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'claude-sonnet-4-5',
+                max_tokens: 4000,
+                messages: [
+                  {
+                    role: 'user',
+                    content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
+                  },
+                ],
+              }),
+            });
+
+            console.log('[LLM] Response status:', response.status);
+
+            if (!response.ok) {
+              const err = await response.text();
+              console.error('[LLM] Anthropic API error:', response.status, err);
+              throw new Error(`Anthropic API error ${response.status}: ${err}`);
+            }
+
+            const data = await response.json();
+            const text = data.content?.[0]?.text;
+
+            if (!text) {
+              console.error('[LLM] No text in response:', data);
+              throw new Error('No text content in Anthropic response');
+            }
+
             try {
-              const response = await fetch('/anthropic/v1/messages', {
-                method: 'POST',
-                headers: {
-                  'x-api-key': apiKey,
-                  'anthropic-version': '2023-06-01',
-                  'content-type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: 'claude-sonnet-4-5',
-                  max_tokens: 4000,
-                  messages: [
-                    {
-                      role: 'user',
-                      content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
-                    },
-                  ],
-                }),
-              });
-
-              if (!response.ok) {
-                const err = await response.text();
-                console.error('Anthropic error:', err);
-                return null;
-              }
-
-              const data = await response.json();
-              const text = data.content?.[0]?.text;
-              try {
-                return JSON.parse(text);
-              } catch {
-                console.error('Invalid JSON from Anthropic:', text);
-                return null;
-              }
-            } catch (err) {
-              console.error('LLM call failed:', err);
-              return null;
+              return JSON.parse(text);
+            } catch (parseErr) {
+              console.error('[LLM] Failed to parse JSON response:', text);
+              throw new Error(`Invalid JSON from Anthropic: ${text.slice(0, 200)}`);
             }
           },
         },

@@ -1,6 +1,6 @@
 /**
  * csTopicStore.js — Computer Science student data layer
- * Always fetches from Supabase on login. localStorage is a render cache only.
+ * Source of truth: Supabase. localStorage = render cache only.
  */
 
 import { supabaseClient } from "@/api/base44Client";
@@ -23,7 +23,7 @@ let _userId = null;
 let _ready = false;
 let _readyPromise = null;
 
-function localKey(e) { return `hub_cs_progress_v2_${e}`; }
+function localKey(e) { return `hub_cs_v3_${e}`; }
 
 function readLocal(email) {
   try { return JSON.parse(localStorage.getItem(localKey(email))); } catch { return null; }
@@ -35,25 +35,28 @@ function writeLocal(email, payload) {
 
 function clearLocal(email) {
   try {
-    localStorage.removeItem(localKey(email));
-    localStorage.removeItem(`hub_cs_progress_${email}`);
+    ['hub_cs_progress_', 'hub_cs_progress_v2_', 'hub_cs_v3_'].forEach(p => {
+      localStorage.removeItem(p + email);
+    });
   } catch {}
 }
 
-function withTimeout(p, ms, fallback) {
-  return Promise.race([p, new Promise(r => setTimeout(() => r(fallback), ms))]);
-}
-
 async function fetchFromSupabase(userId) {
-  const { data: rows, error } = await withTimeout(
-    supabaseClient.from('StudentData').select('id, cs_data').eq('user_id', userId),
-    8000,
-    { data: null, error: new Error('timeout') }
-  );
+  console.log('[csStore] fetching from Supabase for user:', userId);
 
-  if (error || !rows) { console.warn('[csStore] fetch error:', error?.message); return null; }
+  const { data: rows, error } = await supabaseClient
+    .from('StudentData')
+    .select('id, cs_data')
+    .eq('user_id', userId);
 
-  if (rows.length > 0) {
+  if (error) {
+    console.error('[csStore] FETCH ERROR:', error.message, error.code);
+    return null;
+  }
+
+  console.log('[csStore] fetched rows:', rows?.length ?? 0);
+
+  if (rows && rows.length > 0) {
     const r = rows[0];
     const raw = r.cs_data;
     const data = (raw && typeof raw === "object" && Object.keys(raw).length > 0)
@@ -75,25 +78,26 @@ async function pushToSupabase(data) {
   if (!_userId) return;
   try {
     if (_recordId) {
-      const { error } = await withTimeout(
-        supabaseClient.from('StudentData').update({ cs_data: data }).eq('id', _recordId),
-        5000,
-        { error: new Error('timeout') }
-      );
-      if (error) console.warn('[csStore] update error:', error.message);
+      const { error } = await supabaseClient
+        .from('StudentData')
+        .update({ cs_data: data })
+        .eq('id', _recordId);
+      if (error) console.error('[csStore] UPDATE ERROR:', error.message, error.code);
     } else {
-      const { data: rows, error } = await withTimeout(
-        supabaseClient.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select(),
-        5000,
-        { data: null, error: new Error('timeout') }
-      );
-      if (!error && rows?.[0]) {
+      const { data: rows, error } = await supabaseClient
+        .from('StudentData')
+        .update({ cs_data: data })
+        .eq('user_id', _userId)
+        .select();
+      if (error) {
+        console.error('[csStore] UPDATE-BY-USER_ID ERROR:', error.message);
+      } else if (rows?.[0]) {
         _recordId = rows[0].id;
         if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
       }
     }
   } catch (e) {
-    console.warn('[csStore] save failed (non-fatal):', e);
+    console.error('[csStore] pushToSupabase exception:', e);
   }
 }
 
@@ -109,27 +113,25 @@ export async function preloadCSStore(userEmail, userId) {
 
   if (_ready) return;
 
-  // Show local cache for instant render
   const local = readLocal(userEmail);
   if (local?.data && !_cache) {
     _cache = local.data;
     if (local.id) _recordId = local.id;
   }
 
-  // ALWAYS load from Supabase
   _readyPromise = (async () => {
     const result = await fetchFromSupabase(userId);
     if (result) {
       _recordId = result.id ?? _recordId;
       _cache = result.data;
-      _ready = true;
       writeLocal(userEmail, { id: _recordId, data: _cache });
-      console.log('[csStore] Supabase data loaded ✓');
+      console.log('[csStore] ✓ Supabase data loaded');
     } else {
       if (!_cache) _cache = DEFAULT_CS_DATA();
-      _ready = true;
-      console.warn('[csStore] Supabase unavailable, using local/default');
+      console.warn('[csStore] ⚠ Supabase failed, using cache/default');
     }
+    _ready = true;
+    _readyPromise = null;
   })();
 
   await _readyPromise;
@@ -145,12 +147,11 @@ async function ensureLoaded() {
     if (result) {
       _recordId = result.id ?? _recordId;
       _cache = result.data;
-      _ready = true;
       if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache });
     } else {
       if (!_cache) _cache = DEFAULT_CS_DATA();
-      _ready = true;
     }
+    _ready = true;
     _readyPromise = null;
   })();
 
@@ -161,7 +162,7 @@ async function ensureLoaded() {
 function saveToDB(data) {
   _cache = data;
   if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
-  pushToSupabase(data).catch(() => {});
+  pushToSupabase(data).catch(e => console.error('[csStore] bg save failed:', e));
 }
 
 export async function csRecordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {

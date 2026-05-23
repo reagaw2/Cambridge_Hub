@@ -1,12 +1,9 @@
 /**
  * topicStore.js — Student data layer (Physics)
- * Always fetches from Supabase on login. localStorage is only used to
- * speed up the initial render — it NEVER overwrites the Supabase copy.
+ * Source of truth: Supabase. localStorage = render cache only.
  */
 
 import { supabaseClient } from "@/api/base44Client";
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 export function toDateString(date) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -34,16 +31,15 @@ const DEFAULT_DATA = () => ({
   last_session_time: null,
 });
 
-let _cache = null;        // in-memory working copy
-let _recordId = null;     // Supabase row id
+let _cache = null;
+let _recordId = null;
 let _userEmail = null;
 let _userId = null;
-let _ready = false;       // true once we have a confirmed Supabase copy
-let _readyPromise = null; // resolves when Supabase data is loaded
+let _ready = false;
+let _readyPromise = null;
 
-// ── localStorage (render cache only — never used for saves) ────────────────
-
-function localKey(e) { return `hub_student_progress_v2_${e}`; }
+// ── Cache key — v3 busts any old stale data ────────────────────────────────
+function localKey(e) { return `hub_physics_v3_${e}`; }
 
 function readLocal(email) {
   try { return JSON.parse(localStorage.getItem(localKey(email))); } catch { return null; }
@@ -55,29 +51,31 @@ function writeLocal(email, payload) {
 
 function clearLocal(email) {
   try {
-    localStorage.removeItem(localKey(email));
-    // Also clear old v1 key if present
-    localStorage.removeItem(`hub_student_progress_${email}`);
+    // Bust all old cache versions
+    ['hub_student_progress_', 'hub_student_progress_v2_', 'hub_physics_v3_'].forEach(prefix => {
+      localStorage.removeItem(prefix + email);
+    });
   } catch {}
-}
-
-function withTimeout(p, ms, fallback) {
-  return Promise.race([p, new Promise(r => setTimeout(() => r(fallback), ms))]);
 }
 
 // ── Supabase I/O ───────────────────────────────────────────────────────────
 
 async function fetchFromSupabase(userId) {
-  const { data: rows, error } = await withTimeout(
-    supabaseClient.from('StudentData').select('*').eq('user_id', userId),
-    8000,
-    { data: null, error: new Error('timeout') }
-  );
+  console.log('[topicStore] fetching from Supabase for user:', userId);
 
-  if (error) { console.warn('[topicStore] fetch error:', error.message); return null; }
-  if (!rows) return null;
+  const { data: rows, error } = await supabaseClient
+    .from('StudentData')
+    .select('*')
+    .eq('user_id', userId);
 
-  if (rows.length > 0) {
+  if (error) {
+    console.error('[topicStore] FETCH ERROR:', error.message, error.code, error.details);
+    return null;
+  }
+
+  console.log('[topicStore] fetched rows:', rows?.length ?? 0);
+
+  if (rows && rows.length > 0) {
     const r = rows[0];
     return {
       id: r.id,
@@ -97,20 +95,18 @@ async function fetchFromSupabase(userId) {
   }
 
   // No row — create one
-  const { data: inserted, error: ie } = await withTimeout(
-    supabaseClient.from('StudentData').insert([{
-      user_id: userId,
-      user_email: _userEmail,
-      ...DEFAULT_DATA(),
-    }]).select(),
-    6000,
-    { data: null, error: new Error('insert timeout') }
-  );
+  console.log('[topicStore] no row found, creating...');
+  const { data: inserted, error: ie } = await supabaseClient
+    .from('StudentData')
+    .insert([{ user_id: userId, user_email: _userEmail, ...DEFAULT_DATA() }])
+    .select();
 
   if (ie || !inserted?.[0]) {
-    console.warn('[topicStore] insert error:', ie?.message);
+    console.error('[topicStore] INSERT ERROR:', ie?.message, ie?.code);
     return { id: null, data: DEFAULT_DATA() };
   }
+
+  console.log('[topicStore] created new row:', inserted[0].id);
   return { id: inserted[0].id, data: DEFAULT_DATA() };
 }
 
@@ -132,31 +128,30 @@ async function pushToSupabase(data) {
 
   try {
     if (_recordId) {
-      const { error } = await withTimeout(
-        supabaseClient.from('StudentData').update(payload).eq('id', _recordId),
-        5000,
-        { error: new Error('save timeout') }
-      );
-      if (error) console.warn('[topicStore] update error:', error.message);
+      const { error } = await supabaseClient
+        .from('StudentData')
+        .update(payload)
+        .eq('id', _recordId);
+      if (error) console.error('[topicStore] UPDATE ERROR:', error.message, error.code);
     } else {
-      // Row not found yet — insert
-      const { data: ins, error } = await withTimeout(
-        supabaseClient.from('StudentData').insert([{ user_id: _userId, user_email: _userEmail, ...payload }]).select(),
-        5000,
-        { data: null, error: new Error('insert timeout') }
-      );
-      if (error) console.warn('[topicStore] insert error:', error.message);
-      else if (ins?.[0]) _recordId = ins[0].id;
+      const { data: ins, error } = await supabaseClient
+        .from('StudentData')
+        .insert([{ user_id: _userId, user_email: _userEmail, ...payload }])
+        .select();
+      if (error) console.error('[topicStore] INSERT ERROR:', error.message, error.code);
+      else if (ins?.[0]) {
+        _recordId = ins[0].id;
+        if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
+      }
     }
   } catch (e) {
-    console.warn('[topicStore] save failed (non-fatal):', e);
+    console.error('[topicStore] pushToSupabase exception:', e);
   }
 }
 
-// ── Public: preloadStore (called on login) ─────────────────────────────────
+// ── preloadStore — called on login, ALWAYS awaits Supabase ─────────────────
 
 export async function preloadStore(userEmail, userId) {
-  // Reset if different user
   if (_userEmail !== userEmail) {
     _cache = null;
     _recordId = null;
@@ -166,67 +161,67 @@ export async function preloadStore(userEmail, userId) {
     _readyPromise = null;
   }
 
-  // If already loaded for this user, nothing to do
   if (_ready) return;
 
-  // Show local cache immediately for fast render
+  // Show cached data immediately for fast render
   const local = readLocal(userEmail);
   if (local?.data && !_cache) {
     _cache = local.data;
     if (local.id) _recordId = local.id;
-    console.log('[topicStore] showing local cache while fetching Supabase...');
+    console.log('[topicStore] showing cached data while Supabase loads...');
   }
 
-  // ALWAYS fetch from Supabase — this is the source of truth
+  // Always fetch fresh from Supabase — this is what fixes cross-device sync
   _readyPromise = (async () => {
     const result = await fetchFromSupabase(userId);
     if (result) {
       _recordId = result.id ?? _recordId;
       _cache = result.data;
-      _ready = true;
-      // Update local cache to match Supabase
       writeLocal(userEmail, { id: _recordId, data: _cache });
-      console.log('[topicStore] Supabase data loaded ✓');
+      console.log('[topicStore] ✓ Supabase data loaded, streak:', _cache.global_streak);
     } else {
-      // Supabase unavailable — use local or default
       if (!_cache) _cache = DEFAULT_DATA();
-      _ready = true;
-      console.warn('[topicStore] Supabase unavailable, using local/default');
+      console.warn('[topicStore] ⚠ Supabase failed, using cache/default');
     }
+    _ready = true;
+    _readyPromise = null;
   })();
 
   await _readyPromise;
 }
 
-// ── Internal: ensure we have data before reading/writing ──────────────────
+export function initStore(userEmail, userId) {
+  if (_userEmail !== userEmail) {
+    _cache = null;
+    _recordId = null;
+    _userEmail = userEmail;
+    _userId = userId;
+    _ready = false;
+    _readyPromise = null;
+  }
+}
+
+// ── ensureLoaded — waits for Supabase before any read/write ───────────────
 
 async function ensureLoaded() {
   if (_ready && _cache) return _cache;
+  if (_readyPromise) { await _readyPromise; return _cache; }
 
-  // If preload is in progress, wait for it
-  if (_readyPromise) {
-    await _readyPromise;
-    return _cache;
-  }
-
-  // No userId yet — return default (will not be saved)
   if (!_userId) {
     if (!_cache) _cache = DEFAULT_DATA();
     return _cache;
   }
 
-  // Trigger a fresh load
   _readyPromise = (async () => {
     const result = await fetchFromSupabase(_userId);
     if (result) {
       _recordId = result.id ?? _recordId;
       _cache = result.data;
-      _ready = true;
       if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache });
     } else {
       if (!_cache) _cache = DEFAULT_DATA();
-      _ready = true;
     }
+    _ready = true;
     _readyPromise = null;
   })();
 
@@ -234,16 +229,13 @@ async function ensureLoaded() {
   return _cache;
 }
 
-// ── Internal: save ─────────────────────────────────────────────────────────
-
 function saveToDB(data) {
   _cache = data;
   if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
-  // Fire-and-forget push to Supabase
-  pushToSupabase(data).catch(e => console.warn('[topicStore] bg save failed:', e));
+  pushToSupabase(data).catch(e => console.error('[topicStore] bg save failed:', e));
 }
 
-// ── Global Streak + Daily Count ────────────────────────────────────────────
+// ── Global Streak ──────────────────────────────────────────────────────────
 
 export async function recordGlobalQuestionAnswered() {
   const data = await ensureLoaded();
@@ -257,7 +249,7 @@ export async function recordGlobalQuestionAnswered() {
 
   if (dqc.count === 3) {
     if (data.global_streak_last_date === today) {
-      // already counted
+      // already counted today
     } else if (data.global_streak_last_date === yesterday) {
       data.global_streak = (data.global_streak || 0) + 1;
     } else if (!data.global_streak_last_date) {
@@ -336,7 +328,6 @@ export async function recordAttempt(topicKey, score, { total_marks = 1, question
 
   topic.attempts.push({ score, total_marks, date: today, question_id });
   topic.last_attempted = today;
-
   if (topic.last_streak_date === today) {
     // no-op
   } else if (topic.last_streak_date === yesterday) {
@@ -380,7 +371,6 @@ export async function getTopicData(topicKey) {
 
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
-
   let latestDate = topic.last_attempted || null;
   if (mcqAttempts.length > 0) {
     const d = mcqAttempts[mcqAttempts.length - 1].date;
@@ -564,17 +554,5 @@ export async function resetData() {
   if (_userEmail) {
     clearLocal(_userEmail);
     pushToSupabase(fresh).catch(() => {});
-  }
-}
-
-// Legacy alias
-export function initStore(userEmail, userId) {
-  if (_userEmail !== userEmail) {
-    _cache = null;
-    _recordId = null;
-    _userEmail = userEmail;
-    _userId = userId;
-    _ready = false;
-    _readyPromise = null;
   }
 }

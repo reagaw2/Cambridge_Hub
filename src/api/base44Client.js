@@ -3,13 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabaseClient = createClient(supabaseUrl, supabaseKey);
+export const supabaseClient = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: localStorage,
+  },
+});
 
 async function invokeLLM({ prompt, response_json_schema }) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    throw new Error('VITE_ANTHROPIC_API_KEY is not configured. Please add it in the Dyad environment settings.');
+    throw new Error('VITE_ANTHROPIC_API_KEY is not configured.');
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -50,7 +57,6 @@ async function invokeLLM({ prompt, response_json_schema }) {
 
 export const base44 = new Proxy(supabaseClient, {
   get(target, prop) {
-    // Pass through real Supabase methods first
     if (prop === 'from' || prop === 'auth' || prop === 'channel' ||
         prop === 'removeChannel' || prop === 'rpc' || prop === 'storage') {
       return target[prop].bind(target);
@@ -120,7 +126,6 @@ export const base44 = new Proxy(supabaseClient, {
       });
     }
 
-    // Fall through to actual Supabase client for anything else
     const val = target[prop];
     if (typeof val === 'function') return val.bind(target);
     return val;

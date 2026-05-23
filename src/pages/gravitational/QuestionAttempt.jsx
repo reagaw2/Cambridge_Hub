@@ -1,22 +1,21 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 import AnswerInput from "../../components/AnswerInput";
 import { getNextGravitationalQuestion, advanceGravitationalIndex, GRAVITATIONAL_QUESTIONS } from "@/lib/gravitationalBank";
 import { recordAttempt, addToReviewBank } from "@/lib/topicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
-import { useStreamingFeedback } from "@/hooks/useStreamingFeedback";
-import StreamingFeedbackOverlay from "@/components/StreamingFeedbackOverlay";
+import SubmittingOverlay from "@/components/SubmittingOverlay";
 
 export default function GravitationalQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [overrideQuestion, setOverrideQuestion] = useState(null);
   const [showTeachMe, setShowTeachMe] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(false);
-
-  const { streamText, isStreaming, feedback, error, startStream } = useStreamingFeedback();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   const queued = getNextGravitationalQuestion();
   const question = overrideQuestion ?? queued.question;
@@ -25,14 +24,23 @@ export default function GravitationalQuestionAttempt() {
   const isEmpty = answer.trim().length === 0;
 
   const handleSubmit = async () => {
-    setShowOverlay(true);
-    startStream({
-      prompt: question.prompt(answer),
-      response_json_schema: question.response_schema,
-    });
-  };
+    setSubmitting(true);
+    setError(null);
 
-  const handleFeedbackReady = useCallback(async (fb) => {
+    const feedback = await base44.integrations.Core.InvokeLLM({
+      prompt: question.prompt(answer),
+      model: "claude_sonnet_4_6",
+      response_json_schema: question.response_schema,
+    }).catch(() => null);
+
+    setSubmitting(false);
+
+    if (!feedback) {
+      setError("Something went wrong. Please try again.");
+      return;
+    }
+
+    const fb = feedback.response ?? feedback;
     const marksEarned = fb.marks_earned ?? 0;
     const fullMarks = marksEarned >= question.total_marks;
 
@@ -63,7 +71,7 @@ export default function GravitationalQuestionAttempt() {
         paperRef: question.paper_ref,
       },
     });
-  }, [question, answer, navigate]);
+  };
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -114,32 +122,24 @@ export default function GravitationalQuestionAttempt() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={isEmpty || isStreaming}
+                  disabled={isEmpty || submitting}
                   className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {isStreaming ? "Marking…" : "Submit"}
+                  {submitting ? "Marking…" : "Submit"}
                 </button>
               </div>
+              {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
             </>
           )}
 
           <DevQuestionJumper
             allQuestions={GRAVITATIONAL_QUESTIONS}
-            onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setShowTeachMe(false); }}
+            onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setShowTeachMe(false); setError(null); }}
           />
         </div>
       </div>
 
-      {showOverlay && (
-        <StreamingFeedbackOverlay
-          streamText={streamText}
-          isStreaming={isStreaming}
-          feedback={feedback}
-          error={error}
-          marksTotal={question.total_marks}
-          onComplete={handleFeedbackReady}
-        />
-      )}
+      {submitting && <SubmittingOverlay />}
     </div>
   );
 }

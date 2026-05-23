@@ -1,7 +1,3 @@
-/**
- * useStreamingFeedback — streams directly from Anthropic's API in the browser.
- * Uses the SSE stream=true API and reads chunks as they arrive.
- */
 import { useState, useRef, useCallback } from "react";
 
 export function useStreamingFeedback() {
@@ -21,7 +17,6 @@ export function useStreamingFeedback() {
     abortRef.current = controller;
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-
     let accumulated = "";
 
     try {
@@ -60,49 +55,30 @@ export function useStreamingFeedback() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-
-        // Process all complete SSE lines in the buffer
         const lines = buffer.split("\n");
-        // Keep the last incomplete line in the buffer
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data:")) continue;
-
           const jsonStr = trimmed.slice(5).trim();
           if (!jsonStr || jsonStr === "[DONE]") continue;
 
           try {
             const event = JSON.parse(jsonStr);
-
             if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
               accumulated += event.delta.text;
+              // Trigger re-render with each new chunk
               setStreamText(accumulated);
             }
-
-            if (event.type === "message_stop") {
-              // Parse the final accumulated JSON
-              let jsonText = accumulated.trim();
-              const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-              if (match) jsonText = match[1].trim();
-              try {
-                setFeedback(JSON.parse(jsonText));
-              } catch {
-                // Try finding JSON object in the text
-                const objMatch = jsonText.match(/\{[\s\S]*\}/);
-                if (objMatch) setFeedback(JSON.parse(objMatch[0]));
-                else setError("Could not parse feedback. Please try again.");
-              }
-            }
           } catch {
-            // skip malformed event lines
+            // skip malformed lines
           }
         }
       }
 
-      // Fallback: if message_stop never fired but we have text
-      if (!feedback && accumulated.trim()) {
+      // Stream complete — now parse the full accumulated text once
+      if (accumulated.trim()) {
         let jsonText = accumulated.trim();
         const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
         if (match) jsonText = match[1].trim();
@@ -111,16 +87,22 @@ export function useStreamingFeedback() {
         } catch {
           const objMatch = jsonText.match(/\{[\s\S]*\}/);
           if (objMatch) {
-            try { setFeedback(JSON.parse(objMatch[0])); } catch { setError("Could not parse feedback."); }
+            try {
+              setFeedback(JSON.parse(objMatch[0]));
+            } catch {
+              setError("Could not parse feedback. Please try again.");
+            }
           } else {
             setError("Could not parse feedback. Please try again.");
           }
         }
+      } else {
+        setError("No response received. Please try again.");
       }
     } catch (err) {
       if (err.name === "AbortError") return;
       console.error("[useStreamingFeedback] error:", err);
-      setError("Something went wrong. Please try again.");
+      setError(`Error: ${err.message}`);
     } finally {
       setIsStreaming(false);
     }

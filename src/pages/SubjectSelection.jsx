@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, getMCQOnlyTopicNames, getStreakData, recordAppOpen, shouldShowReviewGate, getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { csGetTopicData } from "@/lib/csTopicStore";
-import { Atom, Code2, FileText, BookOpen, GraduationCap, ChevronRight, Zap, Star, ArrowRight, Lock, Users } from "lucide-react";
+import { Atom, Code2, FileText, BookOpen, GraduationCap, Zap, Star, ArrowRight, Lock, Users } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import ReviewGate from "@/components/ReviewGate";
 
@@ -45,7 +45,7 @@ function LockedModeCard({ icon: Icon, iconBg, iconColor, title, description, bad
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className={`w-10 h-10 rounded-xl ${iconBg} border flex items-center justify-center shrink-0`}>
-            <Icon className={`w-4.5 h-4.5 ${iconColor}`} />
+            <Icon className={`w-5 h-5 ${iconColor}`} />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-0.5">
@@ -140,7 +140,7 @@ export default function SubjectSelection() {
       )}
 
       {/* Top bar */}
-      <div className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/5 bg-white/[0.02] backdrop-blur-sm gap-3">
+      <div className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/5 bg-white/[0.02] backdrop-blur-sm">
         {/* Brand */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
@@ -151,18 +151,6 @@ export default function SubjectSelection() {
             <p className="text-[10px] text-white/40 leading-none mt-0.5">A Level Revision</p>
           </div>
         </div>
-
-        {/* Study Buddy pill — centre */}
-        <button
-          disabled
-          className="hidden sm:flex items-center gap-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-300/60 text-[11px] font-semibold px-3 py-1.5 rounded-full cursor-not-allowed select-none"
-        >
-          <Users className="w-3 h-3" />
-          Find a Study Buddy
-          <span className="text-[9px] font-bold uppercase tracking-wider text-pink-400/50 bg-pink-500/15 px-1.5 py-0.5 rounded-full">
-            Soon
-          </span>
-        </button>
 
         {/* Right side */}
         <div className="flex items-center gap-3 shrink-0">
@@ -178,13 +166,13 @@ export default function SubjectSelection() {
         </div>
       </div>
 
-      {/* Study Buddy pill — mobile (below top bar) */}
-      <div className="relative z-10 flex sm:hidden justify-center pt-3 px-4">
-        <div className="flex items-center gap-1.5 bg-pink-500/10 border border-pink-500/20 text-pink-300/60 text-[11px] font-semibold px-3 py-1.5 rounded-full select-none">
-          <Users className="w-3 h-3" />
-          Find a Study Buddy
-          <span className="text-[9px] font-bold uppercase tracking-wider text-pink-400/50 bg-pink-500/15 px-1.5 py-0.5 rounded-full">
-            Soon
+      {/* Study Buddy banner — always visible below top bar */}
+      <div className="relative z-10 flex justify-center px-4 pt-3 pb-1">
+        <div className="flex items-center gap-2 bg-pink-500/10 border border-pink-500/20 rounded-full px-4 py-2 select-none cursor-not-allowed">
+          <Users className="w-3.5 h-3.5 text-pink-400/70 shrink-0" />
+          <span className="text-[12px] font-semibold text-pink-300/70">Find a Study Buddy</span>
+          <span className="text-[9px] font-bold uppercase tracking-wider text-pink-400/60 bg-pink-500/15 border border-pink-500/20 px-2 py-0.5 rounded-full">
+            Coming Soon
           </span>
         </div>
       </div>
@@ -192,7 +180,7 @@ export default function SubjectSelection() {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pb-16">
 
         {/* Hero */}
-        <div className="pt-10 pb-10 text-center space-y-4">
+        <div className="pt-8 pb-10 text-center space-y-4">
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-xs text-white/60">
             <Zap className="w-3 h-3 text-purple-400" />
             Cambridge Syllabus 2024–2026

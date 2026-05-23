@@ -41,7 +41,13 @@ async function loadFromDB() {
 
   _loadPromise = (async () => {
     try {
-      const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
+      const { data: records, error } = await base44
+        .from('StudentData')
+        .select('*')
+        .eq('user_email', _userEmail);
+
+      if (error) throw error;
+
       if (records && records.length > 0) {
         const record = records.sort((a, b) => {
           const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
@@ -80,20 +86,21 @@ async function saveToDB(data) {
   _cache = data;
   try {
     if (_recordId) {
-      await base44.entities.StudentData.update(_recordId, { cs_data: data });
+      const { error } = await base44
+        .from('StudentData')
+        .update({ cs_data: data })
+        .eq('id', _recordId);
+      if (error) console.warn("[csStore] update error:", error.message);
     } else {
-      const records = await base44.entities.StudentData.filter({ user_email: _userEmail });
-      if (records && records.length > 0) {
-        const record = records.sort((a, b) => {
-          const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
-          const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
-          return tb - ta;
-        })[0];
-        _recordId = record.id;
-        await base44.entities.StudentData.update(_recordId, { cs_data: data });
-      } else {
-        const created = await base44.entities.StudentData.create({ user_email: _userEmail, cs_data: data });
-        _recordId = created.id;
+      // Upsert so we never violate the user_email UNIQUE constraint
+      const { data: upserted, error } = await base44
+        .from('StudentData')
+        .upsert({ user_email: _userEmail, cs_data: data }, { onConflict: 'user_email' })
+        .select();
+      if (error) {
+        console.warn("[csStore] upsert error:", error.message);
+      } else if (upserted && upserted[0]) {
+        _recordId = upserted[0].id;
       }
     }
   } catch (e) {

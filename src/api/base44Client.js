@@ -4,33 +4,28 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
-// Hybrid proxy: passes Supabase native calls through unchanged,
-// and polyfills the old Base44 SDK surface (.integrations, .entities).
 export const base44 = new Proxy(supabaseClient, {
   get(target, prop) {
-    // Pass all native Supabase methods (.from, .auth, .storage, etc.) straight through
     if (prop in target) {
       return target[prop];
     }
 
-    // Polyfill: .integrations.Core.InvokeLLM(...)
     if (prop === 'integrations') {
       return {
         Core: {
-          InvokeLLM: async ({ prompt, response_json_schema, model }) => {
+          InvokeLLM: async ({ prompt, response_json_schema }) => {
             const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
             if (!apiKey) {
               console.error('VITE_ANTHROPIC_API_KEY not set');
               return null;
             }
             try {
-              const response = await fetch('https://api.anthropic.com/v1/messages', {
+              const response = await fetch('/anthropic/v1/messages', {
                 method: 'POST',
                 headers: {
                   'x-api-key': apiKey,
                   'anthropic-version': '2023-06-01',
                   'content-type': 'application/json',
-                  'anthropic-dangerous-direct-browser-access': 'true',
                 },
                 body: JSON.stringify({
                   model: 'claude-sonnet-4-5',
@@ -67,7 +62,6 @@ export const base44 = new Proxy(supabaseClient, {
       };
     }
 
-    // Polyfill: .entities.TableName.filter/create/update/list
     if (prop === 'entities') {
       return new Proxy({}, {
         get(_, tableName) {

@@ -15,6 +15,17 @@ async function withTimeout(promise, ms) {
   return Promise.race([promise, timeout(ms)]);
 }
 
+function buildUser(supabaseUser) {
+  const meta = supabaseUser.user_metadata ?? {};
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email,
+    full_name: meta.full_name ?? meta.name ?? null,
+    preferred_name: meta.preferred_name ?? null,
+    onboarding_completed: meta.onboarding_completed ?? true,
+  };
+}
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -28,15 +39,21 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = base44.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] event:', event);
 
+      if (event === 'USER_UPDATED' && session?.user) {
+        // Just refresh the user object — no need to reload progress
+        const mappedUser = buildUser(session.user);
+        if (mappedUser.preferred_name) {
+          localStorage.setItem(
+            `cambridge_hub_preferred_name_${mappedUser.id}`,
+            mappedUser.preferred_name
+          );
+        }
+        setUser(mappedUser);
+        return;
+      }
+
       if (session?.user) {
-        const meta = session.user.user_metadata ?? {};
-        const mappedUser = {
-          id: session.user.id,
-          email: session.user.email,
-          full_name: meta.full_name ?? meta.name ?? null,
-          preferred_name: meta.preferred_name ?? null,
-          onboarding_completed: meta.onboarding_completed ?? true,
-        };
+        const mappedUser = buildUser(session.user);
 
         // Sync preferred_name to localStorage for instant access
         if (mappedUser.preferred_name) {

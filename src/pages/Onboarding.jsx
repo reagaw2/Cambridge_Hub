@@ -1,30 +1,33 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { supabaseClient } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function Onboarding() {
   const { user } = useAuth();
   const [preferredName, setPreferredName] = useState("");
 
-  const firstName = user?.full_name?.split(" ")[0] ?? "you";
+  const firstName = user?.email?.split("@")[0] ?? "you";
   const displayPreview = preferredName.trim() || firstName;
 
-  function handleContinue() {
+  async function handleContinue() {
     const name = preferredName.trim();
+    const uid = user?.id ?? "anon";
 
     // Step 1 — instant localStorage write (scoped per user)
-    const uid = user?.id ?? "anon";
     localStorage.setItem(`cambridge_hub_preferred_name_${uid}`, name);
     localStorage.setItem(`cambridge_hub_onboarding_completed_${uid}`, "true");
 
-    // Step 2 — hard redirect so App.jsx re-evaluates localStorage
-    window.location.href = "/";
+    // Step 2 — save to Supabase user_metadata so it syncs cross-device
+    try {
+      await supabaseClient.auth.updateUser({
+        data: { preferred_name: name, onboarding_completed: true },
+      });
+    } catch (e) {
+      console.warn("[Onboarding] Could not sync to Supabase:", e);
+    }
 
-    // Step 3 — background DB sync (fire and forget)
-    base44.auth.updateMe({
-      preferred_name: name,
-      onboarding_completed: true,
-    }).catch(() => {});
+    // Step 3 — hard redirect so App.jsx re-evaluates localStorage
+    window.location.href = "/";
   }
 
   return (

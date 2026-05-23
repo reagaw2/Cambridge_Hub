@@ -30,21 +30,21 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         setIsLoadingAuth(false);
 
-        if (session.user.email) {
-          // Check for local cache first — if it exists, skip loading spinner entirely
-          const physicsHasCache = !!localStorage.getItem(`hub_student_progress_${session.user.email}`);
-          const csHasCache = !!localStorage.getItem(`hub_cs_progress_${session.user.email}`);
+        const userEmail = session.user.email;
+        const userId = session.user.id;
+
+        if (userEmail && userId) {
+          const physicsHasCache = !!localStorage.getItem(`hub_student_progress_${userEmail}`);
+          const csHasCache = !!localStorage.getItem(`hub_cs_progress_${userEmail}`);
 
           if (!physicsHasCache || !csHasCache) {
-            // No cache for at least one store — show progress loader
             setIsLoadingProgress(true);
           }
 
           try {
-            // Both run in parallel; cache-first means returning users get 0ms
             await Promise.all([
-              preloadStore(session.user.email),
-              preloadCSStore(session.user.email),
+              preloadStore(userEmail, userId),
+              preloadCSStore(userEmail, userId),
             ]);
           } catch (err) {
             console.error('[Auth] Failed to preload progress:', err);
@@ -70,7 +70,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = async () => {
-    // Clear localStorage caches on logout so next user gets fresh data
     if (user?.email) {
       localStorage.removeItem(`hub_student_progress_${user.email}`);
       localStorage.removeItem(`hub_cs_progress_${user.email}`);
@@ -91,8 +90,6 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
-  const checkAppState = async () => {};
-
   return (
     <AuthContext.Provider value={{
       user,
@@ -104,7 +101,7 @@ export const AuthProvider = ({ children }) => {
       appPublicSettings: null,
       logout,
       navigateToLogin,
-      checkAppState,
+      checkAppState: async () => {},
     }}>
       {children}
     </AuthContext.Provider>

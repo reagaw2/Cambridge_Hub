@@ -7,6 +7,16 @@ function applyColorScheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
 }
 
+/** Resolves after `ms` milliseconds — used as a race-condition timeout */
+function timeout(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** Runs a promise but never hangs longer than `ms` ms */
+async function withTimeout(promise, ms) {
+  return Promise.race([promise, timeout(ms)]);
+}
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -30,19 +40,17 @@ export const AuthProvider = ({ children }) => {
         const userEmail = session.user.email;
         const userId = session.user.id;
 
-        // Show the loading spinner while we fetch from Supabase
         setIsLoadingProgress(true);
 
-        // Fetch from Supabase BEFORE setting isAuthenticated — this ensures
-        // the dashboard never renders with stale/empty data
         try {
+          // Race each store against an 8-second timeout so a slow DB never hangs the app
           await Promise.all([
-            preloadStore(userEmail, userId),
-            preloadCSStore(userEmail, userId),
+            withTimeout(preloadStore(userEmail, userId), 8000),
+            withTimeout(preloadCSStore(userEmail, userId), 8000),
           ]);
-          console.log('[Auth] ✓ progress loaded from Supabase');
+          console.log('[Auth] ✓ progress loaded');
         } catch (err) {
-          console.error('[Auth] ✗ failed to preload progress:', err);
+          console.warn('[Auth] progress load error (continuing anyway):', err);
         }
 
         setUser(mappedUser);

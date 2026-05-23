@@ -19,15 +19,14 @@ function Overlay() {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  const currentLabel = STAGES[Math.min(stageIdx, STAGES.length - 1)].label;
+  const label = STAGES[Math.min(stageIdx, STAGES.length - 1)].label;
 
-  return (
+  return createPortal(
     <div
       style={{ position: "fixed", inset: 0, zIndex: 9999 }}
       className="bg-[#0d0d1a]/95 backdrop-blur-sm flex items-center justify-center px-6"
     >
       <div className="flex flex-col items-center gap-6 text-center max-w-xs">
-
         {/* Spinner */}
         <div className="relative w-16 h-16">
           <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
@@ -37,11 +36,9 @@ function Overlay() {
           </div>
         </div>
 
-        {/* Status text */}
+        {/* Status */}
         <div className="space-y-3">
-          <p className="text-base font-semibold text-foreground">
-            {currentLabel}
-          </p>
+          <p className="text-base font-semibold text-foreground">{label}</p>
           <div className="flex items-center justify-center gap-1.5">
             {STAGES.map((_, i) => (
               <div
@@ -58,10 +55,9 @@ function Overlay() {
           Cambridge-standard AI marking takes a moment to get right.
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
-export default function SubmittingOverlay() {
-  return createPortal(<Overlay />, document.body);
-}
+export default Overlay;

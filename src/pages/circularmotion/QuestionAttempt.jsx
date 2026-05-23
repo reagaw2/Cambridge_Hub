@@ -6,6 +6,7 @@ import AnswerInput from "../../components/AnswerInput";
 import { getNextCircularMotionQuestion, advanceCircularMotionIndex, CIRCULAR_MOTION_QUESTIONS } from "@/lib/circularMotionBank";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
+import SubmittingOverlay from "@/components/SubmittingOverlay";
 
 export default function CircularMotionQuestionAttempt() {
   const navigate = useNavigate();
@@ -88,7 +89,9 @@ export default function CircularMotionQuestionAttempt() {
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
                 <button onClick={() => setShowTeachMe(true)} disabled={answer.trim().length > 0} className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Teach Me How</button>
-                <button onClick={handleSubmit} disabled={answer.trim().length === 0 || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{loading ? "Marking..." : "Submit"}</button>
+                <button onClick={handleSubmit} disabled={answer.trim().length === 0 || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                  {loading ? "Marking..." : "Submit"}
+                </button>
               </div>
               {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
             </>
@@ -96,6 +99,8 @@ export default function CircularMotionQuestionAttempt() {
           <DevQuestionJumper allQuestions={CIRCULAR_MOTION_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); setShowTeachMe(false); }} />
         </div>
       </div>
+
+      {loading && <SubmittingOverlay />}
     </div>
   );
 }

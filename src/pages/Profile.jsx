@@ -4,7 +4,7 @@ import { ArrowLeft, Trash2, LogOut, AlertTriangle, Check } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { resetData } from "@/lib/topicStore";
-import { base44 } from "@/api/base44Client";
+import { supabaseClient } from "@/api/base44Client";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -12,19 +12,38 @@ export default function Profile() {
   const { avatarLetter } = useDisplayName();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
-  const [preferredName, setPreferredName] = useState(user?.preferred_name ?? "");
+  const [preferredName, setPreferredName] = useState(
+    user?.preferred_name ?? localStorage.getItem(`cambridge_hub_preferred_name_${user?.id ?? "anon"}`) ?? ""
+  );
   const [nameSaved, setNameSaved] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameError, setNameError] = useState(null);
 
   async function handleSavePreferredName() {
+    setNameSaving(true);
+    setNameError(null);
     const trimmed = preferredName.trim();
+
+    // Always persist to localStorage for instant local display
     localStorage.setItem(`cambridge_hub_preferred_name_${user?.id ?? "anon"}`, trimmed);
-    await base44.auth.updateMe({ preferred_name: trimmed });
+
+    // Persist to Supabase user_metadata so it syncs cross-device
+    const { error } = await supabaseClient.auth.updateUser({
+      data: { preferred_name: trimmed },
+    });
+
+    setNameSaving(false);
+    if (error) {
+      console.error("[Profile] Failed to save preferred name:", error.message);
+      setNameError("Failed to save. Please try again.");
+      return;
+    }
+
     setNameSaved(true);
     setTimeout(() => setNameSaved(false), 2000);
   }
 
   const handleDeleteAccount = async () => {
-    // Clear all data and log out
     await resetData();
     logout(true);
   };
@@ -51,7 +70,7 @@ export default function Profile() {
               </span>
             </div>
             <div>
-              <p className="font-semibold text-foreground">{user?.full_name ?? "Student"}</p>
+              <p className="font-semibold text-foreground">{user?.full_name ?? user?.email?.split("@")[0] ?? "Student"}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{user?.email ?? ""}</p>
             </div>
           </div>
@@ -60,23 +79,25 @@ export default function Profile() {
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Preferred Name</p>
             <p className="text-xs text-muted-foreground/60 leading-relaxed">
-              The name we use to address you. Leave empty to use your first name.
+              The name we use to address you. Syncs across all your devices.
             </p>
             <div className="flex gap-2">
               <input
                 value={preferredName}
-                onChange={(e) => { setPreferredName(e.target.value.slice(0, 20)); setNameSaved(false); }}
+                onChange={(e) => { setPreferredName(e.target.value.slice(0, 20)); setNameSaved(false); setNameError(null); }}
                 placeholder="What should we call you?"
                 maxLength={20}
                 className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
               />
               <button
                 onClick={handleSavePreferredName}
-                className="px-4 py-2 rounded-lg bg-primary/15 text-primary text-sm font-semibold hover:brightness-110 transition-all flex items-center gap-1.5"
+                disabled={nameSaving}
+                className="px-4 py-2 rounded-lg bg-primary/15 text-primary text-sm font-semibold hover:brightness-110 transition-all flex items-center gap-1.5 disabled:opacity-50"
               >
-                {nameSaved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save"}
+                {nameSaved ? <><Check className="w-3.5 h-3.5" /> Saved</> : nameSaving ? "Saving…" : "Save"}
               </button>
             </div>
+            {nameError && <p className="text-xs text-red-400">{nameError}</p>}
           </div>
 
           {/* Sign out */}
@@ -107,7 +128,7 @@ export default function Profile() {
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-red-400">This cannot be undone</p>
                     <p className="text-xs text-foreground/60 leading-relaxed">
-                      Deleting your account will permanently erase all your progress data, streaks, review bank, and session history. Your account will be signed out immediately.
+                      Deleting your account will permanently erase all your progress data, streaks, review bank, and session history.
                     </p>
                   </div>
                 </div>

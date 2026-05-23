@@ -7,12 +7,10 @@ function applyColorScheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
 }
 
-/** Resolves after `ms` milliseconds — used as a race-condition timeout */
 function timeout(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Runs a promise but never hangs longer than `ms` ms */
 async function withTimeout(promise, ms) {
   return Promise.race([promise, timeout(ms)]);
 }
@@ -31,11 +29,22 @@ export const AuthProvider = ({ children }) => {
       console.log('[Auth] event:', event);
 
       if (session?.user) {
+        const meta = session.user.user_metadata ?? {};
         const mappedUser = {
           id: session.user.id,
           email: session.user.email,
-          onboarding_completed: session.user.user_metadata?.onboarding_completed ?? true,
+          full_name: meta.full_name ?? meta.name ?? null,
+          preferred_name: meta.preferred_name ?? null,
+          onboarding_completed: meta.onboarding_completed ?? true,
         };
+
+        // Sync preferred_name to localStorage for instant access
+        if (mappedUser.preferred_name) {
+          localStorage.setItem(
+            `cambridge_hub_preferred_name_${mappedUser.id}`,
+            mappedUser.preferred_name
+          );
+        }
 
         const userEmail = session.user.email;
         const userId = session.user.id;
@@ -43,7 +52,6 @@ export const AuthProvider = ({ children }) => {
         setIsLoadingProgress(true);
 
         try {
-          // Race each store against an 8-second timeout so a slow DB never hangs the app
           await Promise.all([
             withTimeout(preloadStore(userEmail, userId), 8000),
             withTimeout(preloadCSStore(userEmail, userId), 8000),

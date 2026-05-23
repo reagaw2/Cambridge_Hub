@@ -172,16 +172,18 @@ async function saveToDB(data) {
         _recordId = updated[0].id;
       }
     } else {
-      // Clean upsert configuration fallback
-      const { data: created, error } = await base44
+      // No cached _recordId — try to UPDATE by user_email first (avoids RLS-blocked INSERT).
+      // If no row matches, the update affects 0 rows and we log a warning.
+      const { data: updated, error } = await base44
         .from('StudentData')
-        .upsert(payload, { onConflict: 'user_email' })
+        .update(payload)
+        .eq('user_email', _userEmail)
         .select();
 
       if (error) {
-        console.warn("Supabase Row Upsert Fallback Error:", error.message);
-      } else if (created && created[0]) {
-        _recordId = created[0].id;
+        console.warn("topicStore: update-by-email error:", error.message);
+      } else if (updated && updated[0]) {
+        _recordId = updated[0].id;
       }
     }
   } catch (e) {

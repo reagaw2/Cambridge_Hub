@@ -15,9 +15,12 @@ async function callLocalLLM(prompt, schema) {
 
   try {
     if (anthropicKey) {
-      // Route through Vite's dev server proxy (/api/anthropic → https://api.anthropic.com)
-      // to avoid browser CORS restrictions on direct Anthropic API calls.
-      const response = await fetch('/api/anthropic/v1/messages', {
+      // Use an absolute URL to the Vite dev server so the Dyad service worker
+      // (running on a different port) cannot intercept and reject the request.
+      const viteOrigin = window.location.port === '32106'
+        ? window.location.origin
+        : `http://localhost:32106`;
+      const response = await fetch(`${viteOrigin}/api/anthropic/v1/messages`, {
         method: 'POST',
         headers: {
           'x-api-key': anthropicKey,
@@ -30,6 +33,10 @@ async function callLocalLLM(prompt, schema) {
           messages: [{ role: 'user', content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(schema)}. Do not include any conversational intro/outro text, only valid JSON.` }]
         })
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Anthropic proxy ${response.status}: ${errText}`);
+      }
       const data = await response.json();
       return JSON.parse(data.content[0].text);
     }

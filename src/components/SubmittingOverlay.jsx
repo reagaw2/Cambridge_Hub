@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { createPortal } from "react-dom";
 
 const STAGES = [
   { label: "Submitting your answer…", delay: 0 },
@@ -9,7 +9,7 @@ const STAGES = [
   { label: "Almost there…", delay: 9500 },
 ];
 
-export default function SubmittingOverlay() {
+function Overlay() {
   const [stageIdx, setStageIdx] = useState(0);
 
   useEffect(() => {
@@ -22,7 +22,10 @@ export default function SubmittingOverlay() {
   const currentLabel = STAGES[Math.min(stageIdx, STAGES.length - 1)].label;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0d0d1a]/95 backdrop-blur-sm flex items-center justify-center px-6">
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9999 }}
+      className="bg-[#0d0d1a]/95 backdrop-blur-sm flex items-center justify-center px-6"
+    >
       <div className="flex flex-col items-center gap-6 text-center max-w-xs">
 
         {/* Spinner */}
@@ -35,11 +38,8 @@ export default function SubmittingOverlay() {
         </div>
 
         {/* Status text */}
-        <div className="space-y-2">
-          <p
-            key={currentLabel}
-            className="text-base font-semibold text-foreground transition-all duration-500 animate-in fade-in slide-in-from-bottom-1"
-          >
+        <div className="space-y-3">
+          <p className="text-base font-semibold text-foreground">
             {currentLabel}
           </p>
           <div className="flex items-center justify-center gap-1.5">
@@ -47,9 +47,7 @@ export default function SubmittingOverlay() {
               <div
                 key={i}
                 className={`h-1 rounded-full transition-all duration-500 ${
-                  i <= stageIdx
-                    ? "bg-primary w-4"
-                    : "bg-white/10 w-2"
+                  i <= stageIdx ? "bg-primary w-4" : "bg-white/10 w-2"
                 }`}
               />
             ))}
@@ -62,4 +60,8 @@ export default function SubmittingOverlay() {
       </div>
     </div>
   );
+}
+
+export default function SubmittingOverlay() {
+  return createPortal(<Overlay />, document.body);
 }

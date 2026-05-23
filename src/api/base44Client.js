@@ -7,83 +7,52 @@ const supabaseClient = createClient(supabaseUrl, supabaseKey);
 async function invokeLLM({ prompt, response_json_schema }) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
-  console.log('[LLM] invokeLLM called');
-  console.log('[LLM] API key present:', !!apiKey, apiKey ? `(starts with ${apiKey.slice(0, 8)}...)` : '(MISSING)');
-
   if (!apiKey) {
-    console.error('[LLM] VITE_ANTHROPIC_API_KEY environment variable is not set!');
     throw new Error('VITE_ANTHROPIC_API_KEY is not configured. Please add it in the Dyad environment settings.');
   }
 
-  const requestBody = {
-    model: 'claude-sonnet-4-5',
-    max_tokens: 4000,
-    messages: [
-      {
-        role: 'user',
-        content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
-      },
-    ],
-  };
-
-  console.log('[LLM] Calling Anthropic API...');
-
-  let response;
-  try {
-    response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(requestBody),
-    });
-  } catch (networkErr) {
-    console.error('[LLM] Network error calling Anthropic:', networkErr);
-    throw networkErr;
-  }
-
-  console.log('[LLM] Response status:', response.status);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 4000,
+      messages: [
+        {
+          role: 'user',
+          content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
+        },
+      ],
+    }),
+  });
 
   if (!response.ok) {
     const err = await response.text();
-    console.error('[LLM] Anthropic API error:', response.status, err);
     throw new Error(`Anthropic API error ${response.status}: ${err}`);
   }
 
   const data = await response.json();
   const text = data.content?.[0]?.text;
+  if (!text) throw new Error('No text content in Anthropic response');
 
-  if (!text) {
-    console.error('[LLM] No text in response:', data);
-    throw new Error('No text content in Anthropic response');
-  }
-
-  // Strip markdown code blocks if present
   let jsonText = text.trim();
   const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) {
-    jsonText = jsonMatch[1].trim();
-  }
+  if (jsonMatch) jsonText = jsonMatch[1].trim();
 
-  console.log('[LLM] Success, parsing JSON response...');
   return JSON.parse(jsonText);
 }
 
 export const base44 = new Proxy(supabaseClient, {
   get(target, prop) {
-    if (prop in target) {
-      return target[prop];
-    }
+    if (prop in target) return target[prop];
 
     if (prop === 'integrations') {
-      return {
-        Core: {
-          InvokeLLM: invokeLLM,
-        },
-      };
+      return { Core: { InvokeLLM: invokeLLM } };
     }
 
     if (prop === 'agents') {

@@ -1,5 +1,3 @@
 import { defineConfig } from "nitro";
 
-export default defineConfig({
-  serverDir: "./server",
-});
+export default defineConfig({});

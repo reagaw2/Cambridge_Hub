@@ -8,6 +8,11 @@ import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 
+// Give React a frame to paint before starting the heavy async work
+function nextFrame() {
+  return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}
+
 export default function CircularMotionQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
@@ -24,6 +29,8 @@ export default function CircularMotionQuestionAttempt() {
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    // Yield so React flushes the loading state and the overlay paints
+    await nextFrame();
 
     const feedback = await base44.integrations.Core.InvokeLLM({
       prompt: question.prompt(answer),
@@ -88,8 +95,18 @@ export default function CircularMotionQuestionAttempt() {
             <>
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
-                <button onClick={() => setShowTeachMe(true)} disabled={answer.trim().length > 0} className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Teach Me How</button>
-                <button onClick={handleSubmit} disabled={answer.trim().length === 0 || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                <button
+                  onClick={() => setShowTeachMe(true)}
+                  disabled={answer.trim().length > 0}
+                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Teach Me How
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={answer.trim().length === 0 || loading}
+                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
                   {loading ? "Marking..." : "Submit"}
                 </button>
               </div>

@@ -26,35 +26,34 @@ export const AuthProvider = ({ children }) => {
           email: session.user.email,
           onboarding_completed: session.user.user_metadata?.onboarding_completed ?? true,
         };
-        setUser(mappedUser);
-        setIsAuthenticated(true);
-        setIsLoadingAuth(false);
 
         const userEmail = session.user.email;
         const userId = session.user.id;
 
-        if (userEmail && userId) {
-          const physicsHasCache = !!localStorage.getItem(`hub_student_progress_${userEmail}`);
-          const csHasCache = !!localStorage.getItem(`hub_cs_progress_${userEmail}`);
+        // Show the loading spinner while we fetch from Supabase
+        setIsLoadingProgress(true);
 
-          if (!physicsHasCache || !csHasCache) {
-            setIsLoadingProgress(true);
-          }
-
-          try {
-            await Promise.all([
-              preloadStore(userEmail, userId),
-              preloadCSStore(userEmail, userId),
-            ]);
-          } catch (err) {
-            console.error('[Auth] Failed to preload progress:', err);
-          }
-          setIsLoadingProgress(false);
+        // Fetch from Supabase BEFORE setting isAuthenticated — this ensures
+        // the dashboard never renders with stale/empty data
+        try {
+          await Promise.all([
+            preloadStore(userEmail, userId),
+            preloadCSStore(userEmail, userId),
+          ]);
+          console.log('[Auth] ✓ progress loaded from Supabase');
+        } catch (err) {
+          console.error('[Auth] ✗ failed to preload progress:', err);
         }
+
+        setUser(mappedUser);
+        setIsAuthenticated(true);
+        setIsLoadingAuth(false);
+        setIsLoadingProgress(false);
       } else {
         setUser(null);
         setIsAuthenticated(false);
         setIsLoadingAuth(false);
+        setIsLoadingProgress(false);
       }
     });
 
@@ -70,10 +69,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = async () => {
-    if (user?.email) {
-      localStorage.removeItem(`hub_student_progress_${user.email}`);
-      localStorage.removeItem(`hub_cs_progress_${user.email}`);
-    }
     setIsLoadingAuth(true);
     try {
       await base44.auth.signOut();

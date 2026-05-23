@@ -1,6 +1,7 @@
 /**
  * topicStore.js — Student data layer (Physics)
- * Source of truth: Supabase. localStorage = render cache only.
+ * Source of truth: Supabase ONLY. localStorage is written AFTER Supabase loads,
+ * and is NEVER used as the primary data source — only for instant UI pre-render.
  */
 
 import { supabaseClient } from "@/api/base44Client";
@@ -31,15 +32,15 @@ const DEFAULT_DATA = () => ({
   last_session_time: null,
 });
 
+// Module-level state
 let _cache = null;
 let _recordId = null;
 let _userEmail = null;
 let _userId = null;
-let _ready = false;
-let _readyPromise = null;
+let _supabaseLoaded = false;   // true only after Supabase responds
+let _loadPromise = null;        // the in-flight Supabase request
 
-// ── Cache key — v3 busts any old stale data ────────────────────────────────
-function localKey(e) { return `hub_physics_v3_${e}`; }
+function localKey(e) { return `hub_physics_v4_${e}`; }
 
 function readLocal(email) {
   try { return JSON.parse(localStorage.getItem(localKey(email))); } catch { return null; }
@@ -49,19 +50,19 @@ function writeLocal(email, payload) {
   try { localStorage.setItem(localKey(email), JSON.stringify(payload)); } catch {}
 }
 
-function clearLocal(email) {
+function clearAllLocalKeys(email) {
   try {
-    // Bust all old cache versions
-    ['hub_student_progress_', 'hub_student_progress_v2_', 'hub_physics_v3_'].forEach(prefix => {
-      localStorage.removeItem(prefix + email);
+    ['hub_student_progress_', 'hub_student_progress_v2_',
+     'hub_physics_v3_', 'hub_physics_v4_'].forEach(p => {
+      localStorage.removeItem(p + email);
     });
   } catch {}
 }
 
-// ── Supabase I/O ───────────────────────────────────────────────────────────
+// ── Core Supabase fetch ────────────────────────────────────────────────────
 
-async function fetchFromSupabase(userId) {
-  console.log('[topicStore] fetching from Supabase for user:', userId);
+async function loadFromSupabase(userId) {
+  console.log('[topicStore] → fetching from Supabase...');
 
   const { data: rows, error } = await supabaseClient
     .from('StudentData')
@@ -69,14 +70,13 @@ async function fetchFromSupabase(userId) {
     .eq('user_id', userId);
 
   if (error) {
-    console.error('[topicStore] FETCH ERROR:', error.message, error.code, error.details);
+    console.error('[topicStore] ✗ fetch failed:', error.message, '| code:', error.code);
     return null;
   }
 
-  console.log('[topicStore] fetched rows:', rows?.length ?? 0);
-
   if (rows && rows.length > 0) {
     const r = rows[0];
+    console.log('[topicStore] ✓ loaded from Supabase. streak:', r.global_streak, '| topics:', Object.keys(r.topics || {}).length);
     return {
       id: r.id,
       data: {
@@ -94,20 +94,100 @@ async function fetchFromSupabase(userId) {
     };
   }
 
-  // No row — create one
-  console.log('[topicStore] no row found, creating...');
+  // No row yet — create one
+  console.log('[topicStore] no row found, creating new...');
   const { data: inserted, error: ie } = await supabaseClient
     .from('StudentData')
     .insert([{ user_id: userId, user_email: _userEmail, ...DEFAULT_DATA() }])
     .select();
 
   if (ie || !inserted?.[0]) {
-    console.error('[topicStore] INSERT ERROR:', ie?.message, ie?.code);
+    console.error('[topicStore] ✗ insert failed:', ie?.message);
     return { id: null, data: DEFAULT_DATA() };
   }
-
-  console.log('[topicStore] created new row:', inserted[0].id);
+  console.log('[topicStore] ✓ new row created:', inserted[0].id);
   return { id: inserted[0].id, data: DEFAULT_DATA() };
+}
+
+// ── preloadStore — must be awaited on login ────────────────────────────────
+
+export async function preloadStore(userEmail, userId) {
+  // Reset for new user
+  if (_userEmail !== userEmail) {
+    _cache = null;
+    _recordId = null;
+    _userEmail = userEmail;
+    _userId = userId;
+    _supabaseLoaded = false;
+    _loadPromise = null;
+  }
+
+  // Already loaded from Supabase — nothing to do
+  if (_supabaseLoaded) return;
+
+  // Deduplicate concurrent calls
+  if (_loadPromise) {
+    await _loadPromise;
+    return;
+  }
+
+  _loadPromise = loadFromSupabase(userId);
+  const result = await _loadPromise;
+  _loadPromise = null;
+
+  if (result) {
+    _recordId = result.id ?? _recordId;
+    _cache = result.data;
+    _supabaseLoaded = true;
+    writeLocal(userEmail, { id: _recordId, data: _cache });
+  } else {
+    // Supabase failed — fall back to local cache or default
+    const local = readLocal(userEmail);
+    _cache = local?.data ?? DEFAULT_DATA();
+    if (local?.id) _recordId = local.id;
+    _supabaseLoaded = false; // will retry next call
+    console.warn('[topicStore] ⚠ using fallback data (Supabase unavailable)');
+  }
+}
+
+// ── ensureLoaded — used by all read/write helpers ──────────────────────────
+
+async function ensureLoaded() {
+  // If we have confirmed Supabase data, use it
+  if (_supabaseLoaded && _cache) return _cache;
+
+  // If a load is in flight, wait for it
+  if (_loadPromise) {
+    await _loadPromise;
+    return _cache ?? DEFAULT_DATA();
+  }
+
+  // Need to load — trigger now
+  if (_userId) {
+    _loadPromise = loadFromSupabase(_userId);
+    const result = await _loadPromise;
+    _loadPromise = null;
+    if (result) {
+      _recordId = result.id ?? _recordId;
+      _cache = result.data;
+      _supabaseLoaded = true;
+      if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache });
+    } else {
+      if (!_cache) _cache = DEFAULT_DATA();
+    }
+    return _cache;
+  }
+
+  if (!_cache) _cache = DEFAULT_DATA();
+  return _cache;
+}
+
+// ── saveToDB — writes in-memory then pushes to Supabase ───────────────────
+
+function saveToDB(data) {
+  _cache = data;
+  if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
+  pushToSupabase(data).catch(e => console.error('[topicStore] save failed:', e));
 }
 
 async function pushToSupabase(data) {
@@ -126,116 +206,26 @@ async function pushToSupabase(data) {
     last_session_time: data.last_session_time,
   };
 
-  try {
-    if (_recordId) {
-      const { error } = await supabaseClient
-        .from('StudentData')
-        .update(payload)
-        .eq('id', _recordId);
-      if (error) console.error('[topicStore] UPDATE ERROR:', error.message, error.code);
-    } else {
-      const { data: ins, error } = await supabaseClient
-        .from('StudentData')
-        .insert([{ user_id: _userId, user_email: _userEmail, ...payload }])
-        .select();
-      if (error) console.error('[topicStore] INSERT ERROR:', error.message, error.code);
-      else if (ins?.[0]) {
-        _recordId = ins[0].id;
-        if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
-      }
+  if (_recordId) {
+    const { error } = await supabaseClient
+      .from('StudentData')
+      .update(payload)
+      .eq('id', _recordId);
+    if (error) console.error('[topicStore] update error:', error.message);
+  } else {
+    const { data: ins, error } = await supabaseClient
+      .from('StudentData')
+      .insert([{ user_id: _userId, user_email: _userEmail, ...payload }])
+      .select();
+    if (error) console.error('[topicStore] insert error:', error.message);
+    else if (ins?.[0]) {
+      _recordId = ins[0].id;
+      if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
     }
-  } catch (e) {
-    console.error('[topicStore] pushToSupabase exception:', e);
   }
 }
 
-// ── preloadStore — called on login, ALWAYS awaits Supabase ─────────────────
-
-export async function preloadStore(userEmail, userId) {
-  if (_userEmail !== userEmail) {
-    _cache = null;
-    _recordId = null;
-    _userEmail = userEmail;
-    _userId = userId;
-    _ready = false;
-    _readyPromise = null;
-  }
-
-  if (_ready) return;
-
-  // Show cached data immediately for fast render
-  const local = readLocal(userEmail);
-  if (local?.data && !_cache) {
-    _cache = local.data;
-    if (local.id) _recordId = local.id;
-    console.log('[topicStore] showing cached data while Supabase loads...');
-  }
-
-  // Always fetch fresh from Supabase — this is what fixes cross-device sync
-  _readyPromise = (async () => {
-    const result = await fetchFromSupabase(userId);
-    if (result) {
-      _recordId = result.id ?? _recordId;
-      _cache = result.data;
-      writeLocal(userEmail, { id: _recordId, data: _cache });
-      console.log('[topicStore] ✓ Supabase data loaded, streak:', _cache.global_streak);
-    } else {
-      if (!_cache) _cache = DEFAULT_DATA();
-      console.warn('[topicStore] ⚠ Supabase failed, using cache/default');
-    }
-    _ready = true;
-    _readyPromise = null;
-  })();
-
-  await _readyPromise;
-}
-
-export function initStore(userEmail, userId) {
-  if (_userEmail !== userEmail) {
-    _cache = null;
-    _recordId = null;
-    _userEmail = userEmail;
-    _userId = userId;
-    _ready = false;
-    _readyPromise = null;
-  }
-}
-
-// ── ensureLoaded — waits for Supabase before any read/write ───────────────
-
-async function ensureLoaded() {
-  if (_ready && _cache) return _cache;
-  if (_readyPromise) { await _readyPromise; return _cache; }
-
-  if (!_userId) {
-    if (!_cache) _cache = DEFAULT_DATA();
-    return _cache;
-  }
-
-  _readyPromise = (async () => {
-    const result = await fetchFromSupabase(_userId);
-    if (result) {
-      _recordId = result.id ?? _recordId;
-      _cache = result.data;
-      if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache });
-    } else {
-      if (!_cache) _cache = DEFAULT_DATA();
-    }
-    _ready = true;
-    _readyPromise = null;
-  })();
-
-  await _readyPromise;
-  return _cache;
-}
-
-function saveToDB(data) {
-  _cache = data;
-  if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
-  pushToSupabase(data).catch(e => console.error('[topicStore] bg save failed:', e));
-}
-
-// ── Global Streak ──────────────────────────────────────────────────────────
+// ── Streak ─────────────────────────────────────────────────────────────────
 
 export async function recordGlobalQuestionAnswered() {
   const data = await ensureLoaded();
@@ -249,7 +239,7 @@ export async function recordGlobalQuestionAnswered() {
 
   if (dqc.count === 3) {
     if (data.global_streak_last_date === today) {
-      // already counted today
+      // already counted
     } else if (data.global_streak_last_date === yesterday) {
       data.global_streak = (data.global_streak || 0) + 1;
     } else if (!data.global_streak_last_date) {
@@ -550,9 +540,20 @@ export async function shouldShowReviewGate() {
 export async function resetData() {
   const fresh = DEFAULT_DATA();
   _cache = fresh;
-  _ready = true;
+  _supabaseLoaded = true;
   if (_userEmail) {
-    clearLocal(_userEmail);
+    clearAllLocalKeys(_userEmail);
     pushToSupabase(fresh).catch(() => {});
+  }
+}
+
+export function initStore(userEmail, userId) {
+  if (_userEmail !== userEmail) {
+    _cache = null;
+    _recordId = null;
+    _userEmail = userEmail;
+    _userId = userId;
+    _supabaseLoaded = false;
+    _loadPromise = null;
   }
 }

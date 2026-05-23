@@ -1,20 +1,22 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "../../components/AnswerInput";
 import { getNextGravitationalQuestion, advanceGravitationalIndex, GRAVITATIONAL_QUESTIONS } from "@/lib/gravitationalBank";
 import { recordAttempt, addToReviewBank } from "@/lib/topicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
+import { useStreamingFeedback } from "@/hooks/useStreamingFeedback";
+import StreamingFeedbackOverlay from "@/components/StreamingFeedbackOverlay";
 
 export default function GravitationalQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [overrideQuestion, setOverrideQuestion] = useState(null);
   const [showTeachMe, setShowTeachMe] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
+
+  const { streamText, isStreaming, feedback, error, startStream } = useStreamingFeedback();
 
   const queued = getNextGravitationalQuestion();
   const question = overrideQuestion ?? queued.question;
@@ -22,33 +24,17 @@ export default function GravitationalQuestionAttempt() {
   const total = overrideQuestion ? 1 : queued.total;
   const isEmpty = answer.trim().length === 0;
 
-  if (!question) {
-    return (
-      <div className="min-h-screen bg-background flex justify-center">
-        <div className="w-full max-w-[480px] flex flex-col items-center justify-center gap-4 p-8 text-center">
-          <p className="text-lg font-semibold text-foreground">No questions available right now.</p>
-          <button onClick={() => navigate("/physics")} className="text-sm text-primary">Back to dashboard</button>
-        </div>
-      </div>
-    );
-  }
-
   const handleSubmit = async () => {
-    setLoading(true);
-    setError(null);
-    const feedback = await base44.integrations.Core.InvokeLLM({
+    setShowOverlay(true);
+    startStream({
       prompt: question.prompt(answer),
-      model: "claude_sonnet_4_6",
       response_json_schema: question.response_schema,
-    }).catch(() => null);
-    setLoading(false);
-    if (!feedback) { setError("Something went wrong. Please try again."); return; }
+    });
+  };
 
-    const fb = feedback.response ?? feedback;
+  const handleFeedbackReady = useCallback(async (fb) => {
     const marksEarned = fb.marks_earned ?? 0;
     const fullMarks = marksEarned >= question.total_marks;
-    const nextIdx = idx + 1;
-    const isLastQuestion = nextIdx >= total;
 
     await recordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
     if (!fullMarks) {
@@ -71,13 +57,13 @@ export default function GravitationalQuestionAttempt() {
         answer,
         topicKey: question.topic_key,
         questionId: question.id,
-        nextFullRoute: isLastQuestion ? "/physics" : "/gravitational/question",
+        nextFullRoute: "/gravitational/question",
         nextRetryRoute: "/gravitational/question",
         backRoute: "/physics",
         paperRef: question.paper_ref,
-      }
+      },
     });
-  };
+  }, [question, answer, navigate]);
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -89,6 +75,7 @@ export default function GravitationalQuestionAttempt() {
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
           <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{question.paper_ref}</span>
         </div>
+
         <div className="flex-1 flex flex-col gap-4 p-4">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -101,6 +88,7 @@ export default function GravitationalQuestionAttempt() {
               <span className="font-mono text-xs text-muted-foreground">[{question.total_marks} mark{question.total_marks !== 1 ? "s" : ""}]</span>
             </div>
           </div>
+
           {showTeachMe ? (
             <TeachMeHow
               question={question}
@@ -117,15 +105,41 @@ export default function GravitationalQuestionAttempt() {
             <>
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
-                <button onClick={() => setShowTeachMe(true)} disabled={!isEmpty} className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Teach Me How</button>
-                <button onClick={handleSubmit} disabled={isEmpty || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{loading ? "Marking..." : "Submit"}</button>
+                <button
+                  onClick={() => setShowTeachMe(true)}
+                  disabled={!isEmpty}
+                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Teach Me How
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isEmpty || isStreaming}
+                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isStreaming ? "Marking…" : "Submit"}
+                </button>
               </div>
-              {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
             </>
           )}
-          <DevQuestionJumper allQuestions={GRAVITATIONAL_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setError(null); setShowTeachMe(false); }} />
+
+          <DevQuestionJumper
+            allQuestions={GRAVITATIONAL_QUESTIONS}
+            onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setShowTeachMe(false); }}
+          />
         </div>
       </div>
+
+      {showOverlay && (
+        <StreamingFeedbackOverlay
+          streamText={streamText}
+          isStreaming={isStreaming}
+          feedback={feedback}
+          error={error}
+          marksTotal={question.total_marks}
+          onComplete={handleFeedbackReady}
+        />
+      )}
     </div>
   );
 }

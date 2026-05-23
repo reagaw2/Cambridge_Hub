@@ -15,14 +15,14 @@ async function callLocalLLM(prompt, schema) {
 
   try {
     if (anthropicKey) {
-      // Direct integration loop with Anthropic Claude 3.5 Sonnet
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      // Route through Vite's dev server proxy (/api/anthropic → https://api.anthropic.com)
+      // to avoid browser CORS restrictions on direct Anthropic API calls.
+      const response = await fetch('/api/anthropic/v1/messages', {
         method: 'POST',
         headers: {
           'x-api-key': anthropicKey,
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
-          'dangerously-allow-html-user-overrides': 'true'
         },
         body: JSON.stringify({
           model: 'claude-3-5-sonnet-20241022',
@@ -32,7 +32,7 @@ async function callLocalLLM(prompt, schema) {
       });
       const data = await response.json();
       return JSON.parse(data.content[0].text);
-    } 
+    }
     
     if (openAiKey) {
       // Fallback integration loop with OpenAI GPT-4o

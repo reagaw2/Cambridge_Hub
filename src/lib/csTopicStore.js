@@ -1,6 +1,6 @@
 /**
  * csTopicStore.js — Computer Science student data layer
- * Cache-First: loads from localStorage instantly, syncs with Supabase in background.
+ * Always fetches from Supabase on login. localStorage is a render cache only.
  */
 
 import { supabaseClient } from "@/api/base44Client";
@@ -20,50 +20,42 @@ let _cache = null;
 let _recordId = null;
 let _userEmail = null;
 let _userId = null;
-let _loadPromise = null;
+let _ready = false;
+let _readyPromise = null;
 
-function localKey(userEmail) {
-  return `hub_cs_progress_${userEmail}`;
+function localKey(e) { return `hub_cs_progress_v2_${e}`; }
+
+function readLocal(email) {
+  try { return JSON.parse(localStorage.getItem(localKey(email))); } catch { return null; }
 }
 
-function readLocalCache(userEmail) {
-  try {
-    const raw = localStorage.getItem(localKey(userEmail));
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+function writeLocal(email, payload) {
+  try { localStorage.setItem(localKey(email), JSON.stringify(payload)); } catch {}
 }
 
-function writeLocalCache(userEmail, data) {
+function clearLocal(email) {
   try {
-    localStorage.setItem(localKey(userEmail), JSON.stringify(data));
+    localStorage.removeItem(localKey(email));
+    localStorage.removeItem(`hub_cs_progress_${email}`);
   } catch {}
 }
 
-function withTimeout(promise, ms, fallback) {
-  return Promise.race([
-    promise,
-    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
-  ]);
+function withTimeout(p, ms, fallback) {
+  return Promise.race([p, new Promise(r => setTimeout(() => r(fallback), ms))]);
 }
 
 async function fetchFromSupabase(userId) {
-  const { data: records, error } = await withTimeout(
+  const { data: rows, error } = await withTimeout(
     supabaseClient.from('StudentData').select('id, cs_data').eq('user_id', userId),
-    6000,
+    8000,
     { data: null, error: new Error('timeout') }
   );
 
-  if (error || !records) {
-    console.warn("[csStore] fetchFromSupabase error:", error?.message);
-    return null;
-  }
+  if (error || !rows) { console.warn('[csStore] fetch error:', error?.message); return null; }
 
-  if (records.length > 0) {
-    const record = records[0];
-    const raw = record.cs_data;
+  if (rows.length > 0) {
+    const r = rows[0];
+    const raw = r.cs_data;
     const data = (raw && typeof raw === "object" && Object.keys(raw).length > 0)
       ? {
           topics: raw.topics || {},
@@ -73,10 +65,36 @@ async function fetchFromSupabase(userId) {
           cs_guess_review_bank: raw.cs_guess_review_bank || [],
         }
       : DEFAULT_CS_DATA();
-    return { _recordId: record.id, data };
+    return { id: r.id, data };
   }
 
-  return { _recordId: null, data: DEFAULT_CS_DATA() };
+  return { id: null, data: DEFAULT_CS_DATA() };
+}
+
+async function pushToSupabase(data) {
+  if (!_userId) return;
+  try {
+    if (_recordId) {
+      const { error } = await withTimeout(
+        supabaseClient.from('StudentData').update({ cs_data: data }).eq('id', _recordId),
+        5000,
+        { error: new Error('timeout') }
+      );
+      if (error) console.warn('[csStore] update error:', error.message);
+    } else {
+      const { data: rows, error } = await withTimeout(
+        supabaseClient.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select(),
+        5000,
+        { data: null, error: new Error('timeout') }
+      );
+      if (!error && rows?.[0]) {
+        _recordId = rows[0].id;
+        if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
+      }
+    }
+  } catch (e) {
+    console.warn('[csStore] save failed (non-fatal):', e);
+  }
 }
 
 export async function preloadCSStore(userEmail, userId) {
@@ -85,112 +103,70 @@ export async function preloadCSStore(userEmail, userId) {
     _recordId = null;
     _userEmail = userEmail;
     _userId = userId;
-    _loadPromise = null;
+    _ready = false;
+    _readyPromise = null;
   }
 
-  const cached = readLocalCache(userEmail);
+  if (_ready) return;
 
-  if (cached) {
-    _cache = cached.data ?? cached;
-    if (cached._recordId) _recordId = cached._recordId;
-
-    if (userId) {
-      fetchFromSupabase(userId).then(result => {
-        if (!result) return;
-        _recordId = result._recordId ?? _recordId;
-        _cache = result.data;
-        writeLocalCache(userEmail, { _recordId, data: result.data });
-      }).catch(() => {});
-    }
-    return true;
+  // Show local cache for instant render
+  const local = readLocal(userEmail);
+  if (local?.data && !_cache) {
+    _cache = local.data;
+    if (local.id) _recordId = local.id;
   }
 
-  if (!userId) {
-    _cache = DEFAULT_CS_DATA();
-    return false;
-  }
-
-  try {
-    const result = await withTimeout(fetchFromSupabase(userId), 8000, null);
+  // ALWAYS load from Supabase
+  _readyPromise = (async () => {
+    const result = await fetchFromSupabase(userId);
     if (result) {
-      _recordId = result._recordId;
+      _recordId = result.id ?? _recordId;
       _cache = result.data;
+      _ready = true;
+      writeLocal(userEmail, { id: _recordId, data: _cache });
+      console.log('[csStore] Supabase data loaded ✓');
     } else {
-      _cache = DEFAULT_CS_DATA();
+      if (!_cache) _cache = DEFAULT_CS_DATA();
+      _ready = true;
+      console.warn('[csStore] Supabase unavailable, using local/default');
     }
-    writeLocalCache(userEmail, { _recordId, data: _cache });
-  } catch {
-    _cache = DEFAULT_CS_DATA();
-  }
-  _loadPromise = null;
-  return false;
-}
-
-async function loadFromDB() {
-  if (_cache) return _cache;
-
-  if (_userEmail) {
-    const cached = readLocalCache(_userEmail);
-    if (cached) {
-      _cache = cached.data ?? cached;
-      if (cached._recordId) _recordId = cached._recordId;
-      return _cache;
-    }
-  }
-
-  if (!_userId) {
-    _cache = DEFAULT_CS_DATA();
-    return _cache;
-  }
-
-  if (_loadPromise) return _loadPromise;
-  _loadPromise = (async () => {
-    const result = await withTimeout(fetchFromSupabase(_userId), 6000, null);
-    if (result) {
-      _recordId = result._recordId;
-      _cache = result.data;
-      writeLocalCache(_userEmail, { _recordId, data: _cache });
-    } else {
-      _cache = DEFAULT_CS_DATA();
-    }
-    _loadPromise = null;
-    return _cache;
   })();
-  return _loadPromise;
+
+  await _readyPromise;
 }
 
-async function saveToDB(data) {
-  if (!_userEmail || !_userId) return;
-  _cache = data;
-  writeLocalCache(_userEmail, { _recordId, data });
+async function ensureLoaded() {
+  if (_ready && _cache) return _cache;
+  if (_readyPromise) { await _readyPromise; return _cache; }
+  if (!_userId) { if (!_cache) _cache = DEFAULT_CS_DATA(); return _cache; }
 
-  try {
-    if (_recordId) {
-      const { error } = await withTimeout(
-        supabaseClient.from('StudentData').update({ cs_data: data }).eq('id', _recordId),
-        5000,
-        { error: new Error('save timeout') }
-      );
-      if (error) console.warn("[csStore] update error:", error.message);
+  _readyPromise = (async () => {
+    const result = await fetchFromSupabase(_userId);
+    if (result) {
+      _recordId = result.id ?? _recordId;
+      _cache = result.data;
+      _ready = true;
+      if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache });
     } else {
-      const { data: updated, error } = await withTimeout(
-        supabaseClient.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select(),
-        5000,
-        { data: null, error: new Error('save timeout') }
-      );
-      if (!error && updated?.[0]) {
-        _recordId = updated[0].id;
-        writeLocalCache(_userEmail, { _recordId, data });
-      }
+      if (!_cache) _cache = DEFAULT_CS_DATA();
+      _ready = true;
     }
-  } catch (e) {
-    console.warn("[csStore] save failed (non-fatal):", e);
-  }
+    _readyPromise = null;
+  })();
+
+  await _readyPromise;
+  return _cache;
+}
+
+function saveToDB(data) {
+  _cache = data;
+  if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
+  pushToSupabase(data).catch(() => {});
 }
 
 export async function csRecordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
   const normKey = normaliseTopicKey(topicKey);
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   if (!data.topics[normKey]) {
     data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   }
@@ -207,24 +183,24 @@ export async function csRecordAttempt(topicKey, score, { total_marks = 1, questi
     topic.streak = 1;
   }
   topic.last_streak_date = today;
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
   recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function csGetTopicData(topicKey) {
   const normKey = normaliseTopicKey(topicKey);
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const topic = data.topics[normKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   const attempts = (topic.attempts || []).filter(a => a !== null && typeof a === "object");
   const mcqAttempts = (data.cs_mcq_attempts || []).filter(a => normaliseTopicKey(a.topic) === normKey);
 
-  if (attempts.length === 0 && mcqAttempts.length === 0) return null;
+  if (!attempts.length && !mcqAttempts.length) return null;
 
   let trend = "steady";
   if (attempts.length > 0) {
     const last = attempts[attempts.length - 1];
-    const ratio = last.total_marks > 0 ? last.score / last.total_marks : 0;
-    if (last.score === 0) trend = "needs_work";
+    const ratio = (last.total_marks ?? 1) > 0 ? (last.score ?? 0) / (last.total_marks ?? 1) : 0;
+    if ((last.score ?? 0) === 0) trend = "needs_work";
     else if (ratio >= 1) trend = "improving";
     else trend = "steady";
   }
@@ -242,8 +218,8 @@ export async function csGetTopicData(topicKey) {
   const yesterday = toDateString(new Date(Date.now() - 86400000));
   let latestDate = topic.last_attempted || null;
   if (mcqAttempts.length > 0) {
-    const lastMCQDate = mcqAttempts[mcqAttempts.length - 1].date;
-    if (!latestDate || lastMCQDate > latestDate) latestDate = lastMCQDate;
+    const d = mcqAttempts[mcqAttempts.length - 1].date;
+    if (!latestDate || d > latestDate) latestDate = d;
   }
 
   let lastLabel = null;
@@ -271,42 +247,41 @@ export async function csGetTopicData(topicKey) {
 }
 
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   if (data.cs_review_bank.find(q => q.question_id === question_id)) return;
-  const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   data.cs_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
     first_attempt_score, first_attempt_feedback,
     date_added: toDateString(new Date()),
     priority: first_attempt_score === 0 ? 1 : 2,
-    locked_until,
+    locked_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   });
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
 }
 
 export async function csGetReviewBank() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   return [...(data.cs_review_bank || [])].sort((a, b) => a.priority - b.priority);
 }
 
 export async function csRemoveFromReviewBank(question_id) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   data.cs_review_bank = data.cs_review_bank.filter(q => q.question_id !== question_id);
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
 }
 
 export async function csResetReviewBankLock(question_id) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const entry = data.cs_review_bank.find(q => q.question_id === question_id);
   if (entry) {
     entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    saveToDB(data).catch(() => {});
+    saveToDB(data);
   }
 }
 
 export async function csSaveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
   const normKey = normaliseTopicKey(topic);
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   if (!data.cs_mcq_attempts) data.cs_mcq_attempts = [];
   if (!data.cs_guess_review_bank) data.cs_guess_review_bank = [];
   const today = toDateString(new Date());
@@ -338,11 +313,11 @@ export async function csSaveMCQAttempt({ question_id, topic, source, chosen_opti
     data.cs_guess_review_bank = data.cs_guess_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
 
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
   recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function csGetGuessReviewBank() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   return (data.cs_guess_review_bank || []).map(e => typeof e === "string" ? { question_id: e, locked_until: null } : e);
 }

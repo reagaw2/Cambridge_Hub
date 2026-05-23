@@ -1,7 +1,7 @@
 /**
  * topicStore.js — Student data layer (Physics)
- * Cache-First: loads from localStorage instantly, syncs with Supabase in background.
- * Uses user_id (from auth.uid()) for RLS-compliant reads/writes.
+ * Always fetches from Supabase on login. localStorage is only used to
+ * speed up the initial render — it NEVER overwrites the Supabase copy.
  */
 
 import { supabaseClient } from "@/api/base44Client";
@@ -34,82 +34,70 @@ const DEFAULT_DATA = () => ({
   last_session_time: null,
 });
 
-let _cache = null;
-let _recordId = null;
+let _cache = null;        // in-memory working copy
+let _recordId = null;     // Supabase row id
 let _userEmail = null;
 let _userId = null;
-let _loadPromise = null;
+let _ready = false;       // true once we have a confirmed Supabase copy
+let _readyPromise = null; // resolves when Supabase data is loaded
 
-// ── localStorage cache helpers ─────────────────────────────────────────────
+// ── localStorage (render cache only — never used for saves) ────────────────
 
-function localKey(userEmail) {
-  return `hub_student_progress_${userEmail}`;
+function localKey(e) { return `hub_student_progress_v2_${e}`; }
+
+function readLocal(email) {
+  try { return JSON.parse(localStorage.getItem(localKey(email))); } catch { return null; }
 }
 
-function readLocalCache(userEmail) {
-  try {
-    const raw = localStorage.getItem(localKey(userEmail));
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+function writeLocal(email, payload) {
+  try { localStorage.setItem(localKey(email), JSON.stringify(payload)); } catch {}
 }
 
-function writeLocalCache(userEmail, data) {
+function clearLocal(email) {
   try {
-    localStorage.setItem(localKey(userEmail), JSON.stringify(data));
+    localStorage.removeItem(localKey(email));
+    // Also clear old v1 key if present
+    localStorage.removeItem(`hub_student_progress_${email}`);
   } catch {}
 }
 
-function clearLocalCache(userEmail) {
-  try {
-    localStorage.removeItem(localKey(userEmail));
-  } catch {}
+function withTimeout(p, ms, fallback) {
+  return Promise.race([p, new Promise(r => setTimeout(() => r(fallback), ms))]);
 }
 
-function withTimeout(promise, ms, fallback) {
-  return Promise.race([
-    promise,
-    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
-  ]);
-}
-
-// ── Supabase fetch ─────────────────────────────────────────────────────────
+// ── Supabase I/O ───────────────────────────────────────────────────────────
 
 async function fetchFromSupabase(userId) {
-  const { data: records, error } = await withTimeout(
+  const { data: rows, error } = await withTimeout(
     supabaseClient.from('StudentData').select('*').eq('user_id', userId),
-    6000,
+    8000,
     { data: null, error: new Error('timeout') }
   );
 
-  if (error || !records) {
-    console.warn("[topicStore] fetchFromSupabase error:", error?.message);
-    return null;
-  }
+  if (error) { console.warn('[topicStore] fetch error:', error.message); return null; }
+  if (!rows) return null;
 
-  if (records.length > 0) {
-    const record = records[0];
+  if (rows.length > 0) {
+    const r = rows[0];
     return {
-      _recordId: record.id,
+      id: r.id,
       data: {
-        topics: record.topics || {},
-        written_review_bank: record.written_review_bank || [],
-        review_bank_clears: record.review_bank_clears ?? 0,
-        mcq_attempts: record.mcq_attempts || [],
-        mcq_review_bank: record.mcq_review_bank || [],
-        global_streak: record.global_streak ?? 0,
-        global_streak_last_date: record.global_streak_last_date ?? null,
-        rest_day_passes: record.rest_day_passes ?? 0,
-        daily_question_count: record.daily_question_count ?? null,
-        last_session_time: record.last_session_time ?? null,
+        topics: r.topics || {},
+        written_review_bank: r.written_review_bank || [],
+        review_bank_clears: r.review_bank_clears ?? 0,
+        mcq_attempts: r.mcq_attempts || [],
+        mcq_review_bank: r.mcq_review_bank || [],
+        global_streak: r.global_streak ?? 0,
+        global_streak_last_date: r.global_streak_last_date ?? null,
+        rest_day_passes: r.rest_day_passes ?? 0,
+        daily_question_count: r.daily_question_count ?? null,
+        last_session_time: r.last_session_time ?? null,
       },
     };
   }
 
-  // No row yet — create one
-  const { data: inserted, error: insertError } = await withTimeout(
+  // No row — create one
+  const { data: inserted, error: ie } = await withTimeout(
     supabaseClient.from('StudentData').insert([{
       user_id: userId,
       user_email: _userEmail,
@@ -119,122 +107,14 @@ async function fetchFromSupabase(userId) {
     { data: null, error: new Error('insert timeout') }
   );
 
-  if (insertError || !inserted?.[0]) {
-    console.warn("[topicStore] insert error:", insertError?.message);
-    return { _recordId: null, data: DEFAULT_DATA() };
+  if (ie || !inserted?.[0]) {
+    console.warn('[topicStore] insert error:', ie?.message);
+    return { id: null, data: DEFAULT_DATA() };
   }
-
-  return { _recordId: inserted[0].id, data: DEFAULT_DATA() };
+  return { id: inserted[0].id, data: DEFAULT_DATA() };
 }
 
-// ── preloadStore ───────────────────────────────────────────────────────────
-
-export async function preloadStore(userEmail, userId) {
-  if (_userEmail !== userEmail) {
-    _cache = null;
-    _recordId = null;
-    _userEmail = userEmail;
-    _userId = userId;
-    _loadPromise = null;
-  }
-
-  const cached = readLocalCache(userEmail);
-
-  if (cached) {
-    _cache = cached.data ?? cached;
-    if (cached._recordId) _recordId = cached._recordId;
-    console.log("[topicStore] cache-first: loaded from localStorage instantly");
-
-    // Background sync
-    if (userId) {
-      fetchFromSupabase(userId).then(result => {
-        if (!result) return;
-        _recordId = result._recordId ?? _recordId;
-        _cache = result.data;
-        writeLocalCache(userEmail, { _recordId, data: result.data });
-        console.log("[topicStore] background sync complete");
-      }).catch(e => console.warn("[topicStore] background sync failed:", e));
-    }
-
-    return true;
-  }
-
-  // Slow path — first load
-  console.log("[topicStore] no cache — fetching from Supabase (first load)");
-  if (!userId) {
-    _cache = DEFAULT_DATA();
-    return false;
-  }
-
-  try {
-    const result = await withTimeout(fetchFromSupabase(userId), 8000, null);
-    if (result) {
-      _recordId = result._recordId;
-      _cache = result.data;
-    } else {
-      _cache = DEFAULT_DATA();
-    }
-    writeLocalCache(userEmail, { _recordId, data: _cache });
-  } catch (e) {
-    console.warn("[topicStore] first load failed:", e);
-    _cache = DEFAULT_DATA();
-  }
-  _loadPromise = null;
-  return false;
-}
-
-export function initStore(userEmail, userId) {
-  if (_userEmail !== userEmail) {
-    _cache = null;
-    _recordId = null;
-    _userEmail = userEmail;
-    _userId = userId;
-    _loadPromise = null;
-  }
-}
-
-// ── loadFromDB ─────────────────────────────────────────────────────────────
-
-async function loadFromDB() {
-  if (_cache) return _cache;
-
-  if (_userEmail) {
-    const cached = readLocalCache(_userEmail);
-    if (cached) {
-      _cache = cached.data ?? cached;
-      if (cached._recordId) _recordId = cached._recordId;
-      return _cache;
-    }
-  }
-
-  if (!_userId) {
-    _cache = DEFAULT_DATA();
-    return _cache;
-  }
-
-  if (_loadPromise) return _loadPromise;
-  _loadPromise = (async () => {
-    const result = await withTimeout(fetchFromSupabase(_userId), 6000, null);
-    if (result) {
-      _recordId = result._recordId;
-      _cache = result.data;
-      writeLocalCache(_userEmail, { _recordId, data: _cache });
-    } else {
-      _cache = DEFAULT_DATA();
-    }
-    _loadPromise = null;
-    return _cache;
-  })();
-  return _loadPromise;
-}
-
-// ── saveToDB ───────────────────────────────────────────────────────────────
-
-async function saveToDB(data) {
-  if (!_userEmail) return;
-  _cache = data;
-  writeLocalCache(_userEmail, { _recordId, data });
-
+async function pushToSupabase(data) {
   if (!_userId) return;
 
   const payload = {
@@ -257,42 +137,127 @@ async function saveToDB(data) {
         5000,
         { error: new Error('save timeout') }
       );
-      if (error) console.warn("[topicStore] update error:", error.message);
+      if (error) console.warn('[topicStore] update error:', error.message);
     } else {
-      const { data: inserted, error } = await withTimeout(
+      // Row not found yet — insert
+      const { data: ins, error } = await withTimeout(
         supabaseClient.from('StudentData').insert([{ user_id: _userId, user_email: _userEmail, ...payload }]).select(),
         5000,
         { data: null, error: new Error('insert timeout') }
       );
-      if (error) {
-        console.warn("[topicStore] insert error:", error.message);
-      } else if (inserted?.[0]) {
-        _recordId = inserted[0].id;
-        writeLocalCache(_userEmail, { _recordId, data });
-      }
+      if (error) console.warn('[topicStore] insert error:', error.message);
+      else if (ins?.[0]) _recordId = ins[0].id;
     }
   } catch (e) {
-    console.warn("[topicStore] save failed (non-fatal):", e);
+    console.warn('[topicStore] save failed (non-fatal):', e);
   }
+}
+
+// ── Public: preloadStore (called on login) ─────────────────────────────────
+
+export async function preloadStore(userEmail, userId) {
+  // Reset if different user
+  if (_userEmail !== userEmail) {
+    _cache = null;
+    _recordId = null;
+    _userEmail = userEmail;
+    _userId = userId;
+    _ready = false;
+    _readyPromise = null;
+  }
+
+  // If already loaded for this user, nothing to do
+  if (_ready) return;
+
+  // Show local cache immediately for fast render
+  const local = readLocal(userEmail);
+  if (local?.data && !_cache) {
+    _cache = local.data;
+    if (local.id) _recordId = local.id;
+    console.log('[topicStore] showing local cache while fetching Supabase...');
+  }
+
+  // ALWAYS fetch from Supabase — this is the source of truth
+  _readyPromise = (async () => {
+    const result = await fetchFromSupabase(userId);
+    if (result) {
+      _recordId = result.id ?? _recordId;
+      _cache = result.data;
+      _ready = true;
+      // Update local cache to match Supabase
+      writeLocal(userEmail, { id: _recordId, data: _cache });
+      console.log('[topicStore] Supabase data loaded ✓');
+    } else {
+      // Supabase unavailable — use local or default
+      if (!_cache) _cache = DEFAULT_DATA();
+      _ready = true;
+      console.warn('[topicStore] Supabase unavailable, using local/default');
+    }
+  })();
+
+  await _readyPromise;
+}
+
+// ── Internal: ensure we have data before reading/writing ──────────────────
+
+async function ensureLoaded() {
+  if (_ready && _cache) return _cache;
+
+  // If preload is in progress, wait for it
+  if (_readyPromise) {
+    await _readyPromise;
+    return _cache;
+  }
+
+  // No userId yet — return default (will not be saved)
+  if (!_userId) {
+    if (!_cache) _cache = DEFAULT_DATA();
+    return _cache;
+  }
+
+  // Trigger a fresh load
+  _readyPromise = (async () => {
+    const result = await fetchFromSupabase(_userId);
+    if (result) {
+      _recordId = result.id ?? _recordId;
+      _cache = result.data;
+      _ready = true;
+      if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache });
+    } else {
+      if (!_cache) _cache = DEFAULT_DATA();
+      _ready = true;
+    }
+    _readyPromise = null;
+  })();
+
+  await _readyPromise;
+  return _cache;
+}
+
+// ── Internal: save ─────────────────────────────────────────────────────────
+
+function saveToDB(data) {
+  _cache = data;
+  if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
+  // Fire-and-forget push to Supabase
+  pushToSupabase(data).catch(e => console.warn('[topicStore] bg save failed:', e));
 }
 
 // ── Global Streak + Daily Count ────────────────────────────────────────────
 
 export async function recordGlobalQuestionAnswered() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
   let dqc = data.daily_question_count;
-  if (!dqc || dqc.date !== today) {
-    dqc = { date: today, count: 0 };
-  }
+  if (!dqc || dqc.date !== today) dqc = { date: today, count: 0 };
   dqc.count += 1;
   data.daily_question_count = dqc;
 
   if (dqc.count === 3) {
     if (data.global_streak_last_date === today) {
-      // no-op
+      // already counted
     } else if (data.global_streak_last_date === yesterday) {
       data.global_streak = (data.global_streak || 0) + 1;
     } else if (!data.global_streak_last_date) {
@@ -309,37 +274,34 @@ export async function recordGlobalQuestionAnswered() {
       }
     }
     data.global_streak_last_date = today;
-
     if ((data.global_streak || 0) >= 5 && (data.rest_day_passes || 0) < 1) {
       data.rest_day_passes = 1;
     }
   }
 
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
 }
 
 export async function recordAppOpen() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
   data.last_session_time = new Date().toISOString();
 
-  if (data.global_streak_last_date && data.global_streak_last_date !== today && data.global_streak_last_date !== yesterday) {
+  if (data.global_streak_last_date &&
+      data.global_streak_last_date !== today &&
+      data.global_streak_last_date !== yesterday) {
     const parts = data.global_streak_last_date.split("/");
     const lastDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
     const daysMissed = Math.floor((new Date() - lastDateObj) / 86400000);
     if (daysMissed > 1) {
-      if ((data.rest_day_passes || 0) > 0) {
-        data.rest_day_passes = 0;
-      } else {
-        data.global_streak = 0;
-      }
+      if ((data.rest_day_passes || 0) > 0) data.rest_day_passes = 0;
+      else data.global_streak = 0;
     }
   }
 
-  saveToDB(data).catch(() => {});
-
+  saveToDB(data);
   return {
     global_streak: data.global_streak || 0,
     rest_day_passes: data.rest_day_passes || 0,
@@ -351,7 +313,7 @@ export async function recordAppOpen() {
 }
 
 export async function getStreakData() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   return {
     global_streak: data.global_streak || 0,
     rest_day_passes: data.rest_day_passes || 0,
@@ -364,11 +326,10 @@ export async function getStreakData() {
 
 export async function recordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
   const normKey = normaliseTopicKey(topicKey);
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   if (!data.topics[normKey]) {
     data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   }
-
   const topic = data.topics[normKey];
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
@@ -377,7 +338,7 @@ export async function recordAttempt(topicKey, score, { total_marks = 1, question
   topic.last_attempted = today;
 
   if (topic.last_streak_date === today) {
-    // already recorded today
+    // no-op
   } else if (topic.last_streak_date === yesterday) {
     topic.streak = (topic.streak || 0) + 1;
   } else {
@@ -385,40 +346,32 @@ export async function recordAttempt(topicKey, score, { total_marks = 1, question
   }
   topic.last_streak_date = today;
 
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
   recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function getTopicData(topicKey) {
   const normKey = normaliseTopicKey(topicKey);
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const topic = data.topics[normKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
 
   const attempts = (topic.attempts || []).filter(a => a !== null && typeof a === "object");
-  const { last_attempted } = topic;
   const mcqAttempts = (data.mcq_attempts || []).filter(a => normaliseTopicKey(a.topic) === normKey);
 
-  const hasWritten = attempts.length > 0;
-  const hasMCQ = mcqAttempts.length > 0;
-
-  if (!hasWritten && !hasMCQ) return null;
+  if (!attempts.length && !mcqAttempts.length) return null;
 
   let trend = "steady";
-  if (hasWritten) {
+  if (attempts.length > 0) {
     const last = attempts[attempts.length - 1];
-    const score = last.score ?? 0;
-    const total = last.total_marks ?? 1;
-    const ratio = total > 0 ? score / total : 0;
-    if (score === 0) trend = "needs_work";
+    const ratio = (last.total_marks ?? 1) > 0 ? (last.score ?? 0) / (last.total_marks ?? 1) : 0;
+    if ((last.score ?? 0) === 0) trend = "needs_work";
     else if (ratio >= 1) trend = "improving";
     else trend = "steady";
   }
-
-  if (hasMCQ) {
+  if (mcqAttempts.length > 0) {
     const lastMCQ = mcqAttempts[mcqAttempts.length - 1];
-    const lastWrittenDate = last_attempted;
-    const mcqIsMoreRecent = !lastWrittenDate || lastMCQ.date >= lastWrittenDate;
-    if (!hasWritten || mcqIsMoreRecent) {
+    const mcqMoreRecent = !topic.last_attempted || lastMCQ.date >= topic.last_attempted;
+    if (!attempts.length || mcqMoreRecent) {
       if (lastMCQ.correct && !lastMCQ.flagged_as_guess) trend = "improving";
       else if (lastMCQ.correct && lastMCQ.flagged_as_guess) trend = "steady";
       else trend = "needs_work";
@@ -428,10 +381,10 @@ export async function getTopicData(topicKey) {
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
 
-  let latestDate = last_attempted || null;
-  if (hasMCQ) {
-    const lastMCQDate = mcqAttempts[mcqAttempts.length - 1].date;
-    if (!latestDate || lastMCQDate > latestDate) latestDate = lastMCQDate;
+  let latestDate = topic.last_attempted || null;
+  if (mcqAttempts.length > 0) {
+    const d = mcqAttempts[mcqAttempts.length - 1].date;
+    if (!latestDate || d > latestDate) latestDate = d;
   }
 
   let lastLabel = null;
@@ -451,27 +404,8 @@ export async function getTopicData(topicKey) {
   }
 
   let currentStreak = topic.streak || 0;
-  const lastStreakDate = topic.last_streak_date || null;
-  if (lastStreakDate && lastStreakDate !== today && lastStreakDate !== yesterday) {
+  if (topic.last_streak_date && topic.last_streak_date !== today && topic.last_streak_date !== yesterday) {
     currentStreak = 0;
-  }
-
-  if (!hasWritten && hasMCQ) {
-    const days = [...new Set(mcqAttempts.map(a => a.date))].sort();
-    let s = 0;
-    let checkDate = today;
-    for (let i = days.length - 1; i >= 0; i--) {
-      if (days[i] === checkDate) {
-        s++;
-        const parts = checkDate.split("/");
-        const prevDay = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-        prevDay.setDate(prevDay.getDate() - 1);
-        checkDate = toDateString(prevDay);
-      } else {
-        break;
-      }
-    }
-    currentStreak = s;
   }
 
   return { trend, streak: currentStreak, lastLabel, attempts };
@@ -480,71 +414,66 @@ export async function getTopicData(topicKey) {
 // ── Written Review Bank ────────────────────────────────────────────────────
 
 export async function addToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   if (data.written_review_bank.find(q => q.question_id === question_id)) return;
-
-  const priority = first_attempt_score === 0 ? 1 : 2;
-  const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   data.written_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
     first_attempt_score, first_attempt_feedback,
     date_added: toDateString(new Date()),
-    priority,
-    locked_until,
+    priority: first_attempt_score === 0 ? 1 : 2,
+    locked_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   });
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
 }
 
 export async function resetReviewBankLock(question_id) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const entry = data.written_review_bank.find(q => q.question_id === question_id);
   if (entry) {
     entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    saveToDB(data).catch(() => {});
+    saveToDB(data);
   }
 }
 
 export async function removeFromReviewBank(question_id) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   data.written_review_bank = data.written_review_bank.filter(q => q.question_id !== question_id);
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
 }
 
 export async function getReviewBank() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   return [...data.written_review_bank].sort((a, b) => a.priority - b.priority);
 }
 
 export async function incrementReviewBankClears() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   data.review_bank_clears = (data.review_bank_clears || 0) + 1;
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
 }
 
 // ── MCQ Review Bank ────────────────────────────────────────────────────────
 
 export async function getGuessReviewBank() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   return (data.mcq_review_bank || []).map(e =>
     typeof e === "string" ? { question_id: e, locked_until: null } : e
   );
 }
 
 export async function resetGuessReviewBankLock(question_id) {
-  const data = await loadFromDB();
-  const entry = data.mcq_review_bank.find(e =>
+  const data = await ensureLoaded();
+  const idx = data.mcq_review_bank.findIndex(e =>
     (typeof e === "string" ? e : e.question_id) === question_id
   );
-  if (entry && typeof entry === "object") {
-    entry.locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
-    saveToDB(data).catch(() => {});
-  } else if (typeof entry === "string") {
-    const idx = data.mcq_review_bank.indexOf(entry);
+  if (idx >= 0) {
+    const entry = data.mcq_review_bank[idx];
     data.mcq_review_bank[idx] = {
       question_id,
       locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+      ...(typeof entry === "object" ? entry : {}),
     };
-    saveToDB(data).catch(() => {});
+    saveToDB(data);
   }
 }
 
@@ -552,7 +481,7 @@ export async function resetGuessReviewBankLock(question_id) {
 
 export async function saveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
   const normKey = normaliseTopicKey(topic);
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   if (!data.mcq_attempts) data.mcq_attempts = [];
   if (!data.mcq_review_bank) data.mcq_review_bank = [];
 
@@ -589,12 +518,12 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
     data.mcq_review_bank = data.mcq_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
 
-  saveToDB(data).catch(() => {});
+  saveToDB(data);
   recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function getMCQOnlyTopicNames(writtenKeys) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const seen = new Set();
   const topics = [];
   for (const a of (data.mcq_attempts || [])) {
@@ -608,18 +537,17 @@ export async function getMCQOnlyTopicNames(writtenKeys) {
 }
 
 export async function getMCQStats(topic) {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const attempts = (data.mcq_attempts || []).filter(a => a.topic === topic);
   if (!attempts.length) return null;
   const total_attempted = attempts.length;
   const reasoned_correct = attempts.filter(a => a.correct && !a.flagged_as_guess).length;
   const guessed = attempts.filter(a => a.flagged_as_guess).length;
-  const reasoned_correct_percentage = Math.round((reasoned_correct / total_attempted) * 100);
-  return { total_attempted, reasoned_correct, guessed, reasoned_correct_percentage };
+  return { total_attempted, reasoned_correct, guessed, reasoned_correct_percentage: Math.round((reasoned_correct / total_attempted) * 100) };
 }
 
 export async function shouldShowReviewGate() {
-  const data = await loadFromDB();
+  const data = await ensureLoaded();
   const writtenCount = (data.written_review_bank || []).length;
   const mcqCount = (data.mcq_review_bank || []).length;
   if (writtenCount < 5 && mcqCount < 5) return false;
@@ -630,11 +558,23 @@ export async function shouldShowReviewGate() {
 }
 
 export async function resetData() {
-  _cache = DEFAULT_DATA();
+  const fresh = DEFAULT_DATA();
+  _cache = fresh;
+  _ready = true;
   if (_userEmail) {
-    clearLocalCache(_userEmail);
-    if (_recordId) {
-      saveToDB(_cache).catch(() => {});
-    }
+    clearLocal(_userEmail);
+    pushToSupabase(fresh).catch(() => {});
+  }
+}
+
+// Legacy alias
+export function initStore(userEmail, userId) {
+  if (_userEmail !== userEmail) {
+    _cache = null;
+    _recordId = null;
+    _userEmail = userEmail;
+    _userId = userId;
+    _ready = false;
+    _readyPromise = null;
   }
 }

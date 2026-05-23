@@ -8,7 +8,7 @@ export const supabaseClient = createClient(supabaseUrl, supabaseKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: localStorage,
+    storageKey: 'sb-auth-token',
   },
 });
 
@@ -56,24 +56,20 @@ async function invokeLLM({ prompt, response_json_schema, model }) {
 }
 
 export const base44 = {
-  // Direct Supabase passthrough
   from: (...args) => supabaseClient.from(...args),
   rpc: (...args) => supabaseClient.rpc(...args),
   storage: supabaseClient.storage,
   channel: (...args) => supabaseClient.channel(...args),
   removeChannel: (...args) => supabaseClient.removeChannel(...args),
 
-  // Auth — expose Supabase auth directly
   auth: supabaseClient.auth,
 
-  // AI integrations
   integrations: {
     Core: {
       InvokeLLM: invokeLLM,
     },
   },
 
-  // Agent conversations
   agents: {
     createConversation: async ({ agent_name }) => {
       const { data, error } = await supabaseClient
@@ -107,7 +103,6 @@ export const base44 = {
     },
   },
 
-  // Entity CRUD helpers
   entities: new Proxy({}, {
     get(_, tableName) {
       return {

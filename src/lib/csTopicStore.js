@@ -1,7 +1,6 @@
 /**
  * csTopicStore.js — Computer Science student data layer
- * All CS data is stored inside StudentData.cs_data on the student's record.
- * Completely separate from Physics topicStore.
+ * Cache-First: loads from localStorage instantly, syncs with Supabase in background.
  */
 
 import { base44 } from "@/api/base44Client";
@@ -22,12 +21,81 @@ let _recordId = null;
 let _userEmail = null;
 let _loadPromise = null;
 
+// ── localStorage helpers ───────────────────────────────────────────────────
+
+function localKey(userEmail) {
+  return `hub_cs_progress_${userEmail}`;
+}
+
+function readLocalCache(userEmail) {
+  try {
+    const raw = localStorage.getItem(localKey(userEmail));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalCache(userEmail, data) {
+  try {
+    localStorage.setItem(localKey(userEmail), JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+function clearLocalCache(userEmail) {
+  try {
+    localStorage.removeItem(localKey(userEmail));
+  } catch {
+    // ignore
+  }
+}
+
 function withTimeout(promise, ms, fallback) {
   return Promise.race([
     promise,
     new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
   ]);
 }
+
+// ── Supabase fetch ─────────────────────────────────────────────────────────
+
+async function fetchFromSupabase(userEmail) {
+  const { data: records, error } = await withTimeout(
+    base44.from('StudentData').select('*').eq('user_email', userEmail),
+    6000,
+    { data: null, error: new Error('timeout') }
+  );
+
+  if (error || !records) return null;
+
+  if (records.length > 0) {
+    const record = records.sort((a, b) => {
+      const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
+      const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
+      return tb - ta;
+    })[0];
+
+    const raw = record.cs_data;
+    const data = (raw && typeof raw === "object" && Object.keys(raw).length > 0)
+      ? {
+          topics: raw.topics || {},
+          cs_review_bank: raw.cs_review_bank || [],
+          cs_review_bank_clears: raw.cs_review_bank_clears ?? 0,
+          cs_mcq_attempts: raw.cs_mcq_attempts || [],
+          cs_guess_review_bank: raw.cs_guess_review_bank || [],
+        }
+      : DEFAULT_CS_DATA();
+
+    return { _recordId: record.id, data };
+  }
+
+  return { _recordId: null, data: DEFAULT_CS_DATA() };
+}
+
+// ── preloadCSStore — Cache-First entry point ───────────────────────────────
 
 export async function preloadCSStore(userEmail) {
   if (_userEmail !== userEmail) {
@@ -36,62 +104,87 @@ export async function preloadCSStore(userEmail) {
     _userEmail = userEmail;
     _loadPromise = null;
   }
-  _cache = null;
+
+  const cached = readLocalCache(userEmail);
+
+  if (cached) {
+    // FAST PATH
+    _cache = cached.data ?? cached;
+    if (cached._recordId) _recordId = cached._recordId;
+    console.log("[csStore] cache-first: loaded from localStorage instantly");
+
+    // Background sync
+    fetchFromSupabase(userEmail).then(result => {
+      if (!result) return;
+      _recordId = result._recordId ?? _recordId;
+      _cache = result.data;
+      writeLocalCache(userEmail, { _recordId, data: result.data });
+      console.log("[csStore] background sync complete");
+    }).catch(e => console.warn("[csStore] background sync failed:", e));
+
+    return true;
+  }
+
+  // SLOW PATH
+  console.log("[csStore] no cache — fetching from Supabase (first load)");
+  try {
+    const result = await withTimeout(fetchFromSupabase(userEmail), 8000, null);
+    if (result) {
+      _recordId = result._recordId;
+      _cache = result.data;
+    } else {
+      _cache = DEFAULT_CS_DATA();
+    }
+    writeLocalCache(userEmail, { _recordId, data: _cache });
+  } catch (e) {
+    console.warn("[csStore] first load failed:", e);
+    _cache = DEFAULT_CS_DATA();
+  }
   _loadPromise = null;
-  return withTimeout(loadFromDB(), 8000, DEFAULT_CS_DATA());
+  return false;
 }
+
+// ── loadFromDB — returns in-memory cache ──────────────────────────────────
 
 async function loadFromDB() {
   if (_cache) return _cache;
-  if (_loadPromise) return _loadPromise;
+
+  if (_userEmail) {
+    const cached = readLocalCache(_userEmail);
+    if (cached) {
+      _cache = cached.data ?? cached;
+      if (cached._recordId) _recordId = cached._recordId;
+      return _cache;
+    }
+  }
+
   if (!_userEmail) { _cache = DEFAULT_CS_DATA(); return _cache; }
 
+  if (_loadPromise) return _loadPromise;
   _loadPromise = (async () => {
-    try {
-      const { data: records, error } = await withTimeout(
-        base44.from('StudentData').select('*').eq('user_email', _userEmail),
-        6000,
-        { data: null, error: new Error('timeout') }
-      );
-
-      if (error) throw error;
-
-      if (records && records.length > 0) {
-        const record = records.sort((a, b) => {
-          const ta = a.updated_date ? new Date(a.updated_date).getTime() : 0;
-          const tb = b.updated_date ? new Date(b.updated_date).getTime() : 0;
-          return tb - ta;
-        })[0];
-        _recordId = record.id;
-        const raw = record.cs_data;
-        if (raw && typeof raw === "object" && Object.keys(raw).length > 0) {
-          _cache = {
-            topics: raw.topics || {},
-            cs_review_bank: raw.cs_review_bank || [],
-            cs_review_bank_clears: raw.cs_review_bank_clears ?? 0,
-            cs_mcq_attempts: raw.cs_mcq_attempts || [],
-            cs_guess_review_bank: raw.cs_guess_review_bank || [],
-          };
-        } else {
-          _cache = DEFAULT_CS_DATA();
-        }
-      } else {
-        _cache = DEFAULT_CS_DATA();
-      }
-    } catch (e) {
-      console.warn("[csStore] failed to load from DB", e);
+    const result = await withTimeout(fetchFromSupabase(_userEmail), 6000, null);
+    if (result) {
+      _recordId = result._recordId;
+      _cache = result.data;
+      writeLocalCache(_userEmail, { _recordId, data: _cache });
+    } else {
       _cache = DEFAULT_CS_DATA();
     }
     _loadPromise = null;
     return _cache;
   })();
-
   return _loadPromise;
 }
+
+// ── saveToDB — writes to Supabase AND updates localStorage ────────────────
 
 async function saveToDB(data) {
   if (!_userEmail) return;
   _cache = data;
+
+  // Update localStorage immediately
+  writeLocalCache(_userEmail, { _recordId, data });
+
   try {
     if (_recordId) {
       const { error } = await withTimeout(
@@ -110,6 +203,7 @@ async function saveToDB(data) {
         console.warn("[csStore] upsert error (non-fatal):", error.message);
       } else if (upserted && upserted[0]) {
         _recordId = upserted[0].id;
+        writeLocalCache(_userEmail, { _recordId, data });
       }
     }
   } catch (e) {

@@ -12,15 +12,11 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  // Start false — Supabase fires onAuthStateChange synchronously for cached
-  // sessions, so we never need to pre-spin a loading state here.
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingProgress, setIsLoadingProgress] = useState(false);
-  const [authError] = useState(null); // kept for API compatibility
+  const [authError] = useState(null);
 
   useEffect(() => {
-    // Supabase fires this immediately (INITIAL_SESSION or SIGNED_OUT) for the
-    // current tab, so isLoadingAuth is resolved on the very first event.
     const { data: { subscription } } = base44.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] event:', event);
 
@@ -35,24 +31,33 @@ export const AuthProvider = ({ children }) => {
         setIsLoadingAuth(false);
 
         if (session.user.email) {
-          setIsLoadingProgress(true);
+          // Check for local cache first — if it exists, skip loading spinner entirely
+          const physicsHasCache = !!localStorage.getItem(`hub_student_progress_${session.user.email}`);
+          const csHasCache = !!localStorage.getItem(`hub_cs_progress_${session.user.email}`);
+
+          if (!physicsHasCache || !csHasCache) {
+            // No cache for at least one store — show progress loader
+            setIsLoadingProgress(true);
+          }
+
           try {
-            await preloadStore(session.user.email);
-            await preloadCSStore(session.user.email);
+            // Both run in parallel; cache-first means returning users get 0ms
+            await Promise.all([
+              preloadStore(session.user.email),
+              preloadCSStore(session.user.email),
+            ]);
           } catch (err) {
             console.error('[Auth] Failed to preload progress:', err);
           }
           setIsLoadingProgress(false);
         }
       } else {
-        // No session (SIGNED_OUT or no cached token) — stop loading immediately.
         setUser(null);
         setIsAuthenticated(false);
         setIsLoadingAuth(false);
       }
     });
 
-    // Sync dark mode with OS preference
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     applyColorScheme(mq.matches);
     const handler = (e) => applyColorScheme(e.matches);
@@ -65,6 +70,11 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = async () => {
+    // Clear localStorage caches on logout so next user gets fresh data
+    if (user?.email) {
+      localStorage.removeItem(`hub_student_progress_${user.email}`);
+      localStorage.removeItem(`hub_cs_progress_${user.email}`);
+    }
     setIsLoadingAuth(true);
     try {
       await base44.auth.signOut();
@@ -76,23 +86,19 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(false);
   };
 
-  // Kept for backward compatibility — no-op since we no longer have
-  // a Base44 platform login flow.
   const navigateToLogin = () => {
     setUser(null);
     setIsAuthenticated(false);
   };
 
-  const checkAppState = async () => {
-    // no-op — retained so pages that call it don't crash
-  };
+  const checkAppState = async () => {};
 
   return (
     <AuthContext.Provider value={{
       user,
       isAuthenticated,
       isLoadingAuth,
-      isLoadingPublicSettings: false, // always resolved — no Base44 platform check
+      isLoadingPublicSettings: false,
       isLoadingProgress,
       authError,
       appPublicSettings: null,

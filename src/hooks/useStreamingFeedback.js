@@ -1,13 +1,6 @@
 /**
- * useStreamingFeedback — calls the /api/llm-stream endpoint and streams
- * the response text chunk by chunk, then parses the final JSON.
- *
- * Returns:
- *   streamText   — the raw text built up so far (for display)
- *   isStreaming  — true while stream is active
- *   feedback     — the fully parsed JSON object once complete
- *   error        — error string if something went wrong
- *   startStream  — call this with { prompt, response_json_schema } to begin
+ * useStreamingFeedback — streams directly from Anthropic's API in the browser.
+ * Uses the SSE stream=true API and reads chunks as they arrive.
  */
 import { useState, useRef, useCallback } from "react";
 
@@ -19,7 +12,6 @@ export function useStreamingFeedback() {
   const abortRef = useRef(null);
 
   const startStream = useCallback(async ({ prompt, response_json_schema }) => {
-    // Reset state
     setStreamText("");
     setFeedback(null);
     setError(null);
@@ -28,108 +20,107 @@ export function useStreamingFeedback() {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
     let accumulated = "";
 
     try {
-      const res = await fetch("/api/llm-stream", {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, response_json_schema }),
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5",
+          max_tokens: 4000,
+          stream: true,
+          messages: [
+            {
+              role: "user",
+              content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
+            },
+          ],
+        }),
         signal: controller.signal,
       });
 
       if (!res.ok || !res.body) {
-        // Fallback: try the non-streaming endpoint
-        throw new Error(`Stream request failed: ${res.status}`);
+        throw new Error(`Anthropic API error: ${res.status}`);
       }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process all complete SSE lines in the buffer
+        const lines = buffer.split("\n");
+        // Keep the last incomplete line in the buffer
+        buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr || jsonStr === "[DONE]") continue;
 
           try {
-            const parsed = JSON.parse(jsonStr);
-            if (parsed.error) {
-              throw new Error(parsed.error);
-            }
-            if (parsed.text) {
-              accumulated += parsed.text;
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+              accumulated += event.delta.text;
               setStreamText(accumulated);
             }
-            if (parsed.done) {
-              // Stream complete — parse the full JSON
+
+            if (event.type === "message_stop") {
+              // Parse the final accumulated JSON
               let jsonText = accumulated.trim();
-              const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-              if (jsonMatch) jsonText = jsonMatch[1].trim();
-              const parsed = JSON.parse(jsonText);
-              setFeedback(parsed);
+              const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+              if (match) jsonText = match[1].trim();
+              try {
+                setFeedback(JSON.parse(jsonText));
+              } catch {
+                // Try finding JSON object in the text
+                const objMatch = jsonText.match(/\{[\s\S]*\}/);
+                if (objMatch) setFeedback(JSON.parse(objMatch[0]));
+                else setError("Could not parse feedback. Please try again.");
+              }
             }
-          } catch (parseErr) {
-            // skip malformed SSE chunks
+          } catch {
+            // skip malformed event lines
           }
         }
       }
 
-      // If we never got a `done` event but accumulated text, try parsing anyway
+      // Fallback: if message_stop never fired but we have text
       if (!feedback && accumulated.trim()) {
+        let jsonText = accumulated.trim();
+        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (match) jsonText = match[1].trim();
         try {
-          let jsonText = accumulated.trim();
-          const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-          if (jsonMatch) jsonText = jsonMatch[1].trim();
           setFeedback(JSON.parse(jsonText));
         } catch {
-          setError("Could not parse AI response. Please try again.");
+          const objMatch = jsonText.match(/\{[\s\S]*\}/);
+          if (objMatch) {
+            try { setFeedback(JSON.parse(objMatch[0])); } catch { setError("Could not parse feedback."); }
+          } else {
+            setError("Could not parse feedback. Please try again.");
+          }
         }
       }
     } catch (err) {
       if (err.name === "AbortError") return;
-
-      console.warn("[useStreamingFeedback] stream failed, falling back to /api/llm:", err.message);
-
-      // ── Fallback to non-streaming endpoint ──────────────────────────────
-      try {
-        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-        if (!apiKey) throw new Error("No API key");
-
-        const fallbackRes = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-            "anthropic-dangerous-direct-browser-access": "true",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-5",
-            max_tokens: 4000,
-            messages: [{
-              role: "user",
-              content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
-            }],
-          }),
-        });
-
-        const data = await fallbackRes.json();
-        const text = data.content?.[0]?.text ?? "";
-        let jsonText = text.trim();
-        const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) jsonText = jsonMatch[1].trim();
-        const parsed = JSON.parse(jsonText);
-        setStreamText(JSON.stringify(parsed, null, 2));
-        setFeedback(parsed);
-      } catch (fallbackErr) {
-        setError("Something went wrong. Please try again.");
-      }
+      console.error("[useStreamingFeedback] error:", err);
+      setError("Something went wrong. Please try again.");
     } finally {
       setIsStreaming(false);
     }

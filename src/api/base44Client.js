@@ -4,6 +4,53 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
+async function invokeLLM({ prompt, response_json_schema }) {
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+  const requestBody = {
+    model: 'claude-sonnet-4-5',
+    max_tokens: 4000,
+    messages: [
+      {
+        role: 'user',
+        content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
+      },
+    ],
+  };
+
+  // Call via Vite proxy (dev) — proxy adds the auth headers server-side
+  const response = await fetch('/api/llm', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      // Include key in header for environments where proxy doesn't inject it
+      ...(apiKey ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' } : {}),
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`LLM API error ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  const text = data.content?.[0]?.text;
+
+  if (!text) {
+    throw new Error('No text content in response');
+  }
+
+  // Strip markdown code blocks if present
+  let jsonText = text.trim();
+  const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonText = jsonMatch[1].trim();
+  }
+
+  return JSON.parse(jsonText);
+}
+
 export const base44 = new Proxy(supabaseClient, {
   get(target, prop) {
     if (prop in target) {
@@ -13,20 +60,7 @@ export const base44 = new Proxy(supabaseClient, {
     if (prop === 'integrations') {
       return {
         Core: {
-          InvokeLLM: async ({ prompt, response_json_schema }) => {
-            const response = await fetch('/api/llm', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ prompt, response_json_schema }),
-            });
-
-            if (!response.ok) {
-              const err = await response.text();
-              throw new Error(`LLM API error ${response.status}: ${err}`);
-            }
-
-            return response.json();
-          },
+          InvokeLLM: invokeLLM,
         },
       };
     }

@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+export const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
 async function invokeLLM({ prompt, response_json_schema }) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
@@ -49,7 +50,11 @@ async function invokeLLM({ prompt, response_json_schema }) {
 
 export const base44 = new Proxy(supabaseClient, {
   get(target, prop) {
-    if (prop in target) return target[prop];
+    // Pass through real Supabase methods first
+    if (prop === 'from' || prop === 'auth' || prop === 'channel' ||
+        prop === 'removeChannel' || prop === 'rpc' || prop === 'storage') {
+      return target[prop].bind(target);
+    }
 
     if (prop === 'integrations') {
       return { Core: { InvokeLLM: invokeLLM } };
@@ -115,6 +120,9 @@ export const base44 = new Proxy(supabaseClient, {
       });
     }
 
-    return undefined;
+    // Fall through to actual Supabase client for anything else
+    const val = target[prop];
+    if (typeof val === 'function') return val.bind(target);
+    return val;
   },
 });

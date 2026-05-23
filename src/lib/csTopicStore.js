@@ -1,10 +1,9 @@
 /**
  * csTopicStore.js — Computer Science student data layer
  * Cache-First: loads from localStorage instantly, syncs with Supabase in background.
- * Uses user_id (from auth.uid()) for RLS-compliant reads/writes.
  */
 
-import { base44 } from "@/api/base44Client";
+import { supabaseClient } from "@/api/base44Client";
 import { normaliseTopicKey, toDateString, recordGlobalQuestionAnswered } from "./topicStore";
 
 export { normaliseTopicKey, toDateString };
@@ -43,12 +42,6 @@ function writeLocalCache(userEmail, data) {
   } catch {}
 }
 
-function clearLocalCache(userEmail) {
-  try {
-    localStorage.removeItem(localKey(userEmail));
-  } catch {}
-}
-
 function withTimeout(promise, ms, fallback) {
   return Promise.race([
     promise,
@@ -58,7 +51,7 @@ function withTimeout(promise, ms, fallback) {
 
 async function fetchFromSupabase(userId) {
   const { data: records, error } = await withTimeout(
-    base44.from('StudentData').select('id, cs_data').eq('user_id', userId),
+    supabaseClient.from('StudentData').select('id, cs_data').eq('user_id', userId),
     6000,
     { data: null, error: new Error('timeout') }
   );
@@ -80,11 +73,9 @@ async function fetchFromSupabase(userId) {
           cs_guess_review_bank: raw.cs_guess_review_bank || [],
         }
       : DEFAULT_CS_DATA();
-
     return { _recordId: record.id, data };
   }
 
-  // No row found — the physics store will have created it; wait and retry once
   return { _recordId: null, data: DEFAULT_CS_DATA() };
 }
 
@@ -102,7 +93,6 @@ export async function preloadCSStore(userEmail, userId) {
   if (cached) {
     _cache = cached.data ?? cached;
     if (cached._recordId) _recordId = cached._recordId;
-    console.log("[csStore] cache-first: loaded from localStorage instantly");
 
     if (userId) {
       fetchFromSupabase(userId).then(result => {
@@ -110,14 +100,11 @@ export async function preloadCSStore(userEmail, userId) {
         _recordId = result._recordId ?? _recordId;
         _cache = result.data;
         writeLocalCache(userEmail, { _recordId, data: result.data });
-        console.log("[csStore] background sync complete");
-      }).catch(e => console.warn("[csStore] background sync failed:", e));
+      }).catch(() => {});
     }
-
     return true;
   }
 
-  console.log("[csStore] no cache — fetching from Supabase (first load)");
   if (!userId) {
     _cache = DEFAULT_CS_DATA();
     return false;
@@ -132,8 +119,7 @@ export async function preloadCSStore(userEmail, userId) {
       _cache = DEFAULT_CS_DATA();
     }
     writeLocalCache(userEmail, { _recordId, data: _cache });
-  } catch (e) {
-    console.warn("[csStore] first load failed:", e);
+  } catch {
     _cache = DEFAULT_CS_DATA();
   }
   _loadPromise = null;
@@ -181,21 +167,18 @@ async function saveToDB(data) {
   try {
     if (_recordId) {
       const { error } = await withTimeout(
-        base44.from('StudentData').update({ cs_data: data }).eq('id', _recordId),
+        supabaseClient.from('StudentData').update({ cs_data: data }).eq('id', _recordId),
         5000,
         { error: new Error('save timeout') }
       );
       if (error) console.warn("[csStore] update error:", error.message);
     } else {
-      // Row might exist but without cs_data — try update by user_id
       const { data: updated, error } = await withTimeout(
-        base44.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select(),
+        supabaseClient.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select(),
         5000,
         { data: null, error: new Error('save timeout') }
       );
-      if (error) {
-        console.warn("[csStore] update-by-user_id error:", error.message);
-      } else if (updated?.[0]) {
+      if (!error && updated?.[0]) {
         _recordId = updated[0].id;
         writeLocalCache(_userEmail, { _recordId, data });
       }
@@ -289,9 +272,7 @@ export async function csGetTopicData(topicKey) {
 
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
-  if (data.cs_review_bank.find(q => q.question_id === question_id)) {
-    return;
-  }
+  if (data.cs_review_bank.find(q => q.question_id === question_id)) return;
   const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   data.cs_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,

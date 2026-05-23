@@ -4,7 +4,7 @@
  * Uses user_id (from auth.uid()) for RLS-compliant reads/writes.
  */
 
-import { base44 } from "@/api/base44Client";
+import { supabaseClient } from "@/api/base44Client";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ function withTimeout(promise, ms, fallback) {
 
 async function fetchFromSupabase(userId) {
   const { data: records, error } = await withTimeout(
-    base44.from('StudentData').select('*').eq('user_id', userId),
+    supabaseClient.from('StudentData').select('*').eq('user_id', userId),
     6000,
     { data: null, error: new Error('timeout') }
   );
@@ -95,10 +95,10 @@ async function fetchFromSupabase(userId) {
       _recordId: record.id,
       data: {
         topics: record.topics || {},
-        written_review_bank: record.written_review_bank || record.review_bank || [],
+        written_review_bank: record.written_review_bank || [],
         review_bank_clears: record.review_bank_clears ?? 0,
         mcq_attempts: record.mcq_attempts || [],
-        mcq_review_bank: record.mcq_review_bank || record.guess_review_bank || [],
+        mcq_review_bank: record.mcq_review_bank || [],
         global_streak: record.global_streak ?? 0,
         global_streak_last_date: record.global_streak_last_date ?? null,
         rest_day_passes: record.rest_day_passes ?? 0,
@@ -110,7 +110,7 @@ async function fetchFromSupabase(userId) {
 
   // No row yet — create one
   const { data: inserted, error: insertError } = await withTimeout(
-    base44.from('StudentData').insert([{
+    supabaseClient.from('StudentData').insert([{
       user_id: userId,
       user_email: _userEmail,
       ...DEFAULT_DATA(),
@@ -253,14 +253,14 @@ async function saveToDB(data) {
   try {
     if (_recordId) {
       const { error } = await withTimeout(
-        base44.from('StudentData').update(payload).eq('id', _recordId),
+        supabaseClient.from('StudentData').update(payload).eq('id', _recordId),
         5000,
         { error: new Error('save timeout') }
       );
       if (error) console.warn("[topicStore] update error:", error.message);
     } else {
       const { data: inserted, error } = await withTimeout(
-        base44.from('StudentData').insert([{ user_id: _userId, user_email: _userEmail, ...payload }]).select(),
+        supabaseClient.from('StudentData').insert([{ user_id: _userId, user_email: _userEmail, ...payload }]).select(),
         5000,
         { data: null, error: new Error('insert timeout') }
       );
@@ -315,20 +315,7 @@ export async function recordGlobalQuestionAnswered() {
     }
   }
 
-  if (data.global_streak_last_date && data.global_streak_last_date !== today && data.global_streak_last_date !== yesterday && dqc.count === 1) {
-    const parts = data.global_streak_last_date.split("/");
-    const lastDateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-    const daysMissed = Math.floor((new Date() - lastDateObj) / 86400000);
-    if (daysMissed > 1) {
-      if ((data.rest_day_passes || 0) > 0) {
-        data.rest_day_passes = 0;
-      } else {
-        data.global_streak = 0;
-      }
-    }
-  }
-
-  saveToDB(data).catch(e => console.warn("topicStore: background save failed:", e));
+  saveToDB(data).catch(() => {});
 }
 
 export async function recordAppOpen() {
@@ -351,7 +338,7 @@ export async function recordAppOpen() {
     }
   }
 
-  saveToDB(data).catch(e => console.warn("topicStore: recordAppOpen save failed:", e));
+  saveToDB(data).catch(() => {});
 
   return {
     global_streak: data.global_streak || 0,
@@ -398,8 +385,8 @@ export async function recordAttempt(topicKey, score, { total_marks = 1, question
   }
   topic.last_streak_date = today;
 
-  saveToDB(data).catch(e => console.warn("topicStore: recordAttempt save failed:", e));
-  recordGlobalQuestionAnswered().catch(e => console.warn("topicStore: recordGlobalQuestionAnswered failed:", e));
+  saveToDB(data).catch(() => {});
+  recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function getTopicData(topicKey) {
@@ -455,8 +442,7 @@ export async function getTopicData(topicKey) {
       const parts = latestDate.split("/");
       if (parts.length === 3) {
         const dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-        const diffMs = new Date() - dateObj;
-        const diffDays = Math.floor(diffMs / 86400000);
+        const diffDays = Math.floor((new Date() - dateObj) / 86400000);
         lastLabel = diffDays === 1 ? "Yesterday" : `${diffDays} days ago`;
       } else {
         lastLabel = latestDate;
@@ -495,9 +481,7 @@ export async function getTopicData(topicKey) {
 
 export async function addToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
-  if (data.written_review_bank.find(q => q.question_id === question_id)) {
-    return;
-  }
+  if (data.written_review_bank.find(q => q.question_id === question_id)) return;
 
   const priority = first_attempt_score === 0 ? 1 : 2;
   const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -508,7 +492,6 @@ export async function addToReviewBank({ question_id, topic, question_text, mark_
     priority,
     locked_until,
   });
-
   saveToDB(data).catch(() => {});
 }
 
@@ -596,8 +579,11 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
   if (flagged_as_guess || !correct) {
     const existing = data.mcq_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
     if (!existing) {
-      const locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
-      data.mcq_review_bank.push({ question_id, locked_until, flagged_as_guess: !!flagged_as_guess });
+      data.mcq_review_bank.push({
+        question_id,
+        locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+        flagged_as_guess: !!flagged_as_guess,
+      });
     }
   } else if (correct && !flagged_as_guess) {
     data.mcq_review_bank = data.mcq_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
@@ -637,7 +623,6 @@ export async function shouldShowReviewGate() {
   const writtenCount = (data.written_review_bank || []).length;
   const mcqCount = (data.mcq_review_bank || []).length;
   if (writtenCount < 5 && mcqCount < 5) return false;
-
   const lastSession = data.last_session_time;
   if (!lastSession) return false;
   const hoursSince = (Date.now() - new Date(lastSession).getTime()) / (1000 * 60 * 60);
@@ -649,7 +634,7 @@ export async function resetData() {
   if (_userEmail) {
     clearLocalCache(_userEmail);
     if (_recordId) {
-      saveToDB(_cache).catch(e => console.warn("topicStore: resetData save failed:", e));
+      saveToDB(_cache).catch(() => {});
     }
   }
 }

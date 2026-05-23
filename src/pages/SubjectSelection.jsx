@@ -4,9 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, getMCQOnlyTopicNames, getStreakData, recordAppOpen, shouldShowReviewGate, getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { csGetTopicData } from "@/lib/csTopicStore";
-import { getAnyPausedSession } from "@/lib/examStore";
-import { Atom, Code2, FileText, Play, BookOpen, GraduationCap, ChevronRight, Zap, Clock, Star, ArrowRight } from "lucide-react";
-import { toast } from "sonner";
+import { Atom, Code2, FileText, BookOpen, GraduationCap, ChevronRight, Zap, Star, ArrowRight, Lock } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import ReviewGate from "@/components/ReviewGate";
 
@@ -41,6 +39,36 @@ function ScorePill({ score }) {
   return <span className={`text-sm font-bold tabular-nums ${color}`}>{score}%</span>;
 }
 
+// Locked mode card with "Coming Soon" overlay
+function LockedModeCard({ icon: Icon, iconBg, iconColor, title, description, badge }) {
+  return (
+    <div className="relative w-full text-left rounded-2xl border border-white/5 bg-white/[0.02] p-5 overflow-hidden opacity-60 cursor-not-allowed select-none">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className={`w-10 h-10 rounded-xl ${iconBg} border flex items-center justify-center shrink-0`}>
+            <Icon className={`w-4.5 h-4.5 ${iconColor}`} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <p className="font-bold text-white/50 text-sm">{title}</p>
+              {badge && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 rounded-full">{badge}</span>
+              )}
+            </div>
+            <p className="text-[11px] text-white/25">{description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 bg-white/8 border border-white/10 px-2.5 py-1 rounded-full">
+            Coming Soon
+          </span>
+          <Lock className="w-3.5 h-3.5 text-white/30" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SubjectSelection() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,7 +82,6 @@ export default function SubjectSelection() {
   const [showGate, setShowGate] = useState(false);
   const [gateWrittenCount, setGateWrittenCount] = useState(0);
   const [gateMcqCount, setGateMcqCount] = useState(0);
-  const [pausedExam, setPausedExam] = useState(null);
 
   useEffect(() => {
     async function calcPhysicsScore() {
@@ -76,12 +103,11 @@ export default function SubjectSelection() {
       setCsLoaded(true);
     }
     async function loadData() {
-      const [sd, gateCheck, writtenBank, mcqBank, paused] = await Promise.all([
+      const [sd, gateCheck, writtenBank, mcqBank] = await Promise.all([
         getStreakData(),
         shouldShowReviewGate(),
         getReviewBank(),
         getGuessReviewBank(),
-        getAnyPausedSession(),
       ]);
       setStreakData(sd);
       if (gateCheck) {
@@ -89,7 +115,6 @@ export default function SubjectSelection() {
         setGateMcqCount(mcqBank.length);
         setShowGate(true);
       }
-      setPausedExam(paused);
       await recordAppOpen();
     }
     calcPhysicsScore();
@@ -156,22 +181,6 @@ export default function SubjectSelection() {
           </p>
         </div>
 
-        {/* Paused session banner */}
-        {pausedExam && (
-          <div className="mb-6 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-5 py-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-0.5">Session Paused</p>
-              <p className="text-sm text-white/80 font-medium">{pausedExam.paper}</p>
-            </div>
-            <button
-              onClick={() => navigate("/exam/session", { state: { paperId: pausedExam.paper, fresh: false } })}
-              className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-3 py-2 rounded-xl hover:brightness-110 transition-all shrink-0"
-            >
-              <Play className="w-3.5 h-3.5" /> Resume
-            </button>
-          </div>
-        )}
-
         {/* Subject cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
 
@@ -221,69 +230,30 @@ export default function SubjectSelection() {
 
         </div>
 
-        {/* Mode cards */}
+        {/* Mode cards — all locked as Coming Soon */}
         <div className="space-y-3">
-
-          {/* Past Paper Mode */}
-          <button
-            onClick={() => navigate("/exam/select")}
-            className="group w-full text-left rounded-2xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] hover:border-purple-500/30 p-5 transition-all duration-200 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)]"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0">
-                  <FileText className="w-4.5 h-4.5 text-purple-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-white text-sm">Past Paper Mode</p>
-                  <p className="text-[11px] text-white/40 mt-0.5">Full timed paper under exam conditions</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-purple-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </div>
-          </button>
-
-          {/* Timed Mock */}
-          <button
-            onClick={() => navigate("/mock/select")}
-            className="group w-full text-left rounded-2xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] hover:border-amber-500/30 p-5 transition-all duration-200 hover:shadow-[0_0_20px_rgba(245,158,11,0.1)]"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-                  <BookOpen className="w-4.5 h-4.5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-white text-sm">Timed Mock Exam</p>
-                  <p className="text-[11px] text-white/40 mt-0.5">Full paper with self-marking at the end</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </div>
-          </button>
-
-          {/* Interactive Mock */}
-          <button
-            onClick={() => navigate("/mock-exam")}
-            className="group w-full text-left rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-900/20 to-transparent hover:from-emerald-800/30 hover:border-emerald-500/40 p-5 transition-all duration-200 hover:shadow-[0_0_20px_rgba(16,185,129,0.1)]"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                  <GraduationCap className="w-4.5 h-4.5 text-emerald-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="font-bold text-white text-sm">Interactive Mock Exams</p>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 rounded-full">AI</span>
-                  </div>
-                  <p className="text-[11px] text-white/40">Sub-part by sub-part with instant AI feedback</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </div>
-          </button>
-
+          <LockedModeCard
+            icon={FileText}
+            iconBg="bg-purple-500/15"
+            iconColor="text-purple-400"
+            title="Past Paper Mode"
+            description="Full timed paper under exam conditions"
+          />
+          <LockedModeCard
+            icon={BookOpen}
+            iconBg="bg-amber-500/15"
+            iconColor="text-amber-400"
+            title="Timed Mock Exam"
+            description="Full paper with self-marking at the end"
+          />
+          <LockedModeCard
+            icon={GraduationCap}
+            iconBg="bg-emerald-500/20"
+            iconColor="text-emerald-400"
+            title="Interactive Mock Exams"
+            description="Sub-part by sub-part with instant AI feedback"
+            badge="AI"
+          />
         </div>
 
         <p className="text-center text-[11px] text-white/20 mt-8">

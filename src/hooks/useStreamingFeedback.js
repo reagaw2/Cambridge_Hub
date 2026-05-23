@@ -1,23 +1,30 @@
 import { useState, useRef, useCallback } from "react";
 
+// Yield to the browser event loop so React can flush the render
+function yieldToBrowser() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 export function useStreamingFeedback() {
   const [streamText, setStreamText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [error, setError] = useState(null);
   const abortRef = useRef(null);
+  // Use a ref to accumulate without stale closures
+  const accumulatedRef = useRef("");
 
   const startStream = useCallback(async ({ prompt, response_json_schema }) => {
     setStreamText("");
     setFeedback(null);
     setError(null);
     setIsStreaming(true);
+    accumulatedRef.current = "";
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-    let accumulated = "";
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -49,6 +56,7 @@ export function useStreamingFeedback() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let chunkCount = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -58,6 +66,7 @@ export function useStreamingFeedback() {
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
+        let gotText = false;
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data:")) continue;
@@ -67,37 +76,50 @@ export function useStreamingFeedback() {
           try {
             const event = JSON.parse(jsonStr);
             if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
-              accumulated += event.delta.text;
-              // Trigger re-render with each new chunk
-              setStreamText(accumulated);
+              accumulatedRef.current += event.delta.text;
+              gotText = true;
+              chunkCount++;
             }
           } catch {
             // skip malformed lines
           }
         }
+
+        // Only update state + yield when we actually got text in this read()
+        if (gotText) {
+          setStreamText(accumulatedRef.current);
+          // Yield to browser so React flushes the state update and repaints
+          await yieldToBrowser();
+        }
       }
 
-      // Stream complete — now parse the full accumulated text once
-      if (accumulated.trim()) {
-        let jsonText = accumulated.trim();
-        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (match) jsonText = match[1].trim();
-        try {
-          setFeedback(JSON.parse(jsonText));
-        } catch {
-          const objMatch = jsonText.match(/\{[\s\S]*\}/);
-          if (objMatch) {
-            try {
-              setFeedback(JSON.parse(objMatch[0]));
-            } catch {
-              setError("Could not parse feedback. Please try again.");
-            }
-          } else {
+      console.log(`[streaming] done. total chunks: ${chunkCount}, total chars: ${accumulatedRef.current.length}`);
+
+      // Stream fully consumed — now parse JSON once
+      const raw = accumulatedRef.current.trim();
+      if (!raw) {
+        setError("No response received. Please try again.");
+        return;
+      }
+
+      let jsonText = raw;
+      const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (match) jsonText = match[1].trim();
+
+      try {
+        setFeedback(JSON.parse(jsonText));
+      } catch {
+        // Try to find a JSON object in the text
+        const objMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (objMatch) {
+          try {
+            setFeedback(JSON.parse(objMatch[0]));
+          } catch {
             setError("Could not parse feedback. Please try again.");
           }
+        } else {
+          setError("Could not parse feedback. Please try again.");
         }
-      } else {
-        setError("No response received. Please try again.");
       }
     } catch (err) {
       if (err.name === "AbortError") return;

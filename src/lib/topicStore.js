@@ -6,8 +6,6 @@
 
 import { base44 } from "@/api/base44Client";
 
-let _csCache = null;
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 export function toDateString(date) {
@@ -48,7 +46,7 @@ const DEFAULT_DATA = () => ({
   global_streak: 0,
   global_streak_last_date: null,
   rest_day_passes: 0,
-  daily_question_count: null, 
+  daily_question_count: null,
   last_session_time: null,
 });
 
@@ -56,6 +54,14 @@ let _cache = null;
 let _recordId = null;
 let _userEmail = null;
 let _loadPromise = null;
+
+/** Wraps a promise with a timeout — resolves with fallback if exceeded */
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
 
 export async function preloadStore(userEmail) {
   if (_userEmail !== userEmail) {
@@ -66,7 +72,7 @@ export async function preloadStore(userEmail) {
   }
   _cache = null;
   _loadPromise = null;
-  const result = await loadFromDB();
+  const result = await withTimeout(loadFromDB(), 8000, DEFAULT_DATA());
   console.log("[topicStore] preloadStore complete for", userEmail);
   return result;
 }
@@ -94,11 +100,11 @@ async function loadFromDB() {
 
   _loadPromise = (async () => {
     try {
-      // Direct, optimized native Supabase fetch
-      const { data: records, error } = await base44
-        .from('StudentData')
-        .select('*')
-        .eq('user_email', _userEmail);
+      const { data: records, error } = await withTimeout(
+        base44.from('StudentData').select('*').eq('user_email', _userEmail),
+        6000,
+        { data: null, error: new Error('timeout') }
+      );
 
       if (error) throw error;
 
@@ -129,7 +135,7 @@ async function loadFromDB() {
         _cache = DEFAULT_DATA();
       }
     } catch (e) {
-      console.warn("topicStore: failed to load from DB via Supabase direct channel", e);
+      console.warn("topicStore: failed to load from DB", e);
       _cache = DEFAULT_DATA();
     }
     _loadPromise = null;
@@ -159,35 +165,36 @@ async function saveToDB(data) {
 
   try {
     if (_recordId) {
-      // Upgraded safe update pipeline
-      const { data: updated, error } = await base44
+      const updatePromise = base44
         .from('StudentData')
         .update(payload)
         .eq('id', _recordId)
         .select();
 
+      const { data: updated, error } = await withTimeout(updatePromise, 5000, { data: null, error: new Error('save timeout') });
+
       if (error) {
-        console.warn("Supabase Row Update Error:", error.message);
+        console.warn("topicStore: update error (non-fatal):", error.message);
       } else if (updated && updated[0]) {
         _recordId = updated[0].id;
       }
     } else {
-      // No cached _recordId — try to UPDATE by user_email first (avoids RLS-blocked INSERT).
-      // If no row matches, the update affects 0 rows and we log a warning.
-      const { data: updated, error } = await base44
+      const updatePromise = base44
         .from('StudentData')
         .update(payload)
         .eq('user_email', _userEmail)
         .select();
 
+      const { data: updated, error } = await withTimeout(updatePromise, 5000, { data: null, error: new Error('save timeout') });
+
       if (error) {
-        console.warn("topicStore: update-by-email error:", error.message);
+        console.warn("topicStore: update-by-email error (non-fatal):", error.message);
       } else if (updated && updated[0]) {
         _recordId = updated[0].id;
       }
     }
   } catch (e) {
-    console.warn("topicStore: structural catch hit in saveToDB channel", e);
+    console.warn("topicStore: save failed (non-fatal):", e);
   }
 }
 
@@ -245,7 +252,8 @@ export async function recordGlobalQuestionAnswered() {
     }
   }
 
-  await saveToDB(data);
+  // Fire-and-forget save — never await this in a UI flow
+  saveToDB(data).catch(e => console.warn("topicStore: background save failed:", e));
 }
 
 export async function recordAppOpen() {
@@ -268,7 +276,8 @@ export async function recordAppOpen() {
     }
   }
 
-  await saveToDB(data);
+  // Fire-and-forget
+  saveToDB(data).catch(e => console.warn("topicStore: recordAppOpen save failed:", e));
 
   return {
     global_streak: data.global_streak || 0,
@@ -314,8 +323,10 @@ export async function recordAttempt(topicKey, score, { total_marks = 1, question
     topic.streak = 1;
   }
   topic.last_streak_date = today;
-  await saveToDB(data);
-  await recordGlobalQuestionAnswered();
+
+  // Fire-and-forget save
+  saveToDB(data).catch(e => console.warn("topicStore: recordAttempt save failed:", e));
+  recordGlobalQuestionAnswered().catch(e => console.warn("topicStore: recordGlobalQuestionAnswered failed:", e));
 }
 
 export async function getTopicData(topicKey) {
@@ -411,7 +422,10 @@ export async function getTopicData(topicKey) {
 
 export async function addToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
-  if (data.written_review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
+  if (data.written_review_bank.find(q => q.question_id === question_id)) {
+    saveToDB(data).catch(() => {});
+    return;
+  }
 
   const priority = first_attempt_score === 0 ? 1 : 2;
   const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -423,7 +437,7 @@ export async function addToReviewBank({ question_id, topic, question_text, mark_
     locked_until,
   });
 
-  await saveToDB(data);
+  saveToDB(data).catch(() => {});
 }
 
 export async function resetReviewBankLock(question_id) {
@@ -431,14 +445,14 @@ export async function resetReviewBankLock(question_id) {
   const entry = data.written_review_bank.find(q => q.question_id === question_id);
   if (entry) {
     entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    await saveToDB(data);
+    saveToDB(data).catch(() => {});
   }
 }
 
 export async function removeFromReviewBank(question_id) {
   const data = await loadFromDB();
   data.written_review_bank = data.written_review_bank.filter(q => q.question_id !== question_id);
-  await saveToDB(data);
+  saveToDB(data).catch(() => {});
 }
 
 export async function getReviewBank() {
@@ -449,7 +463,7 @@ export async function getReviewBank() {
 export async function incrementReviewBankClears() {
   const data = await loadFromDB();
   data.review_bank_clears = (data.review_bank_clears || 0) + 1;
-  await saveToDB(data);
+  saveToDB(data).catch(() => {});
 }
 
 // ── MCQ Review Bank ────────────────────────────────────────────────────────
@@ -468,14 +482,14 @@ export async function resetGuessReviewBankLock(question_id) {
   );
   if (entry && typeof entry === "object") {
     entry.locked_until = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
-    await saveToDB(data);
+    saveToDB(data).catch(() => {});
   } else if (typeof entry === "string") {
     const idx = data.mcq_review_bank.indexOf(entry);
     data.mcq_review_bank[idx] = {
       question_id,
       locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
     };
-    await saveToDB(data);
+    saveToDB(data).catch(() => {});
   }
 }
 
@@ -521,8 +535,9 @@ export async function saveMCQAttempt({ question_id, topic, source, chosen_option
     data.mcq_review_bank = data.mcq_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
 
-  await saveToDB(data);
-  await recordGlobalQuestionAnswered();
+  // Fire-and-forget saves
+  saveToDB(data).catch(() => {});
+  recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function getMCQOnlyTopicNames(writtenKeys) {
@@ -565,13 +580,6 @@ export async function shouldShowReviewGate() {
 export async function resetData() {
   _cache = DEFAULT_DATA();
   if (_recordId && _userEmail) {
-    try {
-      await base44.from('StudentData').update({
-        ..._cache,
-        user_email: _userEmail,
-      }).eq('id', _recordId);
-    } catch (e) {
-      console.warn("topicStore: failed to reset data", e);
-    }
+    saveToDB(_cache).catch(e => console.warn("topicStore: resetData save failed:", e));
   }
 }

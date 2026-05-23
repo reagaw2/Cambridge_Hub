@@ -22,6 +22,13 @@ let _recordId = null;
 let _userEmail = null;
 let _loadPromise = null;
 
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 export async function preloadCSStore(userEmail) {
   if (_userEmail !== userEmail) {
     _cache = null;
@@ -31,7 +38,7 @@ export async function preloadCSStore(userEmail) {
   }
   _cache = null;
   _loadPromise = null;
-  return loadFromDB();
+  return withTimeout(loadFromDB(), 8000, DEFAULT_CS_DATA());
 }
 
 async function loadFromDB() {
@@ -41,10 +48,11 @@ async function loadFromDB() {
 
   _loadPromise = (async () => {
     try {
-      const { data: records, error } = await base44
-        .from('StudentData')
-        .select('*')
-        .eq('user_email', _userEmail);
+      const { data: records, error } = await withTimeout(
+        base44.from('StudentData').select('*').eq('user_email', _userEmail),
+        6000,
+        { data: null, error: new Error('timeout') }
+      );
 
       if (error) throw error;
 
@@ -86,25 +94,26 @@ async function saveToDB(data) {
   _cache = data;
   try {
     if (_recordId) {
-      const { error } = await base44
-        .from('StudentData')
-        .update({ cs_data: data })
-        .eq('id', _recordId);
-      if (error) console.warn("[csStore] update error:", error.message);
+      const { error } = await withTimeout(
+        base44.from('StudentData').update({ cs_data: data }).eq('id', _recordId),
+        5000,
+        { error: new Error('save timeout') }
+      );
+      if (error) console.warn("[csStore] update error (non-fatal):", error.message);
     } else {
-      // Upsert so we never violate the user_email UNIQUE constraint
-      const { data: upserted, error } = await base44
-        .from('StudentData')
-        .upsert({ user_email: _userEmail, cs_data: data }, { onConflict: 'user_email' })
-        .select();
+      const { data: upserted, error } = await withTimeout(
+        base44.from('StudentData').upsert({ user_email: _userEmail, cs_data: data }, { onConflict: 'user_email' }).select(),
+        5000,
+        { data: null, error: new Error('save timeout') }
+      );
       if (error) {
-        console.warn("[csStore] upsert error:", error.message);
+        console.warn("[csStore] upsert error (non-fatal):", error.message);
       } else if (upserted && upserted[0]) {
         _recordId = upserted[0].id;
       }
     }
   } catch (e) {
-    console.warn("[csStore] failed to save to DB", e);
+    console.warn("[csStore] failed to save to DB (non-fatal):", e);
   }
 }
 
@@ -127,8 +136,8 @@ export async function csRecordAttempt(topicKey, score, { total_marks = 1, questi
     topic.streak = 1;
   }
   topic.last_streak_date = today;
-  await saveToDB(data);
-  await recordGlobalQuestionAnswered();
+  saveToDB(data).catch(() => {});
+  recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function csGetTopicData(topicKey) {
@@ -192,7 +201,10 @@ export async function csGetTopicData(topicKey) {
 
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await loadFromDB();
-  if (data.cs_review_bank.find(q => q.question_id === question_id)) { await saveToDB(data); return; }
+  if (data.cs_review_bank.find(q => q.question_id === question_id)) {
+    saveToDB(data).catch(() => {});
+    return;
+  }
   const locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   data.cs_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
@@ -201,7 +213,7 @@ export async function csAddToReviewBank({ question_id, topic, question_text, mar
     priority: first_attempt_score === 0 ? 1 : 2,
     locked_until,
   });
-  await saveToDB(data);
+  saveToDB(data).catch(() => {});
 }
 
 export async function csGetReviewBank() {
@@ -212,7 +224,7 @@ export async function csGetReviewBank() {
 export async function csRemoveFromReviewBank(question_id) {
   const data = await loadFromDB();
   data.cs_review_bank = data.cs_review_bank.filter(q => q.question_id !== question_id);
-  await saveToDB(data);
+  saveToDB(data).catch(() => {});
 }
 
 export async function csResetReviewBankLock(question_id) {
@@ -220,7 +232,7 @@ export async function csResetReviewBankLock(question_id) {
   const entry = data.cs_review_bank.find(q => q.question_id === question_id);
   if (entry) {
     entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    await saveToDB(data);
+    saveToDB(data).catch(() => {});
   }
 }
 
@@ -258,8 +270,8 @@ export async function csSaveMCQAttempt({ question_id, topic, source, chosen_opti
     data.cs_guess_review_bank = data.cs_guess_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
 
-  await saveToDB(data);
-  await recordGlobalQuestionAnswered();
+  saveToDB(data).catch(() => {});
+  recordGlobalQuestionAnswered().catch(() => {});
 }
 
 export async function csGetGuessReviewBank() {

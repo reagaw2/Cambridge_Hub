@@ -50,32 +50,45 @@ function CountdownCard({ event }) {
   const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG["Assignment"];
   const Icon = cfg.icon;
 
-  const totalWindow = 90;
-  const elapsed = totalWindow - Math.min(days ?? totalWindow, totalWindow);
-  const progressPct = Math.round((elapsed / totalWindow) * 100);
+  const isPast = days !== null && days < 0;
+  const isToday = days === 0;
+  const isUrgent = days !== null && days <= 3 && days >= 0;
 
-  const urgentColor =
-    days === 0
+  const urgentColor = isPast
+    ? "text-white/30"
+    : isToday
       ? "text-red-400"
-      : days !== null && days <= 7
+      : isUrgent
         ? "text-orange-400"
         : cfg.text;
+
+  const displayDays = isPast ? Math.abs(days) : days;
+  const daysLabel = isPast
+    ? `day${displayDays !== 1 ? "s" : ""} ago`
+    : isToday
+      ? "Today"
+      : `day${displayDays !== 1 ? "s" : ""}`;
+
+  // Progress bar: 0% if far away, 100% if today/past
+  const totalWindow = 60;
+  const elapsed = Math.min(Math.max(0, totalWindow - (days ?? totalWindow)), totalWindow);
+  const progressPct = Math.round((elapsed / totalWindow) * 100);
 
   return (
     <div
       className={`
-        relative flex-shrink-0 w-[200px] sm:w-[220px] rounded-2xl border ${cfg.border}
-        bg-gradient-to-br ${cfg.bg}
-        backdrop-blur-md ${cfg.glow}
+        relative flex-shrink-0 w-[200px] sm:w-[220px] rounded-2xl border ${isPast ? "border-white/8 opacity-50" : cfg.border}
+        bg-gradient-to-br ${isPast ? "from-white/[0.03] to-transparent" : cfg.bg}
+        backdrop-blur-md ${isPast ? "" : cfg.glow}
         p-5 flex flex-col gap-3 overflow-hidden
         transition-transform duration-300 hover:scale-[1.02]
       `}
     >
       <div className="flex items-center justify-between">
-        <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${cfg.accent} flex items-center justify-center`}>
+        <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${isPast ? "from-white/10 to-white/5" : cfg.accent} flex items-center justify-center`}>
           <Icon className="w-4 h-4 text-white" />
         </div>
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${cfg.badge}`}>
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${isPast ? "bg-white/5 text-white/30 border-white/10" : cfg.badge}`}>
           {event.type}
         </span>
       </div>
@@ -84,14 +97,18 @@ function CountdownCard({ event }) {
         {event.title}
       </p>
 
-      <div className="flex items-end gap-1.5">
-        <span className={`text-5xl font-black tabular-nums leading-none ${urgentColor}`}>
-          {days ?? "—"}
-        </span>
-        <span className="text-xs text-white/40 font-semibold mb-1 leading-none">
-          {days === 1 ? "day" : "days"}
-        </span>
-      </div>
+      {isToday ? (
+        <div className={`text-2xl font-black leading-none ${urgentColor}`}>Today!</div>
+      ) : (
+        <div className="flex items-end gap-1.5">
+          <span className={`text-5xl font-black tabular-nums leading-none ${urgentColor}`}>
+            {displayDays ?? "—"}
+          </span>
+          <span className="text-xs text-white/40 font-semibold mb-1 leading-none">
+            {daysLabel}
+          </span>
+        </div>
+      )}
 
       <p className="text-[11px] text-white/40 flex items-center gap-1">
         <CalendarDays className="w-3 h-3 shrink-0" />
@@ -100,7 +117,7 @@ function CountdownCard({ event }) {
 
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/5 rounded-b-2xl overflow-hidden">
         <div
-          className={`h-full bg-gradient-to-r ${cfg.accent} transition-all duration-700`}
+          className={`h-full bg-gradient-to-r ${isPast ? "from-white/10 to-white/5" : cfg.accent} transition-all duration-700`}
           style={{ width: `${progressPct}%` }}
         />
       </div>
@@ -115,7 +132,7 @@ function EmptyState({ error }) {
         ? <AlertCircle className="w-7 h-7 text-red-400/60" />
         : <CalendarDays className="w-7 h-7 text-white/20" />}
       <p className="text-sm font-semibold text-white/40">
-        {error ? "Couldn't load Canvas events" : "No upcoming exams found"}
+        {error ? "Couldn't load Canvas events" : "No events found in Canvas"}
       </p>
       {error && (
         <p className="text-[11px] text-red-400/50 max-w-xs leading-relaxed">{error}</p>

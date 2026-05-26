@@ -1,12 +1,9 @@
 /**
- * examCountdownStore.js — Exam countdown with manual event entry.
- * Canvas API is unreachable from browser due to ALA's SSL cert.
- * Events are entered manually and stored in localStorage.
+ * examCountdownStore.js — manual exam event entry, stored in localStorage.
  */
 
-const EVENTS_KEY = "exam_countdown_manual_events";
+const EVENTS_KEY = "exam_countdown_manual_events_v2";
 
-/** Returns integer days remaining. Negative = past. 0 = today. */
 export function daysUntil(isoDate) {
   if (!isoDate) return null;
   const now = new Date();
@@ -38,7 +35,7 @@ export function addManualEvent({ title, type, due_date }) {
     id: `manual_${Date.now()}`,
     title: title.trim(),
     type: type || "Assignment",
-    due_date: due_date, // ISO string
+    due_date,
   };
   const updated = [...events, newEvent].sort(
     (a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
@@ -51,14 +48,4 @@ export function deleteManualEvent(id) {
   const events = getManualEvents().filter(e => e.id !== id);
   saveManualEvents(events);
   return events;
-}
-
-// Kept for compatibility with ExamCountdown component
-export async function fetchExamEvents() {
-  return getManualEvents();
-}
-
-export async function loadExamCountdown(onRefresh) {
-  const events = getManualEvents();
-  return { events, fromCache: false };
 }

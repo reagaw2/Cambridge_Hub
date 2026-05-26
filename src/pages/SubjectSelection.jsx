@@ -7,6 +7,7 @@ import { csGetTopicData } from "@/lib/csTopicStore";
 import { Atom, Code2, FileText, BookOpen, GraduationCap, Star, ArrowRight, Lock, Users } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import ReviewGate from "@/components/ReviewGate";
+import ExamCountdown from "@/components/ExamCountdown";
 
 const WRITTEN_KEYS = [
   "gravitational_fields", "nuclear_physics", "thermal_physics", "oscillations",
@@ -141,7 +142,6 @@ export default function SubjectSelection() {
 
       {/* Top bar */}
       <div className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/5 bg-white/[0.02] backdrop-blur-sm">
-        {/* Brand */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
             <Star className="w-3.5 h-3.5 text-white" />
@@ -152,7 +152,6 @@ export default function SubjectSelection() {
           </div>
         </div>
 
-        {/* Right side */}
         <div className="flex items-center gap-3 shrink-0">
           {streakData && (streakData.global_streak > 0 || (streakData.daily_question_count?.count ?? 0) > 0) && (
             <GlobalStreakBadge streakData={streakData} />
@@ -166,7 +165,7 @@ export default function SubjectSelection() {
         </div>
       </div>
 
-      {/* Study Buddy banner — always visible below top bar */}
+      {/* Study Buddy banner */}
       <div className="relative z-10 flex justify-center px-4 pt-3 pb-1">
         <div className="flex items-center gap-2 bg-pink-500/10 border border-pink-500/20 rounded-full px-4 py-2 select-none cursor-not-allowed">
           <Users className="w-3.5 h-3.5 text-pink-400/70 shrink-0" />
@@ -189,10 +188,14 @@ export default function SubjectSelection() {
           </p>
         </div>
 
+        {/* Exam Countdown — shown above subject cards */}
+        <div className="mb-8">
+          <ExamCountdown />
+        </div>
+
         {/* Subject cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
 
-          {/* Physics */}
           <button
             onClick={() => navigate("/physics")}
             className="group relative text-left rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-900/40 to-emerald-950/60 hover:from-emerald-800/50 hover:to-emerald-900/70 p-6 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] overflow-hidden"
@@ -214,7 +217,6 @@ export default function SubjectSelection() {
             </div>
           </button>
 
-          {/* Computer Science */}
           <button
             onClick={() => navigate("/cs")}
             className="group relative text-left rounded-2xl border border-white/10 bg-gradient-to-br from-blue-900/40 to-blue-950/60 hover:from-blue-800/50 hover:to-blue-900/70 p-6 transition-all duration-300 hover:border-blue-500/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] overflow-hidden"

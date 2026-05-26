@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { CalendarDays, Clock, FileText, FlaskConical, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, Clock, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine } from "lucide-react";
 import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent } from "@/lib/examCountdownStore";
+
+const CATEGORIES = ["Exam", "Test", "Quiz", "Assignment"];
 
 const TYPE_CONFIG = {
   Exam: {
@@ -10,32 +12,49 @@ const TYPE_CONFIG = {
     text: "text-cyan-400",
     badge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
     accent: "from-cyan-500 to-blue-600",
-    glow: "shadow-[0_0_30px_rgba(6,182,212,0.2)]",
+    glow: "shadow-[0_0_24px_rgba(6,182,212,0.2)]",
+    emptyText: "No upcoming exams",
+    emptyIcon: "🎓",
   },
-  "Internal Test": {
+  Test: {
     icon: FlaskConical,
     border: "border-violet-500/30",
     bg: "from-violet-500/10 to-purple-600/5",
     text: "text-violet-400",
     badge: "bg-violet-500/20 text-violet-300 border-violet-500/30",
     accent: "from-violet-500 to-purple-600",
-    glow: "shadow-[0_0_30px_rgba(139,92,246,0.2)]",
+    glow: "shadow-[0_0_24px_rgba(139,92,246,0.2)]",
+    emptyText: "No upcoming tests",
+    emptyIcon: "🔬",
+  },
+  Quiz: {
+    icon: BookOpen,
+    border: "border-green-500/30",
+    bg: "from-green-500/10 to-emerald-600/5",
+    text: "text-green-400",
+    badge: "bg-green-500/20 text-green-300 border-green-500/30",
+    accent: "from-green-500 to-emerald-600",
+    glow: "shadow-[0_0_24px_rgba(34,197,94,0.2)]",
+    emptyText: "No upcoming quizzes",
+    emptyIcon: "📝",
   },
   Assignment: {
-    icon: Clock,
+    icon: PenLine,
     border: "border-amber-500/30",
     bg: "from-amber-500/10 to-orange-600/5",
     text: "text-amber-400",
     badge: "bg-amber-500/20 text-amber-300 border-amber-500/30",
     accent: "from-amber-500 to-orange-600",
-    glow: "shadow-[0_0_30px_rgba(245,158,11,0.15)]",
+    glow: "shadow-[0_0_24px_rgba(245,158,11,0.15)]",
+    emptyText: "No upcoming assignments",
+    emptyIcon: "📋",
   },
 };
 
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-GB", {
-    weekday: "short", day: "numeric", month: "short", year: "numeric",
+    weekday: "short", day: "numeric", month: "short",
   });
 }
 
@@ -46,41 +65,32 @@ function CountdownCard({ event, onDelete }) {
   const isPast = days !== null && days < 0;
   const isToday = days === 0;
   const isUrgent = days !== null && days >= 0 && days <= 3;
-  const countColor = isPast ? "text-white/30" : isToday ? "text-red-400" : isUrgent ? "text-orange-400" : cfg.text;
+  const countColor = isPast ? "text-white/25" : isToday ? "text-red-400" : isUrgent ? "text-orange-400" : cfg.text;
 
   return (
-    <div className={`group relative flex-shrink-0 w-48 rounded-2xl border p-5 flex flex-col gap-3 overflow-hidden transition-all duration-200 hover:scale-[1.02] ${isPast ? "border-white/8 opacity-50" : `${cfg.border} ${cfg.glow}`} bg-gradient-to-br ${isPast ? "from-white/[0.03] to-transparent" : cfg.bg}`}>
+    <div className={`group relative rounded-xl border p-4 flex flex-col gap-2.5 overflow-hidden transition-all duration-200 hover:scale-[1.015] ${isPast ? "border-white/8 opacity-40" : `${cfg.border} ${cfg.glow}`} bg-gradient-to-br ${isPast ? "from-white/[0.02] to-transparent" : cfg.bg}`}>
       <button
         onClick={() => onDelete(event.id)}
-        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/10 hover:bg-red-500/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+        className="absolute top-2 right-2 w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
       >
-        <Trash2 className="w-3 h-3 text-white/60" />
+        <Trash2 className="w-2.5 h-2.5 text-white/60" />
       </button>
 
-      <div className="flex items-center justify-between">
-        <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${isPast ? "from-white/10 to-white/5" : cfg.accent} flex items-center justify-center`}>
-          <Icon className="w-4 h-4 text-white" />
-        </div>
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${isPast ? "bg-white/5 text-white/30 border-white/10" : cfg.badge}`}>
-          {event.type}
-        </span>
-      </div>
-
-      <p className="text-sm font-bold text-white leading-snug line-clamp-2 min-h-[40px]">{event.title}</p>
+      <p className="text-xs font-bold text-white leading-snug pr-5 line-clamp-2">{event.title}</p>
 
       {isToday ? (
-        <p className="text-2xl font-black text-red-400">Today!</p>
+        <p className="text-lg font-black text-red-400 leading-none">Today!</p>
       ) : (
-        <div className="flex items-end gap-1.5">
-          <span className={`text-5xl font-black tabular-nums leading-none ${countColor}`}>{Math.abs(days ?? 0)}</span>
-          <span className="text-xs text-white/40 font-semibold mb-1 leading-none">
-            {isPast ? "days ago" : "days"}
+        <div className="flex items-end gap-1">
+          <span className={`text-3xl font-black tabular-nums leading-none ${countColor}`}>{Math.abs(days ?? 0)}</span>
+          <span className="text-[10px] text-white/35 font-semibold mb-0.5 leading-none">
+            {isPast ? "ago" : "days"}
           </span>
         </div>
       )}
 
-      <p className="text-[11px] text-white/40 flex items-center gap-1">
-        <CalendarDays className="w-3 h-3 shrink-0" />
+      <p className="text-[10px] text-white/35 flex items-center gap-1">
+        <CalendarDays className="w-2.5 h-2.5 shrink-0" />
         {fmtDate(event.due_date)}
       </p>
     </div>
@@ -104,7 +114,7 @@ function AddModal({ onClose, onAdd }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
       <div className="bg-[#0d0d1a] border border-white/10 rounded-2xl p-6 space-y-5 w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between">
-          <p className="font-bold text-white">Add Exam / Assignment</p>
+          <p className="font-bold text-white">Add Event</p>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/8 transition-colors">
             <X className="w-4 h-4 text-white/50" />
           </button>
@@ -124,10 +134,10 @@ function AddModal({ onClose, onAdd }) {
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Type</label>
-            <div className="grid grid-cols-3 gap-2">
-              {["Exam", "Internal Test", "Assignment"].map(t => (
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORIES.map(t => (
                 <button key={t} type="button" onClick={() => setType(t)}
-                  className={`py-2 rounded-xl text-xs font-semibold border transition-all ${type === t ? "bg-white/15 border-white/30 text-white" : "bg-white/5 border-white/8 text-white/40 hover:bg-white/10"}`}>
+                  className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${type === t ? "bg-white/15 border-white/30 text-white" : "bg-white/5 border-white/8 text-white/40 hover:bg-white/10"}`}>
                   {t}
                 </button>
               ))}
@@ -157,6 +167,53 @@ function AddModal({ onClose, onAdd }) {
   );
 }
 
+function CategoryLane({ category, events, onDelete, onAdd }) {
+  const cfg = TYPE_CONFIG[category];
+  const Icon = cfg.icon;
+  const laneEvents = events.filter(e => e.type === category);
+
+  return (
+    <div className="space-y-2">
+      {/* Lane header */}
+      <div className="flex items-center gap-2">
+        <div className={`w-5 h-5 rounded-md bg-gradient-to-br ${cfg.accent} flex items-center justify-center`}>
+          <Icon className="w-3 h-3 text-white" />
+        </div>
+        <p className={`text-[11px] font-bold uppercase tracking-widest ${cfg.text}`}>{category}s</p>
+        <span className="text-[10px] text-white/20 font-mono">
+          {laneEvents.length > 0 ? `${laneEvents.length}` : ""}
+        </span>
+      </div>
+
+      {/* Cards row */}
+      {laneEvents.length === 0 ? (
+        <button
+          onClick={onAdd}
+          className="w-full border border-dashed border-white/8 rounded-xl py-3 flex items-center justify-center gap-2 hover:border-white/15 hover:bg-white/[0.02] transition-all"
+        >
+          <Plus className="w-3 h-3 text-white/20" />
+          <span className="text-[11px] text-white/20">{cfg.emptyText}</span>
+        </button>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {laneEvents.map(ev => (
+            <div key={ev.id} className="flex-shrink-0 w-[150px]">
+              <CountdownCard event={ev} onDelete={onDelete} />
+            </div>
+          ))}
+          <button
+            onClick={onAdd}
+            className="flex-shrink-0 w-[80px] rounded-xl border border-dashed border-white/8 hover:border-white/15 hover:bg-white/[0.02] flex flex-col items-center justify-center gap-1 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5 text-white/20" />
+            <span className="text-[10px] text-white/20">Add</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ExamCountdown() {
   const [events, setEvents] = useState(() => getManualEvents());
   const [showModal, setShowModal] = useState(false);
@@ -170,35 +227,32 @@ export default function ExamCountdown() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <p className="text-xs font-bold uppercase tracking-widest text-white/30">Exam Countdown</p>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5">
+        <p className="text-xs font-bold uppercase tracking-widest text-white/30">Upcoming</p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5"
+        >
           <Plus className="w-3 h-3" /> Add event
         </button>
       </div>
 
-      {events.length === 0 ? (
-        <button onClick={() => setShowModal(true)}
-          className="w-full border border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center gap-2 hover:border-white/20 hover:bg-white/[0.02] transition-all">
-          <Plus className="w-5 h-5 text-white/20" />
-          <p className="text-sm text-white/25">Add your upcoming exams and deadlines</p>
-        </button>
-      ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-          {events.map(ev => (
-            <CountdownCard key={ev.id} event={ev} onDelete={handleDelete} />
-          ))}
-          <button onClick={() => setShowModal(true)}
-            className="flex-shrink-0 w-28 rounded-2xl border border-dashed border-white/10 hover:border-white/20 hover:bg-white/[0.02] flex flex-col items-center justify-center gap-2 transition-all min-h-[180px]">
-            <Plus className="w-5 h-5 text-white/20" />
-            <span className="text-[11px] text-white/20">Add</span>
-          </button>
-        </div>
-      )}
+      <div className="space-y-4">
+        {CATEGORIES.map(cat => (
+          <CategoryLane
+            key={cat}
+            category={cat}
+            events={events}
+            onDelete={handleDelete}
+            onAdd={() => setShowModal(true)}
+          />
+        ))}
+      </div>
 
-      {showModal && <AddModal onClose={() => setShowModal(false)} onAdd={handleAdd} />}
+      {showModal && (
+        <AddModal onClose={() => setShowModal(false)} onAdd={handleAdd} />
+      )}
     </div>
   );
 }

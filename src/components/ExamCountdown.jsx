@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, Clock, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine } from "lucide-react";
+import { CalendarDays, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine } from "lucide-react";
 import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent } from "@/lib/examCountdownStore";
 
 const CATEGORIES = ["Exam", "Test", "Quiz", "Assignment"];
@@ -14,7 +14,6 @@ const TYPE_CONFIG = {
     accent: "from-cyan-500 to-blue-600",
     glow: "shadow-[0_0_24px_rgba(6,182,212,0.2)]",
     emptyText: "No upcoming exams",
-    emptyIcon: "🎓",
   },
   Test: {
     icon: FlaskConical,
@@ -25,7 +24,6 @@ const TYPE_CONFIG = {
     accent: "from-violet-500 to-purple-600",
     glow: "shadow-[0_0_24px_rgba(139,92,246,0.2)]",
     emptyText: "No upcoming tests",
-    emptyIcon: "🔬",
   },
   Quiz: {
     icon: BookOpen,
@@ -36,7 +34,6 @@ const TYPE_CONFIG = {
     accent: "from-green-500 to-emerald-600",
     glow: "shadow-[0_0_24px_rgba(34,197,94,0.2)]",
     emptyText: "No upcoming quizzes",
-    emptyIcon: "📝",
   },
   Assignment: {
     icon: PenLine,
@@ -47,7 +44,6 @@ const TYPE_CONFIG = {
     accent: "from-amber-500 to-orange-600",
     glow: "shadow-[0_0_24px_rgba(245,158,11,0.15)]",
     emptyText: "No upcoming assignments",
-    emptyIcon: "📋",
   },
 };
 
@@ -174,23 +170,19 @@ function CategoryLane({ category, events, onDelete, onAdd }) {
 
   return (
     <div className="space-y-2">
-      {/* Lane header */}
       <div className="flex items-center gap-2">
         <div className={`w-5 h-5 rounded-md bg-gradient-to-br ${cfg.accent} flex items-center justify-center`}>
           <Icon className="w-3 h-3 text-white" />
         </div>
         <p className={`text-[11px] font-bold uppercase tracking-widest ${cfg.text}`}>{category}s</p>
-        <span className="text-[10px] text-white/20 font-mono">
-          {laneEvents.length > 0 ? `${laneEvents.length}` : ""}
-        </span>
+        {laneEvents.length > 0 && (
+          <span className="text-[10px] text-white/20 font-mono">{laneEvents.length}</span>
+        )}
       </div>
 
-      {/* Cards row */}
       {laneEvents.length === 0 ? (
-        <button
-          onClick={onAdd}
-          className="w-full border border-dashed border-white/8 rounded-xl py-3 flex items-center justify-center gap-2 hover:border-white/15 hover:bg-white/[0.02] transition-all"
-        >
+        <button onClick={onAdd}
+          className="w-full border border-dashed border-white/8 rounded-xl py-3 flex items-center justify-center gap-2 hover:border-white/15 hover:bg-white/[0.02] transition-all">
           <Plus className="w-3 h-3 text-white/20" />
           <span className="text-[11px] text-white/20">{cfg.emptyText}</span>
         </button>
@@ -201,10 +193,8 @@ function CategoryLane({ category, events, onDelete, onAdd }) {
               <CountdownCard event={ev} onDelete={onDelete} />
             </div>
           ))}
-          <button
-            onClick={onAdd}
-            className="flex-shrink-0 w-[80px] rounded-xl border border-dashed border-white/8 hover:border-white/15 hover:bg-white/[0.02] flex flex-col items-center justify-center gap-1 transition-all"
-          >
+          <button onClick={onAdd}
+            className="flex-shrink-0 w-[80px] rounded-xl border border-dashed border-white/8 hover:border-white/15 hover:bg-white/[0.02] flex flex-col items-center justify-center gap-1 transition-all min-h-[120px]">
             <Plus className="w-3.5 h-3.5 text-white/20" />
             <span className="text-[10px] text-white/20">Add</span>
           </button>
@@ -230,10 +220,8 @@ export default function ExamCountdown() {
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <p className="text-xs font-bold uppercase tracking-widest text-white/30">Upcoming</p>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5"
-        >
+        <button onClick={() => setShowModal(true)}
+          className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5">
           <Plus className="w-3 h-3" /> Add event
         </button>
       </div>
@@ -250,9 +238,7 @@ export default function ExamCountdown() {
         ))}
       </div>
 
-      {showModal && (
-        <AddModal onClose={() => setShowModal(false)} onAdd={handleAdd} />
-      )}
+      {showModal && <AddModal onClose={() => setShowModal(false)} onAdd={handleAdd} />}
     </div>
   );
 }

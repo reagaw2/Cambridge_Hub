@@ -1,13 +1,10 @@
 /**
- * examCountdownStore.js — Canvas exam countdown.
- * Uses allorigins.win proxy which handles Canvas's SSL certificate.
+ * examCountdownStore.js — Exam countdown with manual event entry.
+ * Canvas API is unreachable from browser due to ALA's SSL cert.
+ * Events are entered manually and stored in localStorage.
  */
 
-const CACHE_KEY = "exam_countdown_cache";
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-
-const CANVAS_BASE = "https://africanleadershipacademy.instructure.com";
-const TOKEN = "4000~FwAyNtXQfTxYXachFuaffNRMXwM96CQ3YyfWGycukUN7xFxLQh6NreTPkTJk6h68";
+const EVENTS_KEY = "exam_countdown_manual_events";
 
 /** Returns integer days remaining. Negative = past. 0 = today. */
 export function daysUntil(isoDate) {
@@ -19,112 +16,49 @@ export function daysUntil(isoDate) {
   return Math.floor((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function readCache() {
+export function getManualEvents() {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const { data, timestamp } = JSON.parse(raw);
-    if (Date.now() - timestamp > CACHE_TTL_MS) return null;
-    return data;
+    const raw = localStorage.getItem(EVENTS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
   } catch {
-    return null;
+    return [];
   }
 }
 
-function writeCache(data) {
+export function saveManualEvents(events) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+    localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
   } catch {}
 }
 
-function classifyTitle(title) {
-  const lower = (title ?? "").toLowerCase();
-  if (lower.includes("exam") || lower.includes("paper")) return "Exam";
-  if (lower.includes("test") || lower.includes("quiz")) return "Internal Test";
-  return "Assignment";
-}
-
-async function proxyFetch(canvasUrl) {
-  // allorigins returns { status: { url, content_type }, contents: "..." }
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(canvasUrl)}`;
-  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
-  if (!res.ok) throw new Error(`allorigins ${res.status}`);
-  const wrapper = await res.json();
-  if (!wrapper.contents) return [];
-  const data = JSON.parse(wrapper.contents);
-  return Array.isArray(data) ? data : [];
-}
-
-export async function fetchExamEvents() {
-  const start = new Date();
-  start.setDate(start.getDate() - 60);
-  const end = new Date();
-  end.setDate(end.getDate() + 365);
-  const s = start.toISOString();
-  const e = end.toISOString();
-  const tok = TOKEN;
-
-  const urls = [
-    `${CANVAS_BASE}/api/v1/users/self/calendar_events?type=event&start_date=${s}&end_date=${e}&access_token=${tok}&per_page=100`,
-    `${CANVAS_BASE}/api/v1/users/self/upcoming_events?access_token=${tok}&per_page=100`,
-    `${CANVAS_BASE}/api/v1/users/self/calendar_events?type=assignment&start_date=${s}&end_date=${e}&access_token=${tok}&per_page=100`,
-  ];
-
-  const results = await Promise.allSettled(urls.map(proxyFetch));
-  const [calEvents, upcomingEvents, calAssignments] = results.map(r =>
-    r.status === "fulfilled" ? r.value : []
+export function addManualEvent({ title, type, due_date }) {
+  const events = getManualEvents();
+  const newEvent = {
+    id: `manual_${Date.now()}`,
+    title: title.trim(),
+    type: type || "Assignment",
+    due_date: due_date, // ISO string
+  };
+  const updated = [...events, newEvent].sort(
+    (a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
   );
+  saveManualEvents(updated);
+  return updated;
+}
 
-  const all = [];
+export function deleteManualEvent(id) {
+  const events = getManualEvents().filter(e => e.id !== id);
+  saveManualEvents(events);
+  return events;
+}
 
-  for (const ev of calEvents) {
-    const title = ev.title ?? ev.description ?? "Untitled";
-    const due = ev.start_at ?? ev.end_at ?? null;
-    if (due) all.push({ id: `cal_${ev.id}`, title, type: classifyTitle(title), due_date: due });
-  }
-
-  for (const ev of upcomingEvents) {
-    const title = ev.title ?? ev.assignment?.name ?? ev.description ?? "Untitled";
-    const due = ev.assignment?.due_at ?? ev.start_at ?? ev.end_at ?? null;
-    if (due) all.push({ id: `up_${ev.assignment?.id ?? ev.id}`, title, type: classifyTitle(title), due_date: due });
-  }
-
-  for (const ev of calAssignments) {
-    const title = ev.title ?? ev.assignment?.name ?? "Untitled";
-    const due = ev.assignment?.due_at ?? ev.end_at ?? ev.start_at ?? null;
-    if (due) all.push({ id: `asgn_${ev.assignment?.id ?? ev.id}`, title, type: classifyTitle(title), due_date: due });
-  }
-
-  all.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-
-  const seen = new Set();
-  return all.filter(ev => {
-    const key = `${(ev.title ?? "").toLowerCase().trim()}__${ev.due_date?.slice(0, 10)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+// Kept for compatibility with ExamCountdown component
+export async function fetchExamEvents() {
+  return getManualEvents();
 }
 
 export async function loadExamCountdown(onRefresh) {
-  const cached = readCache();
-
-  const apiPromise = fetchExamEvents()
-    .then(fresh => {
-      writeCache(fresh);
-      onRefresh?.(fresh);
-      return fresh;
-    })
-    .catch(err => {
-      console.warn("[examCountdown] fetch failed:", err.message);
-      return null;
-    });
-
-  if (cached) {
-    apiPromise.catch(() => {});
-    return { events: cached, fromCache: true };
-  }
-
-  const fresh = await apiPromise;
-  return { events: fresh ?? [], fromCache: false };
+  const events = getManualEvents();
+  return { events, fromCache: false };
 }

@@ -132,43 +132,58 @@ export default function ExamCountdown() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const { events: loaded, fromCache: cached } = await loadExamCountdown((fresh) => {
+      // For a silent refresh, call the API directly (skip cache)
+      if (silent) {
+        const { fetchExamEvents } = await import("@/lib/examCountdownStore");
+        const fresh = await fetchExamEvents();
+        // Write to cache
+        try {
+          localStorage.setItem("exam_countdown_cache", JSON.stringify({ data: fresh, timestamp: Date.now() }));
+        } catch {}
         setEvents(fresh);
         setFromCache(false);
-        setRefreshing(false);
-      });
-      setEvents(loaded);
-      setFromCache(cached);
+      } else {
+        const { events: loaded, fromCache: cached } = await loadExamCountdown((fresh) => {
+          setEvents(fresh);
+          setFromCache(false);
+        });
+        setEvents(loaded);
+        setFromCache(cached);
+      }
     } catch (err) {
       setError(err.message ?? "Unknown error");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(false); }, [load]);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-white/30">Exam Countdown</p>
-          {fromCache && !loading && (
-            <p className="text-[10px] text-white/20 mt-0.5">From cache · refreshing…</p>
+          {fromCache && !loading && !refreshing && (
+            <p className="text-[10px] text-white/20 mt-0.5">Cached · tap refresh to update</p>
           )}
         </div>
         <button
-          onClick={() => load(true)}
+          onClick={() => { if (!refreshing && !loading) load(true); }}
           disabled={refreshing || loading}
           className="flex items-center gap-1 text-[11px] text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
         >
           <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
+          {refreshing ? "Refreshing…" : "Refresh"}
         </button>
       </div>
 

@@ -1,7 +1,8 @@
 /**
  * examCountdownStore.js — Canvas exam countdown state.
  * Cache-first: loads from localStorage instantly, then refreshes from the API.
- * Uses a CORS proxy to call Canvas directly from the browser.
+ * Token is passed as a URL parameter (Canvas supports this) so CORS proxies
+ * don't strip the Authorization header.
  */
 
 const CACHE_KEY = "exam_countdown_cache";
@@ -43,6 +44,11 @@ function classifyTitle(title) {
   return "Assignment";
 }
 
+/** Build a Canvas API URL with the token embedded as a query param */
+function canvasUrl(baseUrl, path, token) {
+  return `${baseUrl}${path}${path.includes("?") ? "&" : "?"}access_token=${token}&per_page=50`;
+}
+
 export async function fetchExamEvents() {
   const baseUrl = import.meta.env.VITE_CANVAS_BASE_URL;
   const token = import.meta.env.VITE_CANVAS_TOKEN;
@@ -51,53 +57,64 @@ export async function fetchExamEvents() {
     throw new Error("VITE_CANVAS_BASE_URL and VITE_CANVAS_TOKEN are not set in .env.local");
   }
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-
   const now = new Date().toISOString();
 
-  // Canvas requires a CORS proxy for browser-side requests.
-  // We use allorigins.win which is a reliable public proxy.
-  const proxy = (url) =>
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+  // Use corsproxy.io — more reliable for authenticated requests
+  const proxy = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
 
-  const [calRes, assignRes] = await Promise.allSettled([
-    fetch(proxy(`${baseUrl}/api/v1/users/self/calendar_events?type=event&start_date=${now}&per_page=50`), { headers }),
-    fetch(proxy(`${baseUrl}/api/v1/users/self/upcoming_events?per_page=50`), { headers }),
+  const calendarUrl = canvasUrl(baseUrl, `/api/v1/users/self/calendar_events?type=event&start_date=${now}`, token);
+  const upcomingUrl = canvasUrl(baseUrl, `/api/v1/users/self/upcoming_events`, token);
+  const assignmentsUrl = canvasUrl(baseUrl, `/api/v1/users/self/calendar_events?type=assignment&start_date=${now}`, token);
+
+  const [calRes, upcomingRes, assignRes] = await Promise.allSettled([
+    fetch(proxy(calendarUrl)),
+    fetch(proxy(upcomingUrl)),
+    fetch(proxy(assignmentsUrl)),
   ]);
 
-  const calData = calRes.status === "fulfilled" && calRes.value.ok
-    ? await calRes.value.json().catch(() => [])
-    : [];
+  function safeJson(result) {
+    if (result.status !== "fulfilled" || !result.value.ok) return [];
+    return result.value.json().catch(() => []);
+  }
 
-  const assignData = assignRes.status === "fulfilled" && assignRes.value.ok
-    ? await assignRes.value.json().catch(() => [])
-    : [];
+  const [calData, upcomingData, assignData] = await Promise.all([
+    safeJson(calRes),
+    safeJson(upcomingRes),
+    safeJson(assignRes),
+  ]);
 
-  const events = [
+  const all = [
+    // Calendar events (meetings, exams scheduled as events)
     ...calData.map((e) => ({
       id: `cal_${e.id}`,
       title: e.title ?? e.description ?? "Untitled",
       type: classifyTitle(e.title),
       due_date: e.start_at ?? e.end_at ?? null,
     })),
-    ...assignData.map((e) => ({
-      id: `assign_${e.assignment?.id ?? e.id}`,
+    // Upcoming events (assignments with due dates)
+    ...upcomingData.map((e) => ({
+      id: `up_${e.assignment?.id ?? e.id}`,
       title: e.title ?? e.assignment?.name ?? "Untitled",
       type: classifyTitle(e.title ?? e.assignment?.name),
       due_date: e.assignment?.due_at ?? e.start_at ?? null,
+    })),
+    // Assignment calendar events
+    ...assignData.map((e) => ({
+      id: `asgn_${e.id}`,
+      title: e.title ?? "Untitled",
+      type: classifyTitle(e.title),
+      due_date: e.end_at ?? e.start_at ?? null,
     })),
   ]
     .filter((e) => !!e.due_date)
     .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-  // Deduplicate
+  // Deduplicate by normalised title+date (catches duplicates across endpoints)
   const seen = new Set();
-  return events.filter((e) => {
-    if (seen.has(e.id)) return false;
-    seen.add(e.id);
+  return all.filter((e) => {
+    const key = `${e.title}__${e.due_date?.slice(0, 10)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 }

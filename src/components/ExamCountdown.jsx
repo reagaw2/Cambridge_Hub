@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { CalendarDays, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine, Pencil, Clock, Loader2 } from "lucide-react";
-import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent, saveManualEvents, loadEvents } from "@/lib/examCountdownStore";
+import { CalendarDays, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine, Pencil, Clock, Loader2, RefreshCw, Check } from "lucide-react";
+import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent, saveManualEvents, loadEvents, forceSyncToSupabase } from "@/lib/examCountdownStore";
 
 const CATEGORIES = ["Exam", "Test", "Quiz", "Assignment"];
 
@@ -224,19 +224,31 @@ function CategoryLane({ category, events, onDelete, onEdit, onAdd }) {
 }
 
 export default function ExamCountdown() {
-  // Start with local cache for instant render, then hydrate from Supabase
   const [events, setEvents] = useState(() => getManualEvents());
   const [syncing, setSyncing] = useState(true);
+  const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "done" | "error"
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
 
-  // On mount: pull from Supabase (cross-device sync)
+  // On mount: pull from Supabase
   useEffect(() => {
     loadEvents().then(remote => {
       setEvents(remote);
       setSyncing(false);
     }).catch(() => setSyncing(false));
   }, []);
+
+  async function handleForceSync() {
+    setSyncStatus("syncing");
+    const ok = await forceSyncToSupabase();
+    if (ok) {
+      setSyncStatus("done");
+      setTimeout(() => setSyncStatus(null), 2500);
+    } else {
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus(null), 3000);
+    }
+  }
 
   function handleAdd(data) {
     setEvents(addManualEvent(data));
@@ -275,10 +287,35 @@ export default function ExamCountdown() {
           <p className="text-xs font-bold uppercase tracking-widest text-white/30">Upcoming</p>
           {syncing && <Loader2 className="w-3 h-3 text-white/20 animate-spin" />}
         </div>
-        <button onClick={openAddModal}
-          className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5">
-          <Plus className="w-3 h-3" /> Add event
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Sync Now button */}
+          <button
+            onClick={handleForceSync}
+            disabled={syncStatus === "syncing"}
+            className={`flex items-center gap-1.5 text-[11px] font-semibold border rounded-lg px-2.5 py-1 transition-all ${
+              syncStatus === "done"
+                ? "border-green-500/40 text-green-400 bg-green-500/10"
+                : syncStatus === "error"
+                  ? "border-red-500/40 text-red-400 bg-red-500/10"
+                  : "border-white/10 text-white/40 hover:text-white/70 hover:bg-white/5"
+            } disabled:opacity-50`}
+          >
+            {syncStatus === "syncing" ? (
+              <><Loader2 className="w-3 h-3 animate-spin" /> Syncing…</>
+            ) : syncStatus === "done" ? (
+              <><Check className="w-3 h-3" /> Synced!</>
+            ) : syncStatus === "error" ? (
+              <>⚠ Failed</>
+            ) : (
+              <><RefreshCw className="w-3 h-3" /> Sync now</>
+            )}
+          </button>
+
+          <button onClick={openAddModal}
+            className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5">
+            <Plus className="w-3 h-3" /> Add event
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">

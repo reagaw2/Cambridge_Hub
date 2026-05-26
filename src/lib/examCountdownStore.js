@@ -1,8 +1,3 @@
-/**
- * examCountdownStore.js — exam event entry, synced to Supabase.
- * localStorage is used as a fast local cache only.
- */
-
 import { supabaseClient } from "@/api/base44Client";
 
 const LOCAL_KEY = "exam_countdown_events_v3";
@@ -16,8 +11,6 @@ export function daysUntil(isoDate) {
   return Math.floor((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-// ── Local cache helpers ────────────────────────────────────────────────────
-
 function readLocal() {
   try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) ?? []; } catch { return []; }
 }
@@ -26,57 +19,68 @@ function writeLocal(events) {
   try { localStorage.setItem(LOCAL_KEY, JSON.stringify(events)); } catch {}
 }
 
-// ── Supabase helpers ───────────────────────────────────────────────────────
+async function getUserAndRow() {
+  const { data: { user }, error: authErr } = await supabaseClient.auth.getUser();
+  if (authErr || !user) return { user: null, row: null };
 
-async function getStudentRow() {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  if (!user) return null;
-  const { data: rows } = await supabaseClient
+  const { data: rows, error } = await supabaseClient
     .from("StudentData")
     .select("id, exam_countdown_events")
     .eq("user_id", user.id);
-  return rows?.[0] ?? null;
+
+  if (error) {
+    console.error("[examCountdownStore] fetch error:", error.message);
+    return { user, row: null };
+  }
+
+  return { user, row: rows?.[0] ?? null };
 }
 
 async function pushToSupabase(events) {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  if (!user) return;
-  const { data: rows } = await supabaseClient
-    .from("StudentData")
-    .select("id")
-    .eq("user_id", user.id);
-  if (!rows?.[0]) return;
-  await supabaseClient
+  const { user, row } = await getUserAndRow();
+  if (!user || !row) {
+    console.warn("[examCountdownStore] No user or row — cannot push to Supabase");
+    return false;
+  }
+
+  const { error } = await supabaseClient
     .from("StudentData")
     .update({ exam_countdown_events: events })
-    .eq("id", rows[0].id);
+    .eq("id", row.id);
+
+  if (error) {
+    console.error("[examCountdownStore] update error:", error.message);
+    return false;
+  }
+
+  console.log("[examCountdownStore] ✓ pushed", events.length, "events to Supabase");
+  return true;
 }
 
-// ── Public API ─────────────────────────────────────────────────────────────
-
-/** Load events from Supabase (and refresh local cache). Falls back to localStorage. */
+/** Load events from Supabase — refreshes local cache. Returns local cache on failure. */
 export async function loadEvents() {
-  try {
-    const row = await getStudentRow();
-    if (row) {
-      const events = row.exam_countdown_events ?? [];
-      writeLocal(events);
-      return events;
-    }
-  } catch (e) {
-    console.warn("[examCountdownStore] Supabase load failed, using local cache:", e);
+  const { row } = await getUserAndRow();
+  if (row) {
+    const events = Array.isArray(row.exam_countdown_events) ? row.exam_countdown_events : [];
+    writeLocal(events);
+    return events;
   }
   return readLocal();
 }
 
-/** Returns the locally cached events (for instant render before async load). */
+/** Force-push whatever is in localStorage up to Supabase right now. */
+export async function forceSyncToSupabase() {
+  const local = readLocal();
+  return pushToSupabase(local);
+}
+
 export function getManualEvents() {
   return readLocal();
 }
 
 export function saveManualEvents(events) {
   writeLocal(events);
-  pushToSupabase(events).catch(e => console.warn("[examCountdownStore] sync failed:", e));
+  pushToSupabase(events).catch(e => console.warn("[examCountdownStore] bg sync failed:", e));
 }
 
 export function addManualEvent({ title, type, due_date }) {

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { CalendarDays, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine } from "lucide-react";
-import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent } from "@/lib/examCountdownStore";
+import { CalendarDays, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine, Pencil, Clock } from "lucide-react";
+import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent, saveManualEvents } from "@/lib/examCountdownStore";
 
 const CATEGORIES = ["Exam", "Test", "Quiz", "Assignment"];
 
@@ -10,7 +10,6 @@ const TYPE_CONFIG = {
     border: "border-cyan-500/30",
     bg: "from-cyan-500/10 to-blue-600/5",
     text: "text-cyan-400",
-    badge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
     accent: "from-cyan-500 to-blue-600",
     glow: "shadow-[0_0_24px_rgba(6,182,212,0.2)]",
     emptyText: "No upcoming exams",
@@ -20,7 +19,6 @@ const TYPE_CONFIG = {
     border: "border-violet-500/30",
     bg: "from-violet-500/10 to-purple-600/5",
     text: "text-violet-400",
-    badge: "bg-violet-500/20 text-violet-300 border-violet-500/30",
     accent: "from-violet-500 to-purple-600",
     glow: "shadow-[0_0_24px_rgba(139,92,246,0.2)]",
     emptyText: "No upcoming tests",
@@ -30,7 +28,6 @@ const TYPE_CONFIG = {
     border: "border-green-500/30",
     bg: "from-green-500/10 to-emerald-600/5",
     text: "text-green-400",
-    badge: "bg-green-500/20 text-green-300 border-green-500/30",
     accent: "from-green-500 to-emerald-600",
     glow: "shadow-[0_0_24px_rgba(34,197,94,0.2)]",
     emptyText: "No upcoming quizzes",
@@ -40,7 +37,6 @@ const TYPE_CONFIG = {
     border: "border-amber-500/30",
     bg: "from-amber-500/10 to-orange-600/5",
     text: "text-amber-400",
-    badge: "bg-amber-500/20 text-amber-300 border-amber-500/30",
     accent: "from-amber-500 to-orange-600",
     glow: "shadow-[0_0_24px_rgba(245,158,11,0.15)]",
     emptyText: "No upcoming assignments",
@@ -54,7 +50,12 @@ function fmtDate(iso) {
   });
 }
 
-function CountdownCard({ event, onDelete }) {
+function fmtTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function CountdownCard({ event, onDelete, onEdit }) {
   const days = daysUntil(event.due_date);
   const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG["Assignment"];
   const Icon = cfg.icon;
@@ -64,15 +65,24 @@ function CountdownCard({ event, onDelete }) {
   const countColor = isPast ? "text-white/25" : isToday ? "text-red-400" : isUrgent ? "text-orange-400" : cfg.text;
 
   return (
-    <div className={`group relative rounded-xl border p-4 flex flex-col gap-2.5 overflow-hidden transition-all duration-200 hover:scale-[1.015] ${isPast ? "border-white/8 opacity-40" : `${cfg.border} ${cfg.glow}`} bg-gradient-to-br ${isPast ? "from-white/[0.02] to-transparent" : cfg.bg}`}>
-      <button
-        onClick={() => onDelete(event.id)}
-        className="absolute top-2 right-2 w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-      >
-        <Trash2 className="w-2.5 h-2.5 text-white/60" />
-      </button>
+    <div className={`group relative rounded-xl border p-4 flex flex-col gap-2 overflow-hidden transition-all duration-200 hover:scale-[1.015] ${isPast ? "border-white/8 opacity-40" : `${cfg.border} ${cfg.glow}`} bg-gradient-to-br ${isPast ? "from-white/[0.02] to-transparent" : cfg.bg}`}>
+      {/* Action buttons */}
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+        <button
+          onClick={() => onEdit(event)}
+          className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center"
+        >
+          <Pencil className="w-2.5 h-2.5 text-white/60" />
+        </button>
+        <button
+          onClick={() => onDelete(event.id)}
+          className="w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/30 flex items-center justify-center"
+        >
+          <Trash2 className="w-2.5 h-2.5 text-white/60" />
+        </button>
+      </div>
 
-      <p className="text-xs font-bold text-white leading-snug pr-5 line-clamp-2">{event.title}</p>
+      <p className="text-xs font-bold text-white leading-snug pr-12 line-clamp-2">{event.title}</p>
 
       {isToday ? (
         <p className="text-lg font-black text-red-400 leading-none">Today!</p>
@@ -85,24 +95,40 @@ function CountdownCard({ event, onDelete }) {
         </div>
       )}
 
-      <p className="text-[10px] text-white/35 flex items-center gap-1">
-        <CalendarDays className="w-2.5 h-2.5 shrink-0" />
-        {fmtDate(event.due_date)}
-      </p>
+      <div className="space-y-0.5">
+        <p className="text-[10px] text-white/35 flex items-center gap-1">
+          <CalendarDays className="w-2.5 h-2.5 shrink-0" />
+          {fmtDate(event.due_date)}
+        </p>
+        <p className="text-[10px] text-white/35 flex items-center gap-1">
+          <Clock className="w-2.5 h-2.5 shrink-0" />
+          {fmtTime(event.due_date)}
+        </p>
+      </div>
     </div>
   );
 }
 
-function AddModal({ onClose, onAdd }) {
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState("Assignment");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("23:59");
+function EventModal({ onClose, onSave, editingEvent }) {
+  const isEdit = !!editingEvent;
+
+  // Parse existing due_date into date + time parts for the inputs
+  const parsedDate = isEdit && editingEvent.due_date
+    ? editingEvent.due_date.slice(0, 10)
+    : "";
+  const parsedTime = isEdit && editingEvent.due_date
+    ? editingEvent.due_date.slice(11, 16)
+    : "23:59";
+
+  const [title, setTitle] = useState(isEdit ? editingEvent.title : "");
+  const [type, setType] = useState(isEdit ? editingEvent.type : "Assignment");
+  const [date, setDate] = useState(parsedDate);
+  const [time, setTime] = useState(parsedTime);
 
   function submit(e) {
     e.preventDefault();
     if (!title.trim() || !date) return;
-    onAdd({ title, type, due_date: `${date}T${time}:00` });
+    onSave({ title, type, due_date: `${date}T${time}:00`, id: editingEvent?.id });
     onClose();
   }
 
@@ -110,7 +136,7 @@ function AddModal({ onClose, onAdd }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
       <div className="bg-[#0d0d1a] border border-white/10 rounded-2xl p-6 space-y-5 w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between">
-          <p className="font-bold text-white">Add Event</p>
+          <p className="font-bold text-white">{isEdit ? "Edit Event" : "Add Event"}</p>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/8 transition-colors">
             <X className="w-4 h-4 text-white/50" />
           </button>
@@ -155,7 +181,7 @@ function AddModal({ onClose, onAdd }) {
 
           <button type="submit" disabled={!title.trim() || !date}
             className="w-full bg-white/10 border border-white/20 text-white font-semibold text-sm py-3 rounded-xl hover:bg-white/15 active:scale-[0.98] transition-all disabled:opacity-40">
-            Add Event
+            {isEdit ? "Save Changes" : "Add Event"}
           </button>
         </form>
       </div>
@@ -163,7 +189,7 @@ function AddModal({ onClose, onAdd }) {
   );
 }
 
-function CategoryLane({ category, events, onDelete, onAdd }) {
+function CategoryLane({ category, events, onDelete, onEdit, onAdd }) {
   const cfg = TYPE_CONFIG[category];
   const Icon = cfg.icon;
   const laneEvents = events.filter(e => e.type === category);
@@ -190,7 +216,7 @@ function CategoryLane({ category, events, onDelete, onAdd }) {
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {laneEvents.map(ev => (
             <div key={ev.id} className="flex-shrink-0 w-[150px]">
-              <CountdownCard event={ev} onDelete={onDelete} />
+              <CountdownCard event={ev} onDelete={onDelete} onEdit={onEdit} />
             </div>
           ))}
           <button onClick={onAdd}
@@ -207,20 +233,45 @@ function CategoryLane({ category, events, onDelete, onAdd }) {
 export default function ExamCountdown() {
   const [events, setEvents] = useState(() => getManualEvents());
   const [showModal, setShowModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
 
   function handleAdd(data) {
     setEvents(addManualEvent(data));
+  }
+
+  function handleEdit(event) {
+    setEditingEvent(event);
+    setShowModal(true);
+  }
+
+  function handleSave({ title, type, due_date, id }) {
+    if (id) {
+      // Edit existing
+      const updated = getManualEvents().map(e =>
+        e.id === id ? { ...e, title, type, due_date } : e
+      ).sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+      saveManualEvents(updated);
+      setEvents(updated);
+    } else {
+      // New event
+      setEvents(addManualEvent({ title, type, due_date }));
+    }
   }
 
   function handleDelete(id) {
     setEvents(deleteManualEvent(id));
   }
 
+  function openAddModal() {
+    setEditingEvent(null);
+    setShowModal(true);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <p className="text-xs font-bold uppercase tracking-widest text-white/30">Upcoming</p>
-        <button onClick={() => setShowModal(true)}
+        <button onClick={openAddModal}
           className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5">
           <Plus className="w-3 h-3" /> Add event
         </button>
@@ -233,12 +284,19 @@ export default function ExamCountdown() {
             category={cat}
             events={events}
             onDelete={handleDelete}
-            onAdd={() => setShowModal(true)}
+            onEdit={handleEdit}
+            onAdd={openAddModal}
           />
         ))}
       </div>
 
-      {showModal && <AddModal onClose={() => setShowModal(false)} onAdd={handleAdd} />}
+      {showModal && (
+        <EventModal
+          onClose={() => { setShowModal(false); setEditingEvent(null); }}
+          onSave={handleSave}
+          editingEvent={editingEvent}
+        />
+      )}
     </div>
   );
 }

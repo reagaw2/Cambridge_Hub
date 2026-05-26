@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, getMCQOnlyTopicNames, getStreakData, recordAppOpen, shouldShowReviewGate, getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { csGetTopicData } from "@/lib/csTopicStore";
-import { Atom, Code2, FileText, BookOpen, GraduationCap, Zap, Star, ArrowRight, Lock, Users } from "lucide-react";
+import { Atom, Code2, FileText, BookOpen, GraduationCap, Star, ArrowRight, Lock, Users } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import ReviewGate from "@/components/ReviewGate";
 
@@ -181,10 +181,6 @@ export default function SubjectSelection() {
 
         {/* Hero */}
         <div className="pt-8 pb-10 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-xs text-white/60">
-            <Zap className="w-3 h-3 text-purple-400" />
-            Cambridge Syllabus 2024–2026
-          </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight">
             <span className="text-white">{getGreeting(displayName)} 👋</span>
           </h1>

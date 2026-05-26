@@ -2,7 +2,7 @@
  * ExamCountdown — horizontal grid of upcoming Canvas exam cards.
  */
 import { useEffect, useState, useCallback } from "react";
-import { loadExamCountdown, daysUntil } from "@/lib/examCountdownStore";
+import { loadExamCountdown, fetchExamEvents, daysUntil } from "@/lib/examCountdownStore";
 import { CalendarDays, Clock, FileText, FlaskConical, RefreshCw, AlertCircle } from "lucide-react";
 
 const TYPE_CONFIG = {
@@ -131,42 +131,42 @@ export default function ExamCountdown() {
   const [fromCache, setFromCache] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (silent = false) => {
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+  const initialLoad = useCallback(async () => {
+    setLoading(true);
     setError(null);
-
     try {
-      // For a silent refresh, call the API directly (skip cache)
-      if (silent) {
-        const { fetchExamEvents } = await import("@/lib/examCountdownStore");
-        const fresh = await fetchExamEvents();
-        // Write to cache
-        try {
-          localStorage.setItem("exam_countdown_cache", JSON.stringify({ data: fresh, timestamp: Date.now() }));
-        } catch {}
+      const { events: loaded, fromCache: cached } = await loadExamCountdown((fresh) => {
         setEvents(fresh);
         setFromCache(false);
-      } else {
-        const { events: loaded, fromCache: cached } = await loadExamCountdown((fresh) => {
-          setEvents(fresh);
-          setFromCache(false);
-        });
-        setEvents(loaded);
-        setFromCache(cached);
-      }
+      });
+      setEvents(loaded);
+      setFromCache(cached);
     } catch (err) {
       setError(err.message ?? "Unknown error");
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(false); }, [load]);
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setError(null);
+    try {
+      const fresh = await fetchExamEvents();
+      try {
+        localStorage.setItem("exam_countdown_cache", JSON.stringify({ data: fresh, timestamp: Date.now() }));
+      } catch {}
+      setEvents(fresh);
+      setFromCache(false);
+    } catch (err) {
+      setError(err.message ?? "Unknown error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing]);
+
+  useEffect(() => { initialLoad(); }, [initialLoad]);
 
   return (
     <div className="space-y-3">
@@ -178,7 +178,7 @@ export default function ExamCountdown() {
           )}
         </div>
         <button
-          onClick={() => { if (!refreshing && !loading) load(true); }}
+          onClick={handleRefresh}
           disabled={refreshing || loading}
           className="flex items-center gap-1 text-[11px] text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
         >

@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { CalendarDays, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine, Pencil, Clock } from "lucide-react";
-import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent, saveManualEvents } from "@/lib/examCountdownStore";
+import { useState, useEffect } from "react";
+import { CalendarDays, FileText, FlaskConical, BookOpen, Plus, Trash2, X, PenLine, Pencil, Clock, Loader2 } from "lucide-react";
+import { daysUntil, getManualEvents, addManualEvent, deleteManualEvent, saveManualEvents, loadEvents } from "@/lib/examCountdownStore";
 
 const CATEGORIES = ["Exam", "Test", "Quiz", "Assignment"];
 
@@ -58,7 +58,6 @@ function fmtTime(iso) {
 function CountdownCard({ event, onDelete, onEdit }) {
   const days = daysUntil(event.due_date);
   const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG["Assignment"];
-  const Icon = cfg.icon;
   const isPast = days !== null && days < 0;
   const isToday = days === 0;
   const isUrgent = days !== null && days >= 0 && days <= 3;
@@ -66,7 +65,6 @@ function CountdownCard({ event, onDelete, onEdit }) {
 
   return (
     <div className={`group relative rounded-xl border p-4 flex flex-col gap-2 overflow-hidden transition-all duration-200 hover:scale-[1.015] ${isPast ? "border-white/8 opacity-40" : `${cfg.border} ${cfg.glow}`} bg-gradient-to-br ${isPast ? "from-white/[0.02] to-transparent" : cfg.bg}`}>
-      {/* Action buttons */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
         <button
           onClick={() => onEdit(event)}
@@ -112,13 +110,8 @@ function CountdownCard({ event, onDelete, onEdit }) {
 function EventModal({ onClose, onSave, editingEvent }) {
   const isEdit = !!editingEvent;
 
-  // Parse existing due_date into date + time parts for the inputs
-  const parsedDate = isEdit && editingEvent.due_date
-    ? editingEvent.due_date.slice(0, 10)
-    : "";
-  const parsedTime = isEdit && editingEvent.due_date
-    ? editingEvent.due_date.slice(11, 16)
-    : "23:59";
+  const parsedDate = isEdit && editingEvent.due_date ? editingEvent.due_date.slice(0, 10) : "";
+  const parsedTime = isEdit && editingEvent.due_date ? editingEvent.due_date.slice(11, 16) : "23:59";
 
   const [title, setTitle] = useState(isEdit ? editingEvent.title : "");
   const [type, setType] = useState(isEdit ? editingEvent.type : "Assignment");
@@ -231,9 +224,19 @@ function CategoryLane({ category, events, onDelete, onEdit, onAdd }) {
 }
 
 export default function ExamCountdown() {
+  // Start with local cache for instant render, then hydrate from Supabase
   const [events, setEvents] = useState(() => getManualEvents());
+  const [syncing, setSyncing] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+
+  // On mount: pull from Supabase (cross-device sync)
+  useEffect(() => {
+    loadEvents().then(remote => {
+      setEvents(remote);
+      setSyncing(false);
+    }).catch(() => setSyncing(false));
+  }, []);
 
   function handleAdd(data) {
     setEvents(addManualEvent(data));
@@ -246,14 +249,12 @@ export default function ExamCountdown() {
 
   function handleSave({ title, type, due_date, id }) {
     if (id) {
-      // Edit existing
-      const updated = getManualEvents().map(e =>
+      const updated = events.map(e =>
         e.id === id ? { ...e, title, type, due_date } : e
       ).sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
       saveManualEvents(updated);
       setEvents(updated);
     } else {
-      // New event
       setEvents(addManualEvent({ title, type, due_date }));
     }
   }
@@ -270,7 +271,10 @@ export default function ExamCountdown() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <p className="text-xs font-bold uppercase tracking-widest text-white/30">Upcoming</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-white/30">Upcoming</p>
+          {syncing && <Loader2 className="w-3 h-3 text-white/20 animate-spin" />}
+        </div>
         <button onClick={openAddModal}
           className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5">
           <Plus className="w-3 h-3" /> Add event

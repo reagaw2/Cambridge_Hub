@@ -10,6 +10,8 @@ Originally developed at African Leadership Academy (ALA) in Johannesburg, South 
 - Physics (9702)
 - Computer Science (9618)
 
+[Open Cambridge Hub](https://cambridgehub.vercel.app/)
+
 ## Problem
 
 Students preparing for Cambridge A Level examinations often face several structural challenges:

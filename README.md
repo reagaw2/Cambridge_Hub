@@ -1,39 +1,95 @@
-**Welcome to your Base44 project** 
+# Cambridge Hub
 
-**About**
+## AI-Powered Cambridge Exam Preparation Platform
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+Cambridge Hub is an AI-assisted CAIE exam preparation platform designed to help students prepare more intelligently for Cambridge A Level examinations.
 
-This project contains everything you need to run your app locally.
+The platform combines structured question banks, AI-powered conceptual explanations, and personalized performance analytics to create a more effective and data-driven revision experience.
 
-**Edit the code in your local development environment**
+Originally developed at African Leadership Academy (ALA) in Johannesburg, South Africa, Cambridge Hub was built to address the challenges students face when revising high-pressure Cambridge subjects such as:
+- Physics (9702)
+- Computer Science (9618)
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+## Problem
 
-**Prerequisites:** 
+Students preparing for Cambridge A Level examinations often face several structural challenges:
 
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
+- Revision is fragmented across PDFs, past papers, and notes with no centralized system
+- Students tend to memorize mark schemes without developing true conceptual understanding
+- It is difficult to identify weak areas across an entire syllabus consistently
+- Most revision methods are passive rather than active and performance-driven
+- Feedback is often delayed or unavailable, making improvement slow and inefficient
 
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
+In high-pressure academic environments such as African Leadership Academy (ALA), these challenges are amplified due to competitive expectations and limited time before exams.
 
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
-```
+## Core Features
 
-Run the app: `npm run dev`
+### Structured Question Banks
+- Physics (9702) and Computer Science (9618)
+- Multiple choice and structured written questions
+- Syllabus-aligned chapter organization
+- Randomized/shuffle revision modes
+- Admin-managed question editing and updates
 
-**Publish your changes**
+### AI-Powered “Teach Me How” Explanations
+- AI-generated conceptual explanations for mark schemes
+- Step-by-step reasoning support
+- Focus on understanding rather than memorization
+- Powered by the Anthropic API
 
-Open [Base44.com](http://Base44.com) and click on Publish.
+### Weak Topic Analytics
+- Tracks recurring mistakes across topics
+- Identifies weakest syllabus areas automatically
+- Helps students prioritize revision more effectively
+- Generates focused improvement feedback after practice sessions
 
-**Docs & Support**
+### Study Engagement System
+- Daily revision streak tracking
+- Rest Day Pass system for sustainable consistency
+- Review gate system after prolonged inactivity
+- Exam countdown timers for urgency and preparation awareness
 
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
+### Planned Features
+- Adaptive revision scheduling
+- Predictive performance analytics
+- AI-guided tutoring workflows
+- Peer study-group matching
+- Expanded Cambridge subject support
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+## Tech Stack
+
+Cambridge Hub is built using a combination of low-code infrastructure, AI systems, and cloud-based educational content workflows.
+
+### Frontend & Application Layer
+- Base44
+- React-based frontend architecture
+- JavaScript
+
+### AI & Intelligent Systems
+- Anthropic API (Claude Sonnet)
+- AI-assisted conceptual explanation workflows
+- Performance analytics systems
+
+### Content & Data Management
+- Google Drive integration for Cambridge past paper storage
+- Structured syllabus-based question organization
+- Manual extraction and curation of examination content
+
+### Product Focus
+The platform is designed around:
+- adaptive revision workflows
+- active learning principles
+- performance feedback systems
+- high-engagement study behaviors
+
+## Product Vision
+
+Cambridge Hub aims to become Africa’s leading AI-powered platform for Cambridge academic mastery.
+
+The platform is designed around a simple principle:
+
+> Students should spend less time wondering what to study and more time mastering what matters most.
+
+By combining structured revision systems, intelligent analytics, and AI-assisted learning workflows, Cambridge Hub seeks to help students prepare more efficiently, reduce academic stress, and improve performance in high-pressure examination environments.
+
+The long-term goal is to expand beyond a single school environment and provide scalable academic support infrastructure for Cambridge students across Africa.

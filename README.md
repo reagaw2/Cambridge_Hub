@@ -136,3 +136,39 @@ Demonstrates AI-generated conceptual explanations and mark scheme breakdown supp
 
 Displays a review bank where students find questions they failed to attempt fully for review using a spaced repetition system.
 
+
+## Repository Purpose
+
+This repository documents the ongoing development and iteration of Cambridge Hub as an AI-powered educational platform for Cambridge students.
+
+The project serves as:
+- a production educational application
+- a product design and experimentation environment
+- an exploration of AI-assisted learning systems
+- a study of revision behavior and academic performance workflows
+
+The repository tracks:
+- feature development
+- UI/UX improvements
+- AI integration workflows
+- revision system design
+- educational analytics experimentation
+- platform scalability planning
+
+Cambridge Hub is actively evolving through continuous student feedback, iteration, and real-world academic use cases.
+
+
+## Creator
+
+Cambridge Hub was created by Reagan Mungoma, a student developer and aspiring AI/Data Science engineer focused on educational technology, intelligent learning systems, and student-centered product design.
+
+The platform was originally developed from firsthand experience preparing for Cambridge A Level examinations at African Leadership Academy (ALA) in Johannesburg, South Africa.
+
+Cambridge Hub reflects an ongoing interest in:
+- AI-assisted learning systems
+- academic performance optimization
+- behavioral product design
+- educational accessibility across Africa
+- scalable student support infrastructure
+
+The project continues to evolve through experimentation, iteration, and direct student feedback.

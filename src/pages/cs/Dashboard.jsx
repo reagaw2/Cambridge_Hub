@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { csGetTopicData, csGetReviewBank, csGetGuessReviewBank } from "@/lib/csTopicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Code2 } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Code2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 function getLockStatus(locked_until) {
@@ -262,18 +262,6 @@ export default function CSDashboard() {
 
   const { containerRef, pullY, refreshing, onTouchStart, onTouchMove, onTouchEnd } = usePullToRefresh(handleRefresh);
 
-  const focusTopic = ACTIVE_KEYS
-    .map(k => ({ key: k, data: topicData[k] }))
-    .filter(t => t.data)
-    .sort((a, b) => trendToScore(a.data.trend) - trendToScore(b.data.trend))[0];
-
-  const focusLabel = focusTopic
-    ? CHAPTERS.flatMap(c => c.topics).find(t => t.key === focusTopic.key)?.label
-    : "Operating Systems";
-  const focusRoute = focusTopic
-    ? CHAPTERS.flatMap(c => c.topics).find(t => t.key === focusTopic.key)?.route
-    : "/cs/operating-systems/question";
-
   return (
     <div className="min-h-screen bg-[#0d0d1a] text-white">
       {/* Ambient glow */}
@@ -321,18 +309,18 @@ export default function CSDashboard() {
 
         <div className="flex-1 flex flex-col gap-5 p-4 pt-6 pb-8">
 
-          {/* Today's focus */}
-          <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-900/30 to-transparent p-5 space-y-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">Today's Focus</p>
-            <p className="text-sm text-white/80 leading-relaxed">
-              {focusTopic
-                ? `${focusLabel} is your weakest active topic — push further today.`
-                : `Start with ${focusLabel} — it's a core topic and a great place to build momentum.`}
-            </p>
-            <button onClick={() => navigate(focusRoute ?? "/cs/operating-systems/question")}
-              className="text-sm font-semibold text-blue-400 hover:brightness-110 transition-all">
-              Start session →
-            </button>
+          {/* Today's Focus — Coming Soon */}
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5 flex items-center gap-4 opacity-60 cursor-not-allowed select-none">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-blue-400/60" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-0.5">Today's Focus</p>
+              <p className="text-sm text-white/30">AI-powered recommendations</p>
+            </div>
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-blue-400/60 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+              Coming Soon
+            </span>
           </div>
 
           {/* Review Banks */}

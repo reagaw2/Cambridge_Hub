@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import { getStreakData } from "@/lib/topicStore";
 
@@ -209,8 +209,6 @@ export default function Dashboard() {
     await loadDashboardData();
   }
 
-  const gf = topicData["gravitational_fields"];
-
   return (
     <div className="min-h-screen bg-[#0d0d1a] text-white">
       {/* Ambient glow */}
@@ -265,18 +263,18 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Today's focus banner */}
-          <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-900/30 to-transparent p-5 space-y-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">Today's Focus</p>
-            <p className="text-sm text-white/80 leading-relaxed">
-              {gf?.trend === "improving"
-                ? "You're improving on Gravitational Fields — push further today."
-                : "We recommend starting with Gravitational Fields — a core Paper 4 topic."}
-            </p>
-            <button onClick={() => navigate("/gravitational/question")}
-              className="text-sm font-semibold text-emerald-400 hover:brightness-110 transition-all">
-              Start session →
-            </button>
+          {/* Today's Focus — Coming Soon */}
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5 flex items-center gap-4 opacity-60 cursor-not-allowed select-none">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-emerald-400/60" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-0.5">Today's Focus</p>
+              <p className="text-sm text-white/30">AI-powered recommendations</p>
+            </div>
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-400/60 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+              Coming Soon
+            </span>
           </div>
 
           {/* Review Banks */}

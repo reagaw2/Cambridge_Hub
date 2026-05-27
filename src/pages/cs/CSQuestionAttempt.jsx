@@ -11,6 +11,7 @@ import { csRecordAttempt, csAddToReviewBank } from "@/lib/csTopicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import QuestionMedia from "@/components/QuestionMedia";
 import TeachMeHow from "@/components/TeachMeHow";
+import SubmittingOverlay from "@/components/SubmittingOverlay";
 
 // Maps topic_key → the registered route path
 const TOPIC_ROUTES = {
@@ -53,6 +54,9 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     submittedRef.current = true;
     setLoading(true);
     setError(null);
+
+    // Yield two frames so React paints the overlay before the heavy await
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const feedback = await base44.integrations.Core.InvokeLLM({
       prompt: question.prompt(answer),
@@ -105,7 +109,6 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
 
   const handleTeachMeFinalSubmit = async (fb, finalAnswer) => {
     const marksEarned = fb.marks_earned ?? 0;
-    const fullMarks = marksEarned >= question.total_marks;
     const nextIdx = idx + 1;
     const isLastQuestion = nextIdx >= total;
 
@@ -204,6 +207,9 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
           )}
         </div>
       </div>
+
+      {/* Submitting overlay — same as Physics */}
+      {loading && <SubmittingOverlay />}
     </div>
   );
 }

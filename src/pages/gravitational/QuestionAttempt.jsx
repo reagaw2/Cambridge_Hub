@@ -1,21 +1,20 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import AnswerInput from "../../components/AnswerInput";
 import { getNextGravitationalQuestion, advanceGravitationalIndex, GRAVITATIONAL_QUESTIONS } from "@/lib/gravitationalBank";
-import { recordAttempt, addToReviewBank } from "@/lib/topicStore";
+import { recordAttempt, addToReviewBank, writeMistakeDna } from "@/lib/topicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
+import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
 
 export default function GravitationalQuestionAttempt() {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [overrideQuestion, setOverrideQuestion] = useState(null);
   const [showTeachMe, setShowTeachMe] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const { submit, loading, error, setError } = useNodeAwareSubmit();
 
   const queued = getNextGravitationalQuestion();
   const question = overrideQuestion ?? queued.question;
@@ -24,51 +23,29 @@ export default function GravitationalQuestionAttempt() {
   const isEmpty = answer.trim().length === 0;
 
   const handleSubmit = async () => {
-    setSubmitting(true);
-    setError(null);
+    const fb = await submit(question, answer);
+    if (!fb) return;
 
-    const feedback = await base44.integrations.Core.InvokeLLM({
-      prompt: question.prompt(answer),
-      model: "claude_sonnet_4_6",
-      response_json_schema: question.response_schema,
-    }).catch(() => null);
-
-    setSubmitting(false);
-
-    if (!feedback) {
-      setError("Something went wrong. Please try again.");
-      return;
-    }
-
-    const fb = feedback.response ?? feedback;
     const marksEarned = fb.marks_earned ?? 0;
     const fullMarks = marksEarned >= question.total_marks;
 
     await recordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
     if (!fullMarks) {
+      writeMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, answer).catch(() => {});
       await addToReviewBank({
-        question_id: question.id,
-        topic: question.topic,
-        question_text: question.text,
-        mark_scheme: question.mark_scheme ?? "",
-        total_marks: question.total_marks,
-        first_attempt_score: marksEarned,
-        first_attempt_feedback: fb.cambridge_insight ?? "",
+        question_id: question.id, topic: question.topic, question_text: question.text,
+        mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks,
+        first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "",
+        first_attempt_answer: answer,
       });
     }
 
     advanceGravitationalIndex();
-
     navigate("/feedback", {
       state: {
-        feedback: fb,
-        answer,
-        topicKey: question.topic_key,
-        questionId: question.id,
-        nextFullRoute: "/gravitational/question",
-        nextRetryRoute: "/gravitational/question",
-        backRoute: "/physics",
-        paperRef: question.paper_ref,
+        feedback: fb, answer, topicKey: question.topic_key, questionId: question.id,
+        nextFullRoute: "/gravitational/question", nextRetryRoute: "/gravitational/question",
+        backRoute: "/physics", paperRef: question.paper_ref,
       },
     });
   };
@@ -98,48 +75,28 @@ export default function GravitationalQuestionAttempt() {
           </div>
 
           {showTeachMe ? (
-            <TeachMeHow
-              question={question}
-              onFinalSubmit={async (fb, finalAnswer) => {
-                const marksEarned = fb.marks_earned ?? 0;
-                await recordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
-                await addToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "" });
-                advanceGravitationalIndex();
-                navigate("/feedback", { state: { feedback: fb, answer: finalAnswer, topicKey: question.topic_key, questionId: question.id, nextFullRoute: "/gravitational/question", nextRetryRoute: "/gravitational/question", backRoute: "/physics", paperRef: question.paper_ref } });
-              }}
-              onClose={() => setShowTeachMe(false)}
-            />
+            <TeachMeHow question={question} onFinalSubmit={async (fb, finalAnswer) => {
+              const m = fb.marks_earned ?? 0;
+              await recordAttempt(question.topic_key, m, { total_marks: question.total_marks, question_id: question.id });
+              writeMistakeDna(fb, question.id, question.topic, m, question.total_marks, finalAnswer).catch(() => {});
+              await addToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks, first_attempt_score: m, first_attempt_feedback: fb.cambridge_insight ?? "", first_attempt_answer: finalAnswer });
+              advanceGravitationalIndex();
+              navigate("/feedback", { state: { feedback: fb, answer: finalAnswer, topicKey: question.topic_key, questionId: question.id, nextFullRoute: "/gravitational/question", nextRetryRoute: "/gravitational/question", backRoute: "/physics", paperRef: question.paper_ref } });
+            }} onClose={() => setShowTeachMe(false)} />
           ) : (
             <>
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowTeachMe(true)}
-                  disabled={!isEmpty}
-                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Teach Me How
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isEmpty || submitting}
-                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {submitting ? "Marking…" : "Submit"}
-                </button>
+                <button onClick={() => setShowTeachMe(true)} disabled={!isEmpty} className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Teach Me How</button>
+                <button onClick={handleSubmit} disabled={isEmpty || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{loading ? "Marking…" : "Submit"}</button>
               </div>
               {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
             </>
           )}
-
-          <DevQuestionJumper
-            allQuestions={GRAVITATIONAL_QUESTIONS}
-            onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setShowTeachMe(false); setError(null); }}
-          />
+          <DevQuestionJumper allQuestions={GRAVITATIONAL_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setShowTeachMe(false); setError(null); }} />
         </div>
       </div>
-
-      {submitting && <SubmittingOverlay />}
+      {loading && <SubmittingOverlay />}
     </div>
   );
 }

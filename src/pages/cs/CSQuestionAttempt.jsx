@@ -1,9 +1,8 @@
 /**
- * Shared CS question attempt UI.
+ * Shared CS question attempt UI — uses node-aware grading engine.
  */
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
@@ -11,6 +10,7 @@ import DevQuestionJumper from "@/components/DevQuestionJumper";
 import QuestionMedia from "@/components/QuestionMedia";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
+import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
 
 const TOPIC_ROUTES = {
   operating_systems: "/cs/operating-systems/question",
@@ -27,9 +27,8 @@ const TOPIC_ROUTES = {
 export default function CSQuestionAttempt({ question, idx, total, onAdvance, topicLabel, allQuestions, onOverride }) {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [showTeachMe, setShowTeachMe] = useState(false);
+  const { submit, loading, error, setError } = useNodeAwareSubmit();
   const submittedRef = useRef(false);
 
   if (!question) {
@@ -46,103 +45,48 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
   const topicRoute = TOPIC_ROUTES[question.topic_key] ?? "/cs";
   const isEmpty = answer.trim().length === 0;
 
-  const handleSubmit = async () => {
-    if (submittedRef.current) return;
-    submittedRef.current = true;
-    setLoading(true);
-    setError(null);
-
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-    const feedback = await base44.integrations.Core.InvokeLLM({
-      prompt: question.prompt(answer),
-      model: "claude_sonnet_4_6",
-      response_json_schema: question.response_schema,
-    }).catch(() => null);
-
-    setLoading(false);
-    if (!feedback) { submittedRef.current = false; setError("Something went wrong. Please try again."); return; }
-
-    const fb = feedback.response ?? feedback;
+  function goToFeedback(fb, ans) {
     const marksEarned = fb.marks_earned ?? 0;
-    const fullMarks = marksEarned >= question.total_marks;
-
-    await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
-
-    if (!fullMarks) {
-      // Pass the raw answer as 6th argument so DNA entries include student_response
-      csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, answer).catch(() => {});
-
-      await csAddToReviewBank({
-        question_id: question.id,
-        topic: question.topic,
-        question_text: question.text,
-        mark_scheme: "",
-        total_marks: question.total_marks,
-        first_attempt_score: marksEarned,
-        first_attempt_feedback: fb.cambridge_insight ?? "",
-        first_attempt_answer: answer,
-      });
-    }
-
     const nextIdx = idx + 1;
     const isLastQuestion = nextIdx >= total;
     onAdvance();
-
     navigate("/cs/feedback", {
       state: {
-        feedback: fb,
-        answer,
-        topicKey: question.topic_key,
-        questionId: question.id,
+        feedback: fb, answer: ans,
+        topicKey: question.topic_key, questionId: question.id,
         totalMarks: question.total_marks,
         topicRoute: isLastQuestion ? null : topicRoute,
-        backRoute: topicRoute,
-        dashRoute: "/cs",
+        backRoute: topicRoute, dashRoute: "/cs",
         paperRef: question.paper_ref,
         topicLabel: topicLabel ?? question.topic,
         isLastQuestion,
       },
     });
+  }
+
+  const handleSubmit = async () => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const fb = await submit(question, answer);
+    if (!fb) { submittedRef.current = false; return; }
+
+    const marksEarned = fb.marks_earned ?? 0;
+    await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
+    if (marksEarned < question.total_marks) {
+      csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, answer).catch(() => {});
+      await csAddToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "", first_attempt_answer: answer });
+    }
+    goToFeedback(fb, answer);
   };
 
   const handleTeachMeFinalSubmit = async (fb, finalAnswer) => {
     const marksEarned = fb.marks_earned ?? 0;
-    const nextIdx = idx + 1;
-    const isLastQuestion = nextIdx >= total;
-
     await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
-
-    // Always write DNA for Teach Me How attempts too
     csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, finalAnswer).catch(() => {});
-
-    await csAddToReviewBank({
-      question_id: question.id,
-      topic: question.topic,
-      question_text: question.text,
-      mark_scheme: "",
-      total_marks: question.total_marks,
-      first_attempt_score: marksEarned,
-      first_attempt_feedback: fb.cambridge_insight ?? "",
-      first_attempt_answer: finalAnswer,
-    });
-
-    onAdvance();
-    navigate("/cs/feedback", {
-      state: {
-        feedback: fb,
-        answer: finalAnswer,
-        topicKey: question.topic_key,
-        questionId: question.id,
-        totalMarks: question.total_marks,
-        topicRoute: isLastQuestion ? null : topicRoute,
-        backRoute: topicRoute,
-        dashRoute: "/cs",
-        paperRef: question.paper_ref,
-        topicLabel: topicLabel ?? question.topic,
-        isLastQuestion,
-      },
-    });
+    await csAddToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "", first_attempt_answer: finalAnswer });
+    goToFeedback(fb, finalAnswer);
   };
 
   return (
@@ -153,37 +97,25 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Computer Science</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {question.paper_ref}
-          </span>
+          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{question.paper_ref}</span>
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
-                {question.label}
-              </span>
+              <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">{question.label}</span>
               <span className="font-mono text-[11px] text-muted-foreground">Q{idx + 1} of {total}</span>
             </div>
-            <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-              {question.topic}
-            </span>
+            <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">{question.topic}</span>
             <QuestionMedia question={question} />
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
             <div className="flex justify-end">
-              <span className="font-mono text-xs text-muted-foreground">
-                [{question.total_marks} mark{question.total_marks !== 1 ? "s" : ""}]
-              </span>
+              <span className="font-mono text-xs text-muted-foreground">[{question.total_marks} mark{question.total_marks !== 1 ? "s" : ""}]</span>
             </div>
           </div>
 
           {showTeachMe ? (
-            <TeachMeHow
-              question={question}
-              onFinalSubmit={handleTeachMeFinalSubmit}
-              onClose={() => setShowTeachMe(false)}
-            />
+            <TeachMeHow question={question} onFinalSubmit={handleTeachMeFinalSubmit} onClose={() => setShowTeachMe(false)} />
           ) : (
             <>
               <AnswerInput value={answer} onChange={setAnswer} />
@@ -206,8 +138,9 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
               {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
             </>
           )}
+
           {allQuestions && onOverride && (
-            <DevQuestionJumper allQuestions={allQuestions} onJump={(q) => { onOverride(q); }} />
+            <DevQuestionJumper allQuestions={allQuestions} onJump={(q) => { onOverride(q); setAnswer(""); setShowTeachMe(false); setError(null); }} />
           )}
         </div>
       </div>

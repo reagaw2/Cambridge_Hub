@@ -1,66 +1,47 @@
-/**
- * AITutors — lists all AI tutors the student can chat with.
- */
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronRight } from "lucide-react";
-import { TUTORS } from "@/lib/tutorConfig";
+import { ArrowLeft, Lock, BrainCircuit } from "lucide-react";
 
 export default function AITutors() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#0d0d1a] text-white">
+    <div className="min-h-screen bg-[#0d0d1a] text-white flex flex-col">
       {/* Ambient */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-purple-600/15 blur-[120px]" />
-        <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-[140px]" />
+        <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-purple-600/10 blur-[120px]" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] rounded-full bg-blue-600/8 blur-[140px]" />
       </div>
 
-      <div className="relative z-10 max-w-[600px] mx-auto px-4 pb-16">
-        {/* Header */}
-        <div className="flex items-center gap-3 pt-6 pb-8">
-          <button
-            onClick={() => navigate("/")}
-            className="p-2 -ml-2 rounded-xl hover:bg-white/5 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-white/60" />
-          </button>
-          <div>
-            <h1 className="text-xl font-extrabold text-white">AI Tutors</h1>
-            <p className="text-xs text-white/40 mt-0.5">Powered by Cambridge syllabus knowledge</p>
-          </div>
+      {/* Top bar */}
+      <div className="relative z-10 flex items-center gap-3 px-4 pt-6 pb-4">
+        <button
+          onClick={() => navigate("/")}
+          className="p-2 -ml-2 rounded-xl hover:bg-white/5 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-white/60" />
+        </button>
+        <h1 className="text-xl font-extrabold text-white">AI Tutors</h1>
+      </div>
+
+      {/* Coming soon content */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 text-center gap-6">
+        <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center">
+          <Lock className="w-8 h-8 text-white/30" />
         </div>
 
-        {/* Tutor cards */}
-        <div className="space-y-4">
-          {TUTORS.map((tutor) => {
-            const { Icon } = tutor;
-            return (
-              <button
-                key={tutor.id}
-                onClick={() => navigate(`/ai-tutors/${tutor.id}`)}
-                className={`group w-full text-left rounded-2xl border bg-gradient-to-r ${tutor.cardBg} ${tutor.cardBorder} ${tutor.glowColor} p-5 transition-all duration-300`}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${tutor.iconBg}`}>
-                      <Icon className={`w-6 h-6 ${tutor.iconColor}`} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-white text-base">{tutor.name}</p>
-                      <p className="text-xs text-white/50 mt-0.5 leading-relaxed max-w-[260px]">{tutor.description}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-white/60 group-hover:translate-x-0.5 transition-all shrink-0" />
-                </div>
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          <p className="text-2xl font-bold text-white/80">Coming Soon</p>
+          <p className="text-sm text-white/35 leading-relaxed max-w-[260px]">
+            AI Tutors are being upgraded and will be back shortly.
+          </p>
         </div>
 
-        <p className="text-center text-[11px] text-white/20 mt-10">
-          These tutors use AI — always verify key facts with official Cambridge resources.
-        </p>
+        <button
+          onClick={() => navigate("/")}
+          className="mt-4 px-6 py-3 rounded-xl bg-white/8 border border-white/10 text-sm font-semibold text-white/60 hover:bg-white/12 transition-all"
+        >
+          Back to Dashboard
+        </button>
       </div>
     </div>
   );

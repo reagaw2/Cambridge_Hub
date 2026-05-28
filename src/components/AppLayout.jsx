@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { Home, BrainCircuit, User } from "lucide-react";
+import { Home, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Routes where bottom nav should be hidden (question/answer flows)
@@ -31,21 +31,13 @@ const pageVariants = {
 
 const pageTransition = { duration: 0.22, ease: "easeInOut" };
 
-// Tabs that preserve independent navigation state by staying mounted
-const TAB_ROOTS = ["/", "/profile"];
-
-function isTabRoot(pathname) {
-  return TAB_ROOTS.includes(pathname);
-}
-
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const hideNav = shouldHideNav(location.pathname);
 
   const activeTab =
-    location.pathname === "/profile" ? "/profile" :
-    location.pathname.startsWith("/ai-tutors") ? "/ai-tutors" : "/physics";
+    location.pathname === "/profile" ? "/profile" : "/home";
 
   return (
     <div
@@ -80,20 +72,25 @@ export default function AppLayout() {
               onClick={() => navigate("/")}
               className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
             >
-              <Home className={`w-5 h-5 ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`} />
-              <span className={`text-[10px] font-medium ${activeTab === "/physics" ? "text-primary" : "text-muted-foreground/50"}`}>
+              <Home className={`w-5 h-5 ${activeTab === "/home" ? "text-primary" : "text-muted-foreground/50"}`} />
+              <span className={`text-[10px] font-medium ${activeTab === "/home" ? "text-primary" : "text-muted-foreground/50"}`}>
                 Home
               </span>
             </button>
           )}
 
-          <button
-            className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
-            onClick={() => navigate("/ai-tutors")}
-          >
-            <BrainCircuit className={`w-5 h-5 ${activeTab === "/ai-tutors" ? "text-primary" : "text-muted-foreground/50"}`} />
-            <span className={`text-[10px] font-medium ${activeTab === "/ai-tutors" ? "text-primary" : "text-muted-foreground/50"}`}>AI Tutors</span>
-          </button>
+          {/* AI Tutors — locked, coming soon */}
+          <div className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] opacity-35 cursor-not-allowed select-none">
+            <div className="relative">
+              {/* Brain icon as SVG inline to avoid importing BrainCircuit while keeping the look */}
+              <svg className="w-5 h-5 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.04-4.9 2.5 2.5 0 0 1-1-3.95 2.5 2.5 0 0 1 1.5-4.59A2.5 2.5 0 0 1 9.5 2Z"/>
+                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.04-4.9 2.5 2.5 0 0 0 1-3.95 2.5 2.5 0 0 0-1.5-4.59A2.5 2.5 0 0 0 14.5 2Z"/>
+              </svg>
+              <span className="absolute -top-1 -right-2 text-[8px] font-bold text-white/40 leading-none">🔒</span>
+            </div>
+            <span className="text-[10px] font-medium text-muted-foreground/50">AI Tutors</span>
+          </div>
 
           <button
             className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"

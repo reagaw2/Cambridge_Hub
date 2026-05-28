@@ -4,11 +4,11 @@
  */
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import QuestionMedia from "@/components/QuestionMedia";
-import SubmitButton from "@/components/SubmitButton";
+import SubmittingOverlay from "@/components/SubmittingOverlay";
+import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
 import { csGetReviewBank, csRemoveFromReviewBank, csResetReviewBankLock } from "@/lib/csTopicStore";
 
 // All CS question banks keyed by question ID for lookup
@@ -22,7 +22,6 @@ import { NETWORKS_QUESTIONS } from "@/lib/csNetworksBank";
 import { DATA_SECURITY_QUESTIONS } from "@/lib/csDataSecurityBank";
 import { DATA_INTEGRITY_QUESTIONS } from "@/lib/csDataIntegrityBank";
 
-// Build a flat lookup map: question_id → question object
 const ALL_CS_QUESTIONS = [
   ...OS_QUESTIONS, ...LT_QUESTIONS, ...DATA_REP_QUESTIONS,
   ...COMPRESSION_QUESTIONS, ...COMP_QUESTIONS, ...ETHICS_QUESTIONS,
@@ -36,9 +35,8 @@ export default function CSReviewSession() {
   const [bank, setBank] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
   const [loadingBank, setLoadingBank] = useState(true);
-  const [error, setError] = useState(null);
+  const { submit, loading, error } = useNodeAwareSubmit();
 
   useEffect(() => {
     csGetReviewBank().then(rb => {
@@ -47,7 +45,6 @@ export default function CSReviewSession() {
         return new Date(q.locked_until).getTime() <= Date.now();
       });
       setBank(unlocked);
-      // If a specific question was requested (from review bank card), find it
       if (state?.questionId) {
         const idx = unlocked.findIndex(q => q.question_id === state.questionId);
         if (idx >= 0) setCurrentIdx(idx);
@@ -90,19 +87,9 @@ export default function CSReviewSession() {
   }
 
   const handleSubmit = async () => {
-    setLoading(true);
-    setError(null);
+    const fb = await submit(question, answer);
+    if (!fb) return;
 
-    const feedback = await base44.integrations.Core.InvokeLLM({
-      prompt: question.prompt(answer),
-      model: "claude_sonnet_4_6",
-      response_json_schema: question.response_schema,
-    }).catch(() => null);
-
-    setLoading(false);
-    if (!feedback) { setError("Something went wrong. Please try again."); return; }
-
-    const fb = feedback.response ?? feedback;
     const marksEarned = fb.marks_earned ?? 0;
     const fullMarks = marksEarned >= question.total_marks;
 
@@ -172,10 +159,18 @@ export default function CSReviewSession() {
           </div>
 
           <AnswerInput value={answer} onChange={setAnswer} />
-          <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
+          <button
+            onClick={handleSubmit}
+            disabled={answer.trim().length === 0 || loading}
+            className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {loading ? "Marking…" : "Submit Answer"}
+          </button>
           {error && <p className="text-center text-sm text-red-400/80">{error}</p>}
         </div>
       </div>
+
+      {loading && <SubmittingOverlay />}
     </div>
   );
 }

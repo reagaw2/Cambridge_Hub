@@ -1,6 +1,5 @@
 /**
  * Shared CS question attempt UI.
- * Used by all CS topic question pages.
  */
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -71,8 +70,8 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
 
     if (!fullMarks) {
-      // Persist Mistake DNA to Supabase
-      csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks).catch(() => {});
+      // Pass the raw answer as 6th argument so DNA entries include student_response
+      csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, answer).catch(() => {});
 
       await csAddToReviewBank({
         question_id: question.id,
@@ -82,12 +81,12 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
         total_marks: question.total_marks,
         first_attempt_score: marksEarned,
         first_attempt_feedback: fb.cambridge_insight ?? "",
+        first_attempt_answer: answer,
       });
     }
 
     const nextIdx = idx + 1;
     const isLastQuestion = nextIdx >= total;
-
     onAdvance();
 
     navigate("/cs/feedback", {
@@ -114,8 +113,8 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
 
     await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
 
-    // Always persist DNA for Teach Me How (student needed guided support)
-    csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks).catch(() => {});
+    // Always write DNA for Teach Me How attempts too
+    csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, finalAnswer).catch(() => {});
 
     await csAddToReviewBank({
       question_id: question.id,
@@ -125,6 +124,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
       total_marks: question.total_marks,
       first_attempt_score: marksEarned,
       first_attempt_feedback: fb.cambridge_insight ?? "",
+      first_attempt_answer: finalAnswer,
     });
 
     onAdvance();

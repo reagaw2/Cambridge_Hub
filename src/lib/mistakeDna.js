@@ -1,27 +1,20 @@
 /**
  * mistakeDna.js — Mistake DNA Classification Engine
  *
- * Parses Claude's feedback object (mark_1, mark_2, … or pulse_layer_2_marks)
- * and produces a structured array of DNA entries that are stored in the
- * Supabase `mistake_dna` JSONB column on StudentData.
+ * Each entry now includes `student_response` — the raw text the student typed.
  *
- * Each entry:
  * {
- *   mark_type:      "B1" | "M1" | "A1" | "C1"
- *   error_category: "Precision Phrasing Flaw" | "Missing Keyword" |
- *                   "Conceptual Misunderstanding" | "Incomplete Definition" |
- *                   "Wrong Direction / Sign" | "Unit / Notation Error" |
- *                   "Omitted Qualifying Condition" | "Logical Gap"
- *   concept_node:   string — the exact keyword or phrase that was missed
- *   question_id:    string
- *   topic:          string
- *   subject:        "physics" | "cs"
- *   date:           ISO date string
- *   session_score:  number  (marks_earned / total_marks as a ratio 0–1)
+ *   mark_type:        "B1" | "M1" | "A1" | "C1"
+ *   error_category:   string
+ *   concept_node:     string — the exact keyword or phrase that was missed
+ *   student_response: string — the raw text the student submitted
+ *   question_id:      string
+ *   topic:            string
+ *   subject:          "physics" | "cs"
+ *   date:             ISO date string
+ *   session_score:    number  (marks_earned / total_marks as a ratio 0–1)
  * }
  */
-
-// ── Error category heuristics ──────────────────────────────────────────────
 
 const PRECISION_SIGNALS = [
   "per unit", "proportional", "inversely", "directly", "rate of",
@@ -70,7 +63,6 @@ function classifyError(keyword, feedbackText) {
   if (PRECISION_SIGNALS.some(s => combined.includes(s))) return "Precision Phrasing Flaw";
   if (CONCEPTUAL_SIGNALS.some(s => combined.includes(s))) return "Conceptual Misunderstanding";
 
-  // Fallback: short keyword → probably a missing term; longer → logical gap
   if (kw.split(" ").length <= 4) return "Missing Keyword";
   return "Logical Gap";
 }
@@ -92,29 +84,33 @@ function inferMarkType(markKey, feedbackObj) {
 /**
  * buildMistakeDna
  *
- * @param {object} feedback    — full Claude response object
+ * @param {object} feedback        — full Claude response object
  * @param {string} questionId
  * @param {string} topic
- * @param {string} subject     — "physics" | "cs"
+ * @param {string} subject         — "physics" | "cs"
  * @param {number} marksEarned
  * @param {number} totalMarks
- * @returns {Array}            — array of DNA entry objects (only missed marks)
+ * @param {string} studentResponse — the raw text the student submitted
+ * @returns {Array}                — array of DNA entry objects (only missed marks)
  */
-export function buildMistakeDna(feedback, questionId, topic, subject, marksEarned, totalMarks) {
+export function buildMistakeDna(feedback, questionId, topic, subject, marksEarned, totalMarks, studentResponse = "") {
   if (!feedback) return [];
 
   const date = new Date().toISOString();
   const sessionScore = totalMarks > 0 ? marksEarned / totalMarks : 0;
+  // Cap stored response at 600 chars to keep payloads lean
+  const responseText = (studentResponse ?? "").trim().slice(0, 600);
   const dna = [];
 
   // ── Source A: pulse_layer_2_marks (structured) ────────────────────────
   if (Array.isArray(feedback.pulse_layer_2_marks) && feedback.pulse_layer_2_marks.length > 0) {
     for (const m of feedback.pulse_layer_2_marks) {
-      if (m.earned) continue; // only missed marks
+      if (m.earned) continue;
       dna.push({
         mark_type: m.notation ?? "B1",
         error_category: classifyError(m.description, m.examiner_note),
         concept_node: (m.description ?? m.keyword ?? "").trim(),
+        student_response: responseText,
         question_id: questionId,
         topic: topic ?? "Unknown",
         subject: subject ?? "physics",
@@ -136,6 +132,7 @@ export function buildMistakeDna(feedback, questionId, topic, subject, marksEarne
       mark_type: inferMarkType(key, feedback),
       error_category: classifyError(val.keyword, val.feedback),
       concept_node: (val.keyword ?? "").trim(),
+      student_response: responseText,
       question_id: questionId,
       topic: topic ?? "Unknown",
       subject: subject ?? "physics",
@@ -151,7 +148,7 @@ export function buildMistakeDna(feedback, questionId, topic, subject, marksEarne
  * mergeMistakeDna
  *
  * Merges new DNA entries into an existing array stored in Supabase.
- * Caps at 500 entries total (oldest removed first) to avoid unbounded growth.
+ * Caps at 500 entries total (oldest removed first).
  * Deduplicates within the same session (same question_id + concept_node + date day).
  */
 export function mergeMistakeDna(existing = [], incoming = []) {
@@ -167,17 +164,12 @@ export function mergeMistakeDna(existing = [], incoming = []) {
   });
 
   const merged = [...existing, ...filtered];
-
-  // Cap at 500 — keep most recent
   if (merged.length > 500) return merged.slice(merged.length - 500);
   return merged;
 }
 
 /**
  * getWeakestConcepts
- *
- * Returns the top N concept nodes ranked by frequency of miss.
- * Useful for dashboards and study planner.
  */
 export function getWeakestConcepts(mistakeDna = [], topN = 10) {
   const freq = {};
@@ -196,8 +188,6 @@ export function getWeakestConcepts(mistakeDna = [], topN = 10) {
 
 /**
  * getMistakeDnaForTopic
- *
- * Filters the full DNA array down to a specific topic or subject.
  */
 export function getMistakeDnaForTopic(mistakeDna = [], topicKey, subject) {
   return mistakeDna.filter(e => {

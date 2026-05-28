@@ -116,14 +116,15 @@ export default function Feedback() {
         recordAttempt(resolvedTopicKey, marksEarned, { total_marks: maxMarks, question_id: questionId });
 
         if (!fullMarks) {
-          writeMistakeDna(feedback, questionId, metaEntry?.topic ?? resolvedTopicKey, marksEarned, maxMarks).catch(() => {});
+          // Pass the raw answer as the 6th argument so every DNA entry gets student_response
+          writeMistakeDna(feedback, questionId, metaEntry?.topic ?? resolvedTopicKey, marksEarned, maxMarks, answer ?? "").catch(() => {});
 
           if (questionId && QUESTION_META[questionId]) {
             addToReviewBank({
               ...QUESTION_META[questionId],
               first_attempt_score: marksEarned,
               first_attempt_feedback: feedback.cambridge_insight ?? "",
-              first_attempt_answer: answer ?? "",  // ← pass the raw answer
+              first_attempt_answer: answer ?? "",
             });
           }
         }
@@ -164,7 +165,6 @@ export default function Feedback() {
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
-
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate(resolvedBack === "/" ? "/physics" : resolvedBack)}
             className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
@@ -179,7 +179,6 @@ export default function Feedback() {
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
-
           <PulseFeedback
             feedback={feedback}
             subject={subject}
@@ -208,7 +207,6 @@ export default function Feedback() {
             <Flame className="w-3.5 h-3.5 text-orange-400/70" />
             <span className="font-mono text-[11px] text-muted-foreground/50">Answer contributes to your streak</span>
           </div>
-
         </div>
       </div>
     </div>

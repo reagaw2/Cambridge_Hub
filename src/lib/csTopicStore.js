@@ -26,46 +26,20 @@ let _ready = false;
 let _readyPromise = null;
 
 function localKey(e) { return `hub_cs_v3_${e}`; }
-
-function readLocal(email) {
-  try { return JSON.parse(localStorage.getItem(localKey(email))); } catch { return null; }
-}
-
-function writeLocal(email, payload) {
-  try { localStorage.setItem(localKey(email), JSON.stringify(payload)); } catch {}
-}
+function readLocal(email) { try { return JSON.parse(localStorage.getItem(localKey(email))); } catch { return null; } }
+function writeLocal(email, payload) { try { localStorage.setItem(localKey(email), JSON.stringify(payload)); } catch {} }
 
 async function fetchFromSupabase(userId) {
-  console.log('[csStore] fetching from Supabase for user:', userId);
-
-  const { data: rows, error } = await supabaseClient
-    .from('StudentData')
-    .select('id, cs_data')
-    .eq('user_id', userId);
-
-  if (error) {
-    console.error('[csStore] FETCH ERROR:', error.message, error.code);
-    return null;
-  }
-
-  console.log('[csStore] fetched rows:', rows?.length ?? 0);
-
+  const { data: rows, error } = await supabaseClient.from('StudentData').select('id, cs_data').eq('user_id', userId);
+  if (error) { console.error('[csStore] FETCH ERROR:', error.message); return null; }
   if (rows && rows.length > 0) {
     const r = rows[0];
     const raw = r.cs_data;
     const data = (raw && typeof raw === "object" && Object.keys(raw).length > 0)
-      ? {
-          topics: raw.topics || {},
-          cs_review_bank: raw.cs_review_bank || [],
-          cs_review_bank_clears: raw.cs_review_bank_clears ?? 0,
-          cs_mcq_attempts: raw.cs_mcq_attempts || [],
-          cs_guess_review_bank: raw.cs_guess_review_bank || [],
-          cs_mistake_dna: Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna : [],
-        }
+      ? { topics: raw.topics || {}, cs_review_bank: raw.cs_review_bank || [], cs_review_bank_clears: raw.cs_review_bank_clears ?? 0, cs_mcq_attempts: raw.cs_mcq_attempts || [], cs_guess_review_bank: raw.cs_guess_review_bank || [], cs_mistake_dna: Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna : [] }
       : DEFAULT_CS_DATA();
     return { id: r.id, data };
   }
-
   return { id: null, data: DEFAULT_CS_DATA() };
 }
 
@@ -73,62 +47,28 @@ async function pushToSupabase(data) {
   if (!_userId) return;
   try {
     if (_recordId) {
-      const { error } = await supabaseClient
-        .from('StudentData')
-        .update({ cs_data: data })
-        .eq('id', _recordId);
-      if (error) console.error('[csStore] UPDATE ERROR:', error.message, error.code);
+      const { error } = await supabaseClient.from('StudentData').update({ cs_data: data }).eq('id', _recordId);
+      if (error) console.error('[csStore] UPDATE ERROR:', error.message);
     } else {
-      const { data: rows, error } = await supabaseClient
-        .from('StudentData')
-        .update({ cs_data: data })
-        .eq('user_id', _userId)
-        .select();
-      if (error) {
-        console.error('[csStore] UPDATE-BY-USER_ID ERROR:', error.message);
-      } else if (rows?.[0]) {
-        _recordId = rows[0].id;
-        if (_userEmail) writeLocal(_userEmail, { id: _recordId, data });
-      }
+      const { data: rows, error } = await supabaseClient.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select();
+      if (error) console.error('[csStore] UPDATE-BY-USER_ID ERROR:', error.message);
+      else if (rows?.[0]) { _recordId = rows[0].id; if (_userEmail) writeLocal(_userEmail, { id: _recordId, data }); }
     }
-  } catch (e) {
-    console.error('[csStore] pushToSupabase exception:', e);
-  }
+  } catch (e) { console.error('[csStore] pushToSupabase exception:', e); }
 }
 
 export async function preloadCSStore(userEmail, userId) {
-  if (_userEmail !== userEmail) {
-    _cache = null;
-    _recordId = null;
-    _userEmail = userEmail;
-    _userId = userId;
-    _ready = false;
-    _readyPromise = null;
-  }
-
+  if (_userEmail !== userEmail) { _cache = null; _recordId = null; _userEmail = userEmail; _userId = userId; _ready = false; _readyPromise = null; }
   if (_ready) return;
-
   const local = readLocal(userEmail);
-  if (local?.data && !_cache) {
-    _cache = local.data;
-    if (local.id) _recordId = local.id;
-  }
-
+  if (local?.data && !_cache) { _cache = local.data; if (local.id) _recordId = local.id; }
   _readyPromise = (async () => {
     const result = await fetchFromSupabase(userId);
-    if (result) {
-      _recordId = result.id ?? _recordId;
-      _cache = result.data;
-      writeLocal(userEmail, { id: _recordId, data: _cache });
-      console.log('[csStore] ✓ Supabase data loaded');
-    } else {
-      if (!_cache) _cache = DEFAULT_CS_DATA();
-      console.warn('[csStore] ⚠ Supabase failed, using cache/default');
-    }
+    if (result) { _recordId = result.id ?? _recordId; _cache = result.data; writeLocal(userEmail, { id: _recordId, data: _cache }); }
+    else { if (!_cache) _cache = DEFAULT_CS_DATA(); }
     _ready = true;
     _readyPromise = null;
   })();
-
   await _readyPromise;
 }
 
@@ -136,20 +76,13 @@ async function ensureLoaded() {
   if (_ready && _cache) return _cache;
   if (_readyPromise) { await _readyPromise; return _cache; }
   if (!_userId) { if (!_cache) _cache = DEFAULT_CS_DATA(); return _cache; }
-
   _readyPromise = (async () => {
     const result = await fetchFromSupabase(_userId);
-    if (result) {
-      _recordId = result.id ?? _recordId;
-      _cache = result.data;
-      if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache });
-    } else {
-      if (!_cache) _cache = DEFAULT_CS_DATA();
-    }
+    if (result) { _recordId = result.id ?? _recordId; _cache = result.data; if (_userEmail) writeLocal(_userEmail, { id: _recordId, data: _cache }); }
+    else { if (!_cache) _cache = DEFAULT_CS_DATA(); }
     _ready = true;
     _readyPromise = null;
   })();
-
   await _readyPromise;
   return _cache;
 }
@@ -163,21 +96,15 @@ function saveToDB(data) {
 export async function csRecordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
   const normKey = normaliseTopicKey(topicKey);
   const data = await ensureLoaded();
-  if (!data.topics[normKey]) {
-    data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
-  }
+  if (!data.topics[normKey]) data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   const topic = data.topics[normKey];
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
   topic.attempts.push({ score, total_marks, date: today, question_id });
   topic.last_attempted = today;
-  if (topic.last_streak_date === today) {
-    // no-op
-  } else if (topic.last_streak_date === yesterday) {
-    topic.streak = (topic.streak || 0) + 1;
-  } else {
-    topic.streak = 1;
-  }
+  if (topic.last_streak_date === today) {}
+  else if (topic.last_streak_date === yesterday) { topic.streak = (topic.streak || 0) + 1; }
+  else { topic.streak = 1; }
   topic.last_streak_date = today;
   saveToDB(data);
   recordGlobalQuestionAnswered().catch(() => {});
@@ -189,9 +116,7 @@ export async function csGetTopicData(topicKey) {
   const topic = data.topics[normKey] || { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   const attempts = (topic.attempts || []).filter(a => a !== null && typeof a === "object");
   const mcqAttempts = (data.cs_mcq_attempts || []).filter(a => normaliseTopicKey(a.topic) === normKey);
-
   if (!attempts.length && !mcqAttempts.length) return null;
-
   let trend = "steady";
   if (attempts.length > 0) {
     const last = attempts[attempts.length - 1];
@@ -209,58 +134,40 @@ export async function csGetTopicData(topicKey) {
       else trend = "needs_work";
     }
   }
-
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
   let latestDate = topic.last_attempted || null;
-  if (mcqAttempts.length > 0) {
-    const d = mcqAttempts[mcqAttempts.length - 1].date;
-    if (!latestDate || d > latestDate) latestDate = d;
-  }
-
+  if (mcqAttempts.length > 0) { const d = mcqAttempts[mcqAttempts.length - 1].date; if (!latestDate || d > latestDate) latestDate = d; }
   let lastLabel = null;
   if (latestDate) {
     if (latestDate === today) lastLabel = "Today";
     else if (latestDate === yesterday) lastLabel = "Yesterday";
     else {
       const parts = latestDate.split("/");
-      if (parts.length === 3) {
-        const dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-        const diffDays = Math.floor((new Date() - dateObj) / 86400000);
-        lastLabel = diffDays === 1 ? "Yesterday" : `${diffDays} days ago`;
-      } else {
-        lastLabel = latestDate;
-      }
+      if (parts.length === 3) { const dateObj = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); const diffDays = Math.floor((new Date() - dateObj) / 86400000); lastLabel = diffDays === 1 ? "Yesterday" : `${diffDays} days ago`; }
+      else lastLabel = latestDate;
     }
   }
-
   let currentStreak = topic.streak || 0;
-  if (topic.last_streak_date && topic.last_streak_date !== today && topic.last_streak_date !== yesterday) {
-    currentStreak = 0;
-  }
-
+  if (topic.last_streak_date && topic.last_streak_date !== today && topic.last_streak_date !== yesterday) currentStreak = 0;
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
 // ── CS Mistake DNA ─────────────────────────────────────────────────────────
 
 /**
- * csWriteMistakeDna — call after any partial-credit or zero-score CS submission.
+ * csWriteMistakeDna — now accepts `studentResponse` so every DNA entry includes
+ * the student's raw text submission.
  */
-export async function csWriteMistakeDna(feedback, questionId, topic, marksEarned, totalMarks) {
+export async function csWriteMistakeDna(feedback, questionId, topic, marksEarned, totalMarks, studentResponse = "") {
   if (!feedback || marksEarned >= totalMarks) return;
-
   const data = await ensureLoaded();
-  const incoming = buildMistakeDna(feedback, questionId, topic, "cs", marksEarned, totalMarks);
+  const incoming = buildMistakeDna(feedback, questionId, topic, "cs", marksEarned, totalMarks, studentResponse);
   if (!incoming.length) return;
-
   data.cs_mistake_dna = mergeMistakeDna(data.cs_mistake_dna ?? [], incoming);
   saveToDB(data);
 }
 
-/**
- * csGetMistakeDna — returns the full CS mistake DNA array for this student.
- */
 export async function csGetMistakeDna() {
   const data = await ensureLoaded();
   return data.cs_mistake_dna ?? [];
@@ -268,12 +175,13 @@ export async function csGetMistakeDna() {
 
 // ── CS Review Bank ─────────────────────────────────────────────────────────
 
-export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
+export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback, first_attempt_answer = "" }) {
   const data = await ensureLoaded();
   if (data.cs_review_bank.find(q => q.question_id === question_id)) return;
   data.cs_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
     first_attempt_score, first_attempt_feedback,
+    first_attempt_answer: (first_attempt_answer ?? "").slice(0, 600),
     date_added: toDateString(new Date()),
     priority: first_attempt_score === 0 ? 1 : 2,
     locked_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -295,10 +203,7 @@ export async function csRemoveFromReviewBank(question_id) {
 export async function csResetReviewBankLock(question_id) {
   const data = await ensureLoaded();
   const entry = data.cs_review_bank.find(q => q.question_id === question_id);
-  if (entry) {
-    entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    saveToDB(data);
-  }
+  if (entry) { entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); saveToDB(data); }
 }
 
 export async function csSaveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
@@ -308,33 +213,21 @@ export async function csSaveMCQAttempt({ question_id, topic, source, chosen_opti
   if (!data.cs_guess_review_bank) data.cs_guess_review_bank = [];
   const today = toDateString(new Date());
   const yesterday = toDateString(new Date(Date.now() - 86400000));
-
   data.cs_mcq_attempts.push({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning, date: today });
-
-  if (!data.topics[normKey]) {
-    data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
-  }
+  if (!data.topics[normKey]) data.topics[normKey] = { attempts: [], last_attempted: null, streak: 0, last_streak_date: null };
   const topicEntry = data.topics[normKey];
   topicEntry.attempts.push({ score: correct ? 1 : 0, total_marks: 1, date: today, question_id });
   topicEntry.last_attempted = today;
-  if (topicEntry.last_streak_date === today) {
-    // no-op
-  } else if (topicEntry.last_streak_date === yesterday) {
-    topicEntry.streak = (topicEntry.streak || 0) + 1;
-  } else {
-    topicEntry.streak = 1;
-  }
+  if (topicEntry.last_streak_date === today) {}
+  else if (topicEntry.last_streak_date === yesterday) { topicEntry.streak = (topicEntry.streak || 0) + 1; }
+  else { topicEntry.streak = 1; }
   topicEntry.last_streak_date = today;
-
   if (flagged_as_guess) {
     const existing = data.cs_guess_review_bank.find(e => (typeof e === "string" ? e : e.question_id) === question_id);
-    if (!existing) {
-      data.cs_guess_review_bank.push({ question_id, locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() });
-    }
+    if (!existing) data.cs_guess_review_bank.push({ question_id, locked_until: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() });
   } else if (correct && !flagged_as_guess) {
     data.cs_guess_review_bank = data.cs_guess_review_bank.filter(e => (typeof e === "string" ? e : e.question_id) !== question_id);
   }
-
   saveToDB(data);
   recordGlobalQuestionAnswered().catch(() => {});
 }

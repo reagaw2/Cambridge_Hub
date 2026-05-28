@@ -32,40 +32,28 @@ function topicToKey(topic) {
   return topic.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 }
 
-function extractPaperMeta(filename) {
-  const match = filename.match(/(\d{4})_([a-z]\d{2})_(?:qp|ms)_(\d+)/i);
-  if (!match) return null;
-  const [, code, sessionRaw, variant] = match;
-  const seasonMap = { s: "MJ", m: "FM", w: "ON" };
-  const season = seasonMap[sessionRaw[0].toLowerCase()] ?? sessionRaw[0].toUpperCase();
-  const year = "20" + sessionRaw.slice(1);
-  return { code, session: `${season}${year}`, variant };
-}
-
 function buildQuestionId(code, session, variant, qNum) {
-  return `${code === "9702" ? "PHYS" : "CS"}-${code}-${session}-${variant}-Q${String(qNum).padStart(2, "0")}`;
+  const prefix = code === "9702" ? "PHYS" : "CS";
+  return `${prefix}-${code}-${session}-${variant}-Q${String(qNum).padStart(2, "0")}`;
 }
 
 function splitByQuestions(text) {
   const parts = [];
 
-  // Try "Question 1", "Question 2", etc.
+  // Strategy 1: "Question 1", "Question 2", etc.
   const regex = /(?:^|\n)\s*Question\s+(\d{1,2})\b/gm;
   const matches = [...text.matchAll(regex)];
-
   if (matches.length >= 2) {
     for (let i = 0; i < matches.length; i++) {
       const start = matches[i].index + matches[i][0].length;
       const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
       const qText = text.slice(start, end).trim();
-      if (qText.length > 30) {
-        parts.push({ num: parseInt(matches[i][1], 10), text: qText });
-      }
+      if (qText.length > 30) parts.push({ num: parseInt(matches[i][1], 10), text: qText });
     }
     return parts;
   }
 
-  // Fallback: numbered lines like "1\n", "2\n"
+  // Strategy 2: standalone digit lines
   const numRegex = /(?:^|\n)\s*(\d{1,2})\s*\n/gm;
   const numMatches = [...text.matchAll(numRegex)];
   if (numMatches.length >= 2) {
@@ -73,16 +61,17 @@ function splitByQuestions(text) {
       const start = numMatches[i].index + numMatches[i][0].length;
       const end = i + 1 < numMatches.length ? numMatches[i + 1].index : text.length;
       const qText = text.slice(start, end).trim();
-      if (qText.length > 30) {
-        parts.push({ num: parseInt(numMatches[i][1], 10), text: qText });
-      }
+      if (qText.length > 30) parts.push({ num: parseInt(numMatches[i][1], 10), text: qText });
     }
     return parts;
   }
 
-  // Last resort: split every ~500 chars as one question block
-  const chunks = text.match(/.{1,2000}/gs) ?? [];
-  return chunks.map((t, i) => ({ num: i + 1, text: t.trim() })).filter(q => q.text.length > 30);
+  // Strategy 3: treat entire text as Q1 (single question paper)
+  if (text.trim().length > 50) {
+    return [{ num: 1, text: text.trim() }];
+  }
+
+  return [];
 }
 
 function splitMarkSchemeByQuestion(msText, questionNums) {
@@ -90,67 +79,54 @@ function splitMarkSchemeByQuestion(msText, questionNums) {
   for (const qNum of questionNums) {
     const patterns = [
       new RegExp(`Question\\s+${qNum}\\b([\\s\\S]*?)(?=Question\\s+${qNum + 1}\\b|$)`, "i"),
-      new RegExp(`\\b${qNum}\\s*\\(a\\)([\\s\\S]*?)(?=\\b${qNum + 1}\\s*\\(a\\)|$)`, "i"),
+      new RegExp(`(?:^|\\n)\\s*${qNum}\\s*\\n([\\s\\S]*?)(?=(?:^|\\n)\\s*${qNum + 1}\\s*\\n|$)`, "i"),
     ];
     for (const p of patterns) {
       const m = msText.match(p);
       if (m) { result[qNum] = m[1].trim(); break; }
     }
-    if (!result[qNum]) result[qNum] = "";
+    if (!result[qNum]) result[qNum] = msText; // fallback: use full MS for single-Q papers
   }
   return result;
 }
 
-// Browser-side PDF text extraction using FileReader + pattern matching
 async function extractTextFromFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const buffer = e.target.result;
-        const bytes = new Uint8Array(buffer);
+        const bytes = new Uint8Array(e.target.result);
         const latin1 = Array.from(bytes).map(b => String.fromCharCode(b)).join("");
-
         const lines = [];
 
-        // Extract from BT...ET PDF text blocks
         const btEtRegex = /BT([\s\S]*?)ET/g;
         let match;
         while ((match = btEtRegex.exec(latin1)) !== null) {
           const block = match[1];
           const chunks = [];
-
-          // Tj operator
           const tjRegex = /\(([^)]*)\)\s*(?:Tj|')/g;
           let m;
           while ((m = tjRegex.exec(block)) !== null) {
             chunks.push(m[1].replace(/\\n/g, "\n").replace(/\\r/g, "").replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\"));
           }
-
-          // TJ array
           const tjArrRegex = /\[([^\]]*)\]\s*TJ/g;
           while ((m = tjArrRegex.exec(block)) !== null) {
             const strRegex = /\(([^)]*)\)/g;
             let sm;
-            while ((sm = strRegex.exec(m[1])) !== null) {
-              chunks.push(sm[1]);
-            }
+            while ((sm = strRegex.exec(m[1])) !== null) chunks.push(sm[1]);
           }
-
           if (chunks.length > 0) lines.push(chunks.join(" ").trim());
         }
 
         let extracted = lines.join("\n");
 
-        // Fallback: readable ASCII from raw bytes
         if (extracted.length < 200) {
           const plain = latin1.replace(/[^\x20-\x7E\n]/g, " ").replace(/\s{3,}/g, "\n");
-          const readable = plain.split("\n").map(l => l.trim()).filter(l => l.length > 4 && /[a-zA-Z]{2,}/.test(l));
-          extracted = readable.join("\n");
+          extracted = plain.split("\n").map(l => l.trim()).filter(l => l.length > 4 && /[a-zA-Z]{2,}/.test(l)).join("\n");
         }
 
-        if (extracted.length < 100) {
-          reject(new Error(`"${file.name}" appears to be a scanned/image PDF. Please use a text-based PDF from the Cambridge website, or switch to "Paste Text" mode.`));
+        if (extracted.length < 50) {
+          reject(new Error(`"${file.name}" appears to be a scanned/image PDF. Switch to Paste Text mode.`));
           return;
         }
 
@@ -159,12 +135,12 @@ async function extractTextFromFile(file) {
         reject(new Error(`Failed to parse "${file.name}": ${err.message}`));
       }
     };
-    reader.onerror = () => reject(new Error(`Could not read file "${file.name}"`));
+    reader.onerror = () => reject(new Error(`Could not read "${file.name}"`));
     reader.readAsArrayBuffer(file);
   });
 }
 
-async function classifyAndGenerateNodes(questionText, markSchemeText, subject, anthropicKey, onLog) {
+async function classifyAndGenerateNodes(questionText, markSchemeText, subject, anthropicKey) {
   const topicList = SYLLABUS_TOPICS[subject].join(", ");
   const prompt = `You are an expert Cambridge ${subject === "physics" ? "A Level Physics (9702)" : "A Level Computer Science (9618)"} examiner.
 
@@ -176,7 +152,7 @@ ${(markSchemeText || "(not available)").slice(0, 1500)}
 
 AVAILABLE TOPICS: ${topicList}
 
-Respond ONLY in this JSON format:
+Respond ONLY in this JSON format — no extra text:
 {
   "topics": ["1-3 matching topics from the available list"],
   "total_marks": <integer>,
@@ -230,28 +206,23 @@ async function upsertToSupabase(supabaseUrl, serviceKey, table, row) {
   });
   if (!res.ok && res.status !== 409) {
     const err = await res.text();
-    throw new Error(`Supabase ${table} error: ${err}`);
+    throw new Error(`Supabase [${table}]: ${err}`);
   }
 }
 
 async function deleteFromSupabase(supabaseUrl, serviceKey, table, filter) {
   await fetch(`${supabaseUrl}/rest/v1/${table}?${filter}`, {
     method: "DELETE",
-    headers: {
-      "apikey": serviceKey,
-      "Authorization": `Bearer ${serviceKey}`,
-    },
+    headers: { "apikey": serviceKey, "Authorization": `Bearer ${serviceKey}` },
   });
 }
 
-// ── FileDropZone ────────────────────────────────────────────────────────────
 function FileDropZone({ label, accept, file, onFile, hint }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
-
   return (
     <div
-      className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+      className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
         dragging ? "border-primary bg-primary/10"
           : file ? "border-green-500/50 bg-green-500/5"
           : "border-white/10 bg-white/[0.02] hover:border-white/20"
@@ -265,15 +236,15 @@ function FileDropZone({ label, accept, file, onFile, hint }) {
         onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
       {file ? (
         <div className="flex items-center justify-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
           <div className="text-left">
-            <p className="text-sm font-semibold text-white">{file.name}</p>
+            <p className="text-sm font-semibold text-white truncate max-w-[240px]">{file.name}</p>
             <p className="text-[11px] text-white/40">{(file.size / 1024).toFixed(1)} KB</p>
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
-          <Upload className="w-7 h-7 text-white/30 mx-auto" />
+        <div className="space-y-1.5">
+          <Upload className="w-6 h-6 text-white/30 mx-auto" />
           <p className="text-sm font-semibold text-white/60">{label}</p>
           <p className="text-[11px] text-white/25">{hint}</p>
         </div>
@@ -308,7 +279,6 @@ function ResultRow({ r }) {
   );
 }
 
-// ── Main component ──────────────────────────────────────────────────────────
 export default function BulkPaperIngestor() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -316,6 +286,12 @@ export default function BulkPaperIngestor() {
   const [subject, setSubject] = useState("physics");
   const [qpFile, setQpFile] = useState(null);
   const [msFile, setMsFile] = useState(null);
+
+  // Manual paper metadata (always shown — no longer dependent on filename)
+  const [paperCode, setPaperCode] = useState("9702");
+  const [paperSession, setPaperSession] = useState("MJS25");
+  const [paperVariant, setPaperVariant] = useState("42");
+
   const [supabaseUrl, setSupabaseUrl] = useState(import.meta.env.VITE_SUPABASE_URL ?? "");
   const [supabaseServiceKey, setSupabaseServiceKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState(import.meta.env.VITE_ANTHROPIC_API_KEY ?? "");
@@ -328,7 +304,6 @@ export default function BulkPaperIngestor() {
   const [useManualText, setUseManualText] = useState(false);
   const [qpText, setQpText] = useState("");
   const [msText, setMsText] = useState("");
-  const [manualFilename, setManualFilename] = useState("");
 
   if (user?.email !== DEV_EMAIL) {
     return (
@@ -345,59 +320,50 @@ export default function BulkPaperIngestor() {
   async function handleRun() {
     if (!supabaseUrl || !supabaseServiceKey) { setErrorMsg("Please provide Supabase URL and Service Role key."); return; }
     if (!anthropicKey) { setErrorMsg("Please provide your Anthropic API key."); return; }
+    if (!paperCode.trim() || !paperSession.trim() || !paperVariant.trim()) { setErrorMsg("Please fill in Paper Code, Session and Variant."); return; }
 
     setPhase("running");
     setErrorMsg("");
     setResult(null);
     setLogs([]);
 
+    const code = paperCode.trim().toUpperCase();
+    const session = paperSession.trim().toUpperCase();
+    const variant = paperVariant.trim();
+
     try {
-      // 1. Extract text
       let qpExtracted = qpText;
       let msExtracted = msText;
-      const filename = useManualText ? manualFilename : (qpFile?.name ?? "");
 
       if (!useManualText) {
         if (!qpFile) { setErrorMsg("Please upload a Question Paper PDF."); setPhase("idle"); return; }
         setProgressMsg("Extracting text from Question Paper PDF…"); setProgressPct(10);
         addLog("📄 Extracting question paper text...");
         qpExtracted = await extractTextFromFile(qpFile);
-        addLog(`✓ Extracted ${qpExtracted.length} characters from question paper`);
+        addLog(`✓ Extracted ${qpExtracted.length} chars from question paper`);
 
         if (msFile) {
           setProgressMsg("Extracting text from Mark Scheme PDF…"); setProgressPct(20);
           addLog("📄 Extracting mark scheme text...");
           msExtracted = await extractTextFromFile(msFile);
-          addLog(`✓ Extracted ${msExtracted.length} characters from mark scheme`);
+          addLog(`✓ Extracted ${msExtracted.length} chars from mark scheme`);
         }
       }
 
-      if (!qpExtracted?.trim()) { setErrorMsg("No text found in the PDF. Try switching to Paste Text mode."); setPhase("error"); return; }
+      if (!qpExtracted?.trim()) { setErrorMsg("No text found. Switch to Paste Text mode."); setPhase("error"); return; }
 
-      // 2. Parse metadata
-      const meta = filename ? extractPaperMeta(filename) : null;
-      if (!meta && !useManualText) {
-        setErrorMsg(`Could not parse paper metadata from filename "${filename}". Expected format: 9702_s25_qp_42.pdf`);
-        setPhase("error"); return;
-      }
-      const code = meta?.code ?? "9702";
-      const session = meta?.session ?? "S25";
-      const variant = meta?.variant ?? "42";
       addLog(`📋 Paper: ${code}/${variant} · ${session}`);
 
-      // 3. Split questions
-      setProgressMsg("Splitting paper into individual questions…"); setProgressPct(30);
+      setProgressMsg("Splitting paper into questions…"); setProgressPct(30);
       const questions = splitByQuestions(qpExtracted);
-      addLog(`✓ Found ${questions.length} questions`);
+      addLog(`✓ Split into ${questions.length} question${questions.length !== 1 ? "s" : ""}`);
 
       if (questions.length === 0) {
-        setErrorMsg("Could not split the paper into questions. The PDF text may be unreadable — try Paste Text mode.");
-        setPhase("error"); return;
+        setErrorMsg("Could not split the paper. Try Paste Text mode."); setPhase("error"); return;
       }
 
       const msChunks = splitMarkSchemeByQuestion(msExtracted ?? "", questions.map(q => q.num));
 
-      // 4. Process each question
       const results = [];
       const errors = [];
 
@@ -406,13 +372,12 @@ export default function BulkPaperIngestor() {
         const questionId = buildQuestionId(code, session, variant, q.num);
         setProgressMsg(`AI classifying Q${q.num} of ${questions.length}…`);
         setProgressPct(30 + Math.round((i / questions.length) * 60));
-        addLog(`🤖 Processing Q${q.num} (${questionId})…`);
+        addLog(`🤖 Processing Q${q.num} → ${questionId}…`);
 
         try {
           const msText_q = msChunks[q.num] ?? "";
-          const analysis = await classifyAndGenerateNodes(q.text, msText_q, subject, anthropicKey, addLog);
+          const analysis = await classifyAndGenerateNodes(q.text, msText_q, subject, anthropicKey);
 
-          // Upsert question row
           await upsertToSupabase(supabaseUrl, supabaseServiceKey, "questions", {
             id: questionId,
             topic: analysis.topics?.[0] ?? "Unknown",
@@ -426,14 +391,12 @@ export default function BulkPaperIngestor() {
             mark_scheme_text: msText_q.slice(0, 3000),
           });
 
-          // Upsert topics + junction
           for (const topicName of (analysis.topics ?? [])) {
             const topicKey = topicToKey(topicName);
             await upsertToSupabase(supabaseUrl, supabaseServiceKey, "topics", { key: topicKey, name: topicName, subject });
             await upsertToSupabase(supabaseUrl, supabaseServiceKey, "question_topics", { question_id: questionId, topic_key: topicKey });
           }
 
-          // Delete + re-insert nodes
           await deleteFromSupabase(supabaseUrl, supabaseServiceKey, "mark_scheme_nodes", `question_id=eq.${questionId}`);
           if (analysis.nodes?.length > 0) {
             await upsertToSupabase(supabaseUrl, supabaseServiceKey, "mark_scheme_nodes",
@@ -441,10 +404,9 @@ export default function BulkPaperIngestor() {
           }
 
           results.push({ questionId, qNum: q.num, topics: analysis.topics ?? [], nodeCount: analysis.nodes?.length ?? 0, totalMarks: analysis.total_marks ?? 1 });
-          addLog(`✓ Q${q.num} seeded — ${analysis.nodes?.length ?? 0} nodes, topics: ${(analysis.topics ?? []).join(", ")}`);
+          addLog(`✓ Q${q.num}: ${(analysis.topics ?? []).join(", ")} | ${analysis.nodes?.length ?? 0} nodes`);
 
-          // Rate limit pause between questions
-          if (i < questions.length - 1) await new Promise(r => setTimeout(r, 600));
+          if (i < questions.length - 1) await new Promise(r => setTimeout(r, 500));
         } catch (err) {
           errors.push({ qNum: q.num, error: err.message });
           addLog(`✗ Q${q.num} failed: ${err.message}`);
@@ -486,7 +448,7 @@ export default function BulkPaperIngestor() {
           <div className="space-y-1">
             <h1 className="text-xl font-extrabold text-white">Zero-friction Paper Splitter</h1>
             <p className="text-xs text-white/40 leading-relaxed">
-              Upload a Cambridge Question Paper + Mark Scheme. AI splits, classifies topics, and seeds mark scheme nodes into Supabase automatically.
+              Upload any Question Paper + Mark Scheme PDF. Fill in the paper details below — no specific filename required.
             </p>
           </div>
 
@@ -505,6 +467,32 @@ export default function BulkPaperIngestor() {
             </div>
           </div>
 
+          {/* Paper metadata — always shown */}
+          <div className="bg-white/[0.02] border border-white/8 rounded-2xl p-4 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Paper Details</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] text-white/30">Code</label>
+                <input value={paperCode} onChange={e => setPaperCode(e.target.value)}
+                  placeholder="9702"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-white/30">Session (e.g. MJS25)</label>
+                <input value={paperSession} onChange={e => setPaperSession(e.target.value)}
+                  placeholder="MJS25"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-white/30">Variant</label>
+                <input value={paperVariant} onChange={e => setPaperVariant(e.target.value)}
+                  placeholder="42"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
+              </div>
+            </div>
+            <p className="text-[10px] text-white/20">Session format: MJ=May/Jun, ON=Oct/Nov, FM=Feb/Mar + 2-digit year (e.g. MJS25, ONW24)</p>
+          </div>
+
           {/* Input mode */}
           <div className="flex items-center gap-3">
             <button onClick={() => setUseManualText(false)}
@@ -520,15 +508,12 @@ export default function BulkPaperIngestor() {
           {!useManualText ? (
             <div className="space-y-3">
               <FileDropZone label="Question Paper PDF" accept=".pdf" file={qpFile} onFile={setQpFile}
-                hint="e.g. 9702_s25_qp_42.pdf — filename must follow Cambridge naming convention" />
+                hint="Any filename works — use the Paper Details fields above" />
               <FileDropZone label="Mark Scheme PDF (recommended)" accept=".pdf" file={msFile} onFile={setMsFile}
-                hint="e.g. 9702_s25_ms_42.pdf" />
+                hint="Paste text in each question pair for best results" />
             </div>
           ) : (
             <div className="space-y-3">
-              <input value={manualFilename} onChange={e => setManualFilename(e.target.value)}
-                placeholder="Filename for metadata parsing (e.g. 9702_s25_qp_42.pdf)"
-                className="w-full bg-white/[0.03] border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
               <textarea value={qpText} onChange={e => setQpText(e.target.value)}
                 placeholder="Paste the full question paper text…" rows={7}
                 className="w-full bg-white/[0.03] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-amber-500/40 font-mono" />
@@ -545,7 +530,7 @@ export default function BulkPaperIngestor() {
               placeholder="Supabase URL (https://xxx.supabase.co)"
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
             <input value={supabaseServiceKey} onChange={e => setSupabaseServiceKey(e.target.value)}
-              placeholder="Supabase Service Role Key (eyJ…)"
+              placeholder="Supabase service_role key (eyJ…)"
               type="password"
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
             <input value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)}
@@ -569,7 +554,7 @@ export default function BulkPaperIngestor() {
 
           {/* Live logs */}
           {logs.length > 0 && (
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3 max-h-48 overflow-y-auto space-y-0.5">
+            <div className="bg-black/40 border border-white/5 rounded-xl p-3 max-h-52 overflow-y-auto space-y-0.5">
               {logs.map((l, i) => (
                 <p key={i} className="text-[11px] font-mono text-white/50 leading-relaxed">{l}</p>
               ))}
@@ -631,7 +616,7 @@ export default function BulkPaperIngestor() {
                 : <><Zap className="w-4 h-4" /> Split, Classify & Ingest</>}
           </button>
 
-          {/* SQL migration hint */}
+          {/* SQL hint */}
           <details className="group">
             <summary className="text-[11px] text-white/25 cursor-pointer hover:text-white/40 list-none flex items-center gap-1">
               <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />

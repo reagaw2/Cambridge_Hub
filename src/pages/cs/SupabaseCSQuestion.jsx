@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Database } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Database, Calculator } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 import QuestionDiagram from "@/components/QuestionDiagram";
+import ScientificCalculator from "@/components/ScientificCalculator";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import { base44 } from "@/api/base44Client";
 import { useSupabaseQuestions } from "@/hooks/useSupabaseQuestions";
@@ -91,14 +92,13 @@ export default function SupabaseCSQuestion({
     return stored ? parseInt(stored, 10) : 0;
   });
 
-  // answers keyed by questionIdx_partIndex so they persist when browsing
   const [answers, setAnswers] = useState({});
   const [partIndex, setPartIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  // feedbacks keyed by questionIdx_partIndex
   const [feedbacks, setFeedbacks] = useState({});
   const [fallbackOverride, setFallbackOverride] = useState(null);
+  const [showCalc, setShowCalc] = useState(false);
 
   if (loading) {
     return (
@@ -134,6 +134,7 @@ export default function SupabaseCSQuestion({
     setLocalIdx(clamped);
     setPartIndex(0);
     setSubmitError(null);
+    setShowCalc(false);
   }
 
   function goToPart(newPartIdx) {
@@ -158,7 +159,6 @@ export default function SupabaseCSQuestion({
   const isFirstPart = partIndex === 0;
   const showDiagram = question.diagram_svg;
 
-  // Keys for per-question-per-part storage
   const answerKey = `${clampedIdx}_${partIndex}`;
   const currentAnswer = answers[answerKey] ?? "";
   const currentFeedback = feedbacks[answerKey] ?? null;
@@ -224,12 +224,10 @@ export default function SupabaseCSQuestion({
       });
     }
 
-    // Store feedback for this specific part
     setFeedbacks(prev => ({ ...prev, [answerKey]: { fb, marksEarned, partMarks } }));
     setSubmitting(false);
   }
 
-  // Build summary of all submitted parts for this question
   const submittedParts = parts.map((p, i) => {
     const key = `${clampedIdx}_${i}`;
     return feedbacks[key] ? { ...feedbacks[key], part: p, answer: answers[key] ?? "" } : null;
@@ -255,9 +253,18 @@ export default function SupabaseCSQuestion({
               <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Live</span>
             </div>
           </div>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {question.paper_ref ?? "9618"}
-          </span>
+          {/* Calculator toggle */}
+          <button
+            onClick={() => setShowCalc(c => !c)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+              showCalc
+                ? "bg-primary/20 border-primary/50 text-primary"
+                : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:brightness-110"
+            }`}
+          >
+            <Calculator className="w-3.5 h-3.5" />
+            Calc
+          </button>
         </div>
 
         {/* Question navigation */}
@@ -331,6 +338,11 @@ export default function SupabaseCSQuestion({
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
+          {/* Scientific Calculator — inline, shown/hidden via toggle */}
+          {showCalc && (
+            <ScientificCalculator onClose={() => setShowCalc(false)} />
+          )}
+
           {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -342,7 +354,6 @@ export default function SupabaseCSQuestion({
               </span>
             </div>
 
-            {/* Diagram — shown on every part since they all share the same diagram */}
             {showDiagram && (
               <div className="bg-white rounded-xl p-3 border border-border/40 overflow-x-auto">
                 <QuestionDiagram svgString={question.diagram_svg} />
@@ -371,7 +382,7 @@ export default function SupabaseCSQuestion({
             </div>
           </div>
 
-          {/* Per-part feedback (shown after submitting this part) */}
+          {/* Per-part feedback */}
           {currentFeedback && (
             <div className={`rounded-xl border p-4 space-y-3 ${
               currentFeedback.marksEarned >= currentFeedback.partMarks
@@ -419,7 +430,7 @@ export default function SupabaseCSQuestion({
 
           {submitError && <p className="text-center text-sm text-red-400/80">{submitError}</p>}
 
-          {/* All-parts summary once everything is submitted */}
+          {/* All-parts summary */}
           {allPartsSubmitted && totalParts > 1 && (
             <div className="bg-card border border-border rounded-xl p-4 space-y-2">
               <div className="flex items-center justify-between">

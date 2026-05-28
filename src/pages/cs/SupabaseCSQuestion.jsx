@@ -47,7 +47,7 @@ Analyse the student's answer against the mark scheme. Award marks generously but
 }
 
 /**
- * Serialise interactive component state into a readable answer string for Claude.
+ * Serialise interactive state into a readable answer string for Claude.
  */
 function serialiseInteractiveAnswer(diagramConfig, interactiveValue) {
   if (!diagramConfig || !interactiveValue) return null;
@@ -73,7 +73,7 @@ function serialiseInteractiveAnswer(diagramConfig, interactiveValue) {
   }
 
   if (diagramConfig.type === "register") {
-    const parts = diagramConfig.registers.map((reg, i) => {
+    const parts = (diagramConfig.registers ?? []).map((reg, i) => {
       const val = interactiveValue[i] ?? "";
       return val ? `${reg.label}: ${val}` : null;
     }).filter(Boolean);
@@ -84,25 +84,17 @@ function serialiseInteractiveAnswer(diagramConfig, interactiveValue) {
 }
 
 /**
- * Render the interactive diagram component based on config.
+ * Render the interactive component (matching / table_fill / register).
+ * NOT used for static SVG references — those are rendered inline in the question card.
  */
-function DiagramRenderer({ config, value, onChange }) {
-  if (!config) return null;
-
-  if (config.type === "svg") {
-    return (
-      <div
-        className="rounded-xl p-3 border border-border/40 overflow-x-auto bg-white"
-        dangerouslySetInnerHTML={{ __html: config.svgString }}
-      />
-    );
-  }
+function InteractiveDiagram({ config, value, onChange }) {
+  if (!config || config.type === "svg") return null;
 
   if (config.type === "matching") {
     return (
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Draw connections
+          Draw connections — click a left item, then a right item
         </p>
         <MatchingInput
           leftItems={config.leftItems}
@@ -120,7 +112,7 @@ function DiagramRenderer({ config, value, onChange }) {
     return (
       <div className="bg-card border border-border rounded-xl p-4 space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Complete the table
+          Complete the table — click a blank cell to type your answer
         </p>
         <TableFillInput
           headers={config.headers}
@@ -136,16 +128,16 @@ function DiagramRenderer({ config, value, onChange }) {
     return (
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Fill in the register{config.registers.length > 1 ? "s" : ""}
+          Fill in the register{config.registers?.length > 1 ? "s" : ""} — tap a cell to toggle 0 / 1
         </p>
-        {config.registers.map((reg, i) => (
+        {(config.registers ?? []).map((reg, i) => (
           <RegisterInput
             key={i}
             label={reg.label}
             bits={reg.bits ?? 8}
-            value={reg.prefilled ?? (value?.[i] ?? "")}
+            value={value?.[i] ?? ""}
             onChange={(v) => {
-              const next = [...(value ?? config.registers.map(() => ""))];
+              const next = [...(value ?? (config.registers ?? []).map(() => ""))];
               next[i] = v;
               onChange(next);
             }}
@@ -198,10 +190,10 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
             paper_ref: "9618",
             topic: topicLabel ?? topicKey,
             _pair: p,
+            _diagramConfig: extractDiagramConfig(p),
           })));
           setUsingFallback(true);
         } else {
-          // Match each Supabase row to its diagram by content
           const enriched = data.map(row => {
             const matchedPair = matchDiagramToQuestion(row);
             const diagramConfig = extractDiagramConfig(matchedPair);
@@ -218,6 +210,11 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
   const clampedIdx = Math.max(0, Math.min(localIdx, Math.max(total - 1, 0)));
   const question = questions[clampedIdx] ?? null;
   const diagramConfig = question?._diagramConfig ?? null;
+
+  // Is this an interactive question (matching / table / register)?
+  const isInteractive = diagramConfig && diagramConfig.type !== "svg";
+  // Is this a static reference SVG?
+  const hasReferenceSvg = diagramConfig?.type === "svg";
 
   function goToQuestion(newIdx) {
     const clamped = Math.max(0, Math.min(newIdx, total - 1));
@@ -240,7 +237,6 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
     const markScheme = question?.mark_scheme_text ?? "";
     const totalMarks = question?.total_marks ?? extractMarksFromText(markScheme) ?? 2;
 
-    // Build the final answer — combine written + interactive
     const interactiveStr = serialiseInteractiveAnswer(diagramConfig, interactiveValue);
     const finalAnswer = [answer.trim(), interactiveStr].filter(Boolean).join("\n\n");
 
@@ -333,6 +329,7 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
   const isLastQuestion = clampedIdx >= total - 1;
 
   const interactiveStr = serialiseInteractiveAnswer(diagramConfig, interactiveValue);
+  // Submit is enabled if: written answer OR interactive component has input
   const hasAnswer = answer.trim().length > 0 || (interactiveStr && interactiveStr.length > 0);
 
   return (
@@ -388,7 +385,7 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
 
           {showCalc && <ScientificCalculator onClose={() => setShowCalc(false)} />}
 
-          {/* Question card */}
+          {/* Question card — includes static reference SVG inside if present */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
@@ -401,6 +398,14 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
               )}
             </div>
 
+            {/* Static reference diagram — shown inside the question card */}
+            {hasReferenceSvg && (
+              <div
+                className="rounded-xl p-3 border border-border/40 overflow-x-auto bg-white"
+                dangerouslySetInnerHTML={{ __html: diagramConfig.svgString }}
+              />
+            )}
+
             <p className="text-[15px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
               {questionText}
             </p>
@@ -410,19 +415,24 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
             </div>
           </div>
 
-          {/* Interactive diagram — shown before AND after submission */}
-          {diagramConfig && (
-            <DiagramRenderer
+          {/* Interactive component — shown separately below the question card */}
+          {isInteractive && !feedback && (
+            <InteractiveDiagram
               config={diagramConfig}
               value={interactiveValue}
               onChange={setInteractiveValue}
             />
           )}
 
-          {/* Answer + submit — only before submission */}
+          {/* Answer input + submit — only before submission */}
           {!feedback && (
             <>
-              <AnswerInput value={answer} onChange={setAnswer} />
+              {/* For pure interactive questions without a written component, the
+                  AnswerInput is still shown so students can add extra explanation */}
+              <AnswerInput
+                value={answer}
+                onChange={setAnswer}
+              />
               <button
                 onClick={handleSubmit}
                 disabled={!hasAnswer || submitting}
@@ -434,13 +444,24 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
             </>
           )}
 
-          {/* Pulse feedback */}
+          {/* Post-submission: show interactive component (read-only context) + feedback */}
           {feedback && (
             <>
+              {/* Show interactive diagram again so student can see what they drew */}
+              {isInteractive && (
+                <div className="opacity-60 pointer-events-none">
+                  <InteractiveDiagram
+                    config={diagramConfig}
+                    value={interactiveValue}
+                    onChange={() => {}}
+                  />
+                </div>
+              )}
+
               <div className="bg-secondary/40 border border-border rounded-xl px-4 py-3 space-y-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Your answer</p>
                 <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                  {[answer.trim(), serialiseInteractiveAnswer(diagramConfig, interactiveValue)].filter(Boolean).join("\n\n")}
+                  {[answer.trim(), serialiseInteractiveAnswer(diagramConfig, interactiveValue)].filter(Boolean).join("\n\n") || "(no written answer)"}
                 </p>
               </div>
 

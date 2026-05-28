@@ -1,55 +1,23 @@
 import { PRELOADED_PAIRS } from "@/lib/ingestorQuestions";
 
 /**
- * Detects which interactive component type a question needs.
- * Returns one of: "register" | "matching" | "table_fill" | "pixel_grid" | "text" | "bcd_register"
- */
-export function detectQuestionType(questionText = "") {
-  const t = questionText.toLowerCase();
-
-  if (/register\s+[a-z]\s+contains|write\s+(your answer\s+)?in the register|two's complement.*(register|binary)|convert.*(denary|binary).*(register)/i.test(questionText)) {
-    return "register";
-  }
-  if (/draw\s+(a\s+)?line|draw\s+one\s+line|match\s+each|link\s+each|connect\s+each/i.test(questionText)) {
-    return "matching";
-  }
-  if (/complete\s+the\s+table|fill\s+in\s+the\s+(table|blank|missing)|the\s+table\s+(above\s+)?shows.*blank|write\s+the\s+(correct\s+)?(term|definition|word|value)\s+in/i.test(questionText)) {
-    return "table_fill";
-  }
-  if (/pixel|bitmap|colour\s+the|shade\s+the|grid/i.test(questionText) && /colour|shade|fill/i.test(questionText)) {
-    return "pixel_grid";
-  }
-  return "text";
-}
-
-/**
- * Finds the best-matching PRELOADED_PAIRS entry for a Supabase question row
- * by comparing key phrases from the question text.
+ * Match a Supabase question row to its PRELOADED_PAIRS entry by word overlap.
  * Returns the matched pair or null.
  */
 export function matchDiagramToQuestion(supabaseQuestion) {
   const qText = (supabaseQuestion.question_text ?? "").toLowerCase();
-
-  // Score each preloaded pair by word overlap
   let bestScore = 0;
   let bestPair = null;
 
   for (const pair of PRELOADED_PAIRS) {
     const pText = (pair.question ?? "").toLowerCase();
-
-    // Extract meaningful words (length > 4) from both sides
     const qWords = new Set(qText.match(/\b[a-z]{4,}\b/g) ?? []);
-    const pWords = (pText.match(/\b[a-z]{4,}\b/g) ?? []);
+    const pWords = pText.match(/\b[a-z]{4,}\b/g) ?? [];
 
     let score = 0;
     for (const word of pWords) {
       if (qWords.has(word)) score++;
     }
-
-    // Boost score if question numbers / key phrases match exactly
-    const qNum = qText.match(/question\s+(\d+)/)?.[1];
-    const pNum = pText.match(/question\s+(\d+)/)?.[1];
-    if (qNum && pNum && qNum === pNum) score += 5;
 
     if (score > bestScore) {
       bestScore = score;
@@ -57,60 +25,82 @@ export function matchDiagramToQuestion(supabaseQuestion) {
     }
   }
 
-  // Only return a match if confidence is high enough
   return bestScore >= 8 ? bestPair : null;
 }
 
 /**
- * Extracts structured diagram config from a PRELOADED_PAIRS entry.
- * Returns { type, svgString, matchingConfig, tableConfig, registerConfig } or null.
+ * extractDiagramConfig
+ *
+ * Returns one of:
+ *   { type: "matching",   ...matchingProps }   — interactive matching component
+ *   { type: "table_fill", ...tableProps }       — interactive table fill component
+ *   { type: "register",   ...registerProps }    — interactive register component
+ *   { type: "svg",        svgString }           — static reference image (read-only)
+ *   null                                        — no diagram needed
+ *
+ * Decision rule:
+ *   - If the question TEXT explicitly asks the student to draw lines / complete
+ *     the table / fill in the register → interactive component, NO svg shown.
+ *   - If the question has a diagram that the student only needs to READ in order
+ *     to answer a written question → static svg only.
+ *   - If no diagram exists → null.
  */
 export function extractDiagramConfig(pair) {
   if (!pair) return null;
 
-  const qText = (pair.question ?? "").toLowerCase();
+  const qText = pair.question ?? "";
 
-  // Matching question config
-  if (/draw\s+(a\s+)?line|draw\s+one\s+line|link\s+each|match\s+each/i.test(pair.question)) {
-    const config = extractMatchingConfig(pair.question);
+  // ── Interactive: matching ────────────────────────────────────────────────
+  if (/draw\s+(a\s+)?line|draw\s+one\s+line|link\s+each|match\s+each/i.test(qText)) {
+    const config = extractMatchingConfig(qText);
     if (config) return { type: "matching", ...config };
   }
 
-  // Table fill config
-  if (/complete\s+the\s+table|fill\s+in\s+the\s+(table|blank)|blank\s+cell|write\s+the\s+(correct\s+)?(term|definition)/i.test(pair.question)) {
+  // ── Interactive: table fill ──────────────────────────────────────────────
+  if (
+    /complete\s+the\s+table|fill\s+in\s+the\s+(table|blank|missing)/i.test(qText) ||
+    /write\s+the\s+(correct\s+)?(term|definition|word|value)\s+in/i.test(qText)
+  ) {
     const config = extractTableConfig(pair);
     if (config) return { type: "table_fill", ...config };
   }
 
-  // Register config
-  if (/register\s+[a-z]\s+contains|write\s+(your answer\s+)?in the register/i.test(pair.question)) {
+  // ── Interactive: register ────────────────────────────────────────────────
+  if (/write\s+(your answer\s+)?in the register|write\s+it\s+in\s+the\s+register/i.test(qText)) {
     const config = extractRegisterConfig(pair);
     if (config) return { type: "register", ...config };
   }
 
-  // Static SVG diagram
-  if (pair.diagram_svg) return { type: "svg", svgString: pair.diagram_svg };
+  // ── Static reference SVG only (student reads it, does NOT interact) ──────
+  // Questions that say "shown above", "the diagram shows", "the table shows",
+  // "the register contains", "the image above", etc.
+  if (pair.diagram_svg) {
+    const hasReferenceLanguage =
+      /shown above|the (diagram|table|image|register|figure|screen|grid)\s+(above|shows|below)|contains the (8|12).bit|refer to the/i.test(qText) ||
+      // Register questions where the pre-filled value is provided for reading
+      /register\s+[A-Z]\s+contains\s+the\s+(8|12).bit\s+value/i.test(qText);
+
+    if (hasReferenceLanguage) {
+      return { type: "svg", svgString: pair.diagram_svg };
+    }
+
+    // Has a diagram_svg but none of the above — still show it as reference
+    return { type: "svg", svgString: pair.diagram_svg };
+  }
 
   return null;
 }
 
-// ── Matching config extractors ────────────────────────────────────────────────
+// ── Matching config ──────────────────────────────────────────────────────────
 
 function extractMatchingConfig(questionText) {
   // Q9/Q10: max colours → min bits
-  if (/max(imum)?\s+number\s+of\s+colours|min(imum)?\s+(number\s+of\s+)?bits/i.test(questionText)) {
+  if (/max(imum)?\s+(number\s+of\s+)?colours|min(imum)?\s+(number\s+of\s+)?bits/i.test(questionText)) {
     return {
       leftLabel: "Max number of colours",
       rightLabel: "Min bits needed",
       leftItems: ["68", "256", "127", "2", "249"],
       rightItems: ["1", "2", "3", "7", "8", "9"],
-      correctAnswers: [
-        { from: 0, to: 3 }, // 68 → 7 bits
-        { from: 1, to: 4 }, // 256 → 8 bits
-        { from: 2, to: 3 }, // 127 → 7 bits
-        { from: 3, to: 0 }, // 2 → 1 bit
-        { from: 4, to: 4 }, // 249 → 8 bits
-      ],
     };
   }
 
@@ -121,12 +111,6 @@ function extractMatchingConfig(questionText) {
       rightLabel: "Denary",
       leftItems: ["Hex: 3A", "BCD: 0100 1001", "Binary: 01011101", "Two's complement: 11000001"],
       rightItems: ["93", "−65", "58", "−63", "73", "49", "−93"],
-      correctAnswers: [
-        { from: 0, to: 2 }, // 3A → 58
-        { from: 1, to: 5 }, // BCD 0100 1001 → 49
-        { from: 2, to: 0 }, // 01011101 → 93
-        { from: 3, to: 3 }, // 11000001 → −63
-      ],
     };
   }
 
@@ -151,7 +135,7 @@ function extractMatchingConfig(questionText) {
   return null;
 }
 
-// ── Table config extractor ────────────────────────────────────────────────────
+// ── Table fill config ────────────────────────────────────────────────────────
 
 function extractTableConfig(pair) {
   const q = pair.question ?? "";
@@ -168,7 +152,7 @@ function extractTableConfig(pair) {
     };
   }
 
-  // Q17 lossy/lossless table
+  // Q17/Q18 lossy/lossless table
   if (/lossy|lossless/i.test(q) && /cropping|run.length|colour depth/i.test(q)) {
     return {
       headers: ["Compression method", "Lossy ✓", "Lossless ✓"],
@@ -178,11 +162,10 @@ function extractTableConfig(pair) {
         ["Using run-length encoding (RLE)", "", ""],
         ["Reducing the colour depth of the image", "", ""],
       ],
-      radioColumns: [1, 2],
     };
   }
 
-  // Q2 ASCII table (character 't')
+  // Q2 ASCII table
   if (/ascii.*denary.*hex|character.*'t'|complete.*table.*ascii/i.test(q)) {
     return {
       headers: ["Character", "ASCII denary value", "ASCII hex value"],
@@ -198,7 +181,7 @@ function extractTableConfig(pair) {
   return null;
 }
 
-// ── Register config extractor ─────────────────────────────────────────────────
+// ── Register config ──────────────────────────────────────────────────────────
 
 function extractRegisterConfig(pair) {
   const q = pair.question ?? "";
@@ -207,8 +190,8 @@ function extractRegisterConfig(pair) {
   if (/55.*−?102|102.*55/i.test(q)) {
     return {
       registers: [
-        { label: "55", bits: 8, placeholder: "Enter 8-bit binary for 55" },
-        { label: "−102", bits: 8, placeholder: "Enter 8-bit two's complement for −102" },
+        { label: "55", bits: 8 },
+        { label: "−102", bits: 8 },
       ],
     };
   }
@@ -217,8 +200,8 @@ function extractRegisterConfig(pair) {
   if (/114.*−?93|93.*114/i.test(q)) {
     return {
       registers: [
-        { label: "114", bits: 8, placeholder: "Enter 8-bit binary for 114" },
-        { label: "−93", bits: 8, placeholder: "Enter 8-bit two's complement for −93" },
+        { label: "114", bits: 8 },
+        { label: "−93", bits: 8 },
       ],
     };
   }
@@ -227,18 +210,8 @@ function extractRegisterConfig(pair) {
   if (/124.*−?77|77.*124/i.test(q)) {
     return {
       registers: [
-        { label: "124", bits: 8, placeholder: "Enter 8-bit binary for 124" },
-        { label: "−77", bits: 8, placeholder: "Enter 8-bit two's complement for −77" },
-      ],
-    };
-  }
-
-  // Single registers (Q15, Q18, Q20, Q22)
-  const singleMatch = q.match(/register\s+([A-Z])\s+contains\s+the\s+8.bit\s+value[\s\S]*?([01]{8})/i);
-  if (singleMatch) {
-    return {
-      registers: [
-        { label: `Register ${singleMatch[1]}`, bits: 8, prefilled: singleMatch[2] },
+        { label: "124", bits: 8 },
+        { label: "−77", bits: 8 },
       ],
     };
   }
@@ -246,9 +219,7 @@ function extractRegisterConfig(pair) {
   // Q26 12-bit register
   if (/12.bit/i.test(q)) {
     return {
-      registers: [
-        { label: "12-bit register", bits: 12 },
-      ],
+      registers: [{ label: "12-bit register", bits: 12 }],
     };
   }
 

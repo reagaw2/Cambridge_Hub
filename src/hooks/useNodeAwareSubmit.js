@@ -5,13 +5,10 @@ import { getMarkNodes, buildNodeAwarePrompt, validateMandatoryChain } from "@/li
 /**
  * useNodeAwareSubmit
  *
- * Drop-in replacement for inline base44.integrations.Core.InvokeLLM calls
- * in question attempt pages.
+ * Fetches mark nodes from Supabase (fast, cached), builds node-aware prompt,
+ * calls Claude, validates mandatory chain, and returns feedback immediately.
  *
- * Returns:
- *   submit(question, answer) → Promise<feedbackObject | null>
- *   loading: boolean
- *   error: string | null
+ * No artificial delays. Feedback is returned the instant the AI responds.
  */
 export function useNodeAwareSubmit() {
   const [loading, setLoading] = useState(false);
@@ -21,23 +18,23 @@ export function useNodeAwareSubmit() {
     setLoading(true);
     setError(null);
 
+    // 1. Fetch atomic nodes (non-blocking — falls back gracefully if Supabase is slow)
     let nodes = [];
     try {
       nodes = await getMarkNodes(question.id);
     } catch (e) {
-      console.warn("[useNodeAwareSubmit] getMarkNodes failed, falling back to base prompt:", e);
+      console.warn("[useNodeAwareSubmit] getMarkNodes failed, using base prompt:", e.message);
     }
 
-    // Build prompt — enhanced with nodes if available, base prompt otherwise
+    // 2. Build enhanced prompt
     const basePrompt = question.prompt(answer);
-    const enhancedPrompt = nodes.length > 0
-      ? buildNodeAwarePrompt(basePrompt, nodes)
-      : basePrompt;
+    const prompt = nodes.length > 0 ? buildNodeAwarePrompt(basePrompt, nodes) : basePrompt;
 
+    // 3. Call AI
     let rawFeedback = null;
     try {
       const result = await base44.integrations.Core.InvokeLLM({
-        prompt: enhancedPrompt,
+        prompt,
         model: "claude_sonnet_4_6",
         response_json_schema: question.response_schema,
       });
@@ -50,12 +47,12 @@ export function useNodeAwareSubmit() {
     }
 
     if (!rawFeedback) {
-      setError("Something went wrong. Please try again.");
+      setError("No response received. Please try again.");
       setLoading(false);
       return null;
     }
 
-    // Validate mandatory chain — enforces M1→A1 dependencies
+    // 4. Enforce M1 → A1 dependency rules
     const feedback = nodes.length > 0
       ? validateMandatoryChain(rawFeedback, nodes)
       : rawFeedback;

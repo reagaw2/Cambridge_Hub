@@ -6,9 +6,8 @@ export default function SubmitButton({ disabled, loading, onClick }) {
   const isLoading = loading || localLoading;
 
   async function handleClick() {
+    if (isLoading) return;
     setLocalLoading(true);
-    // Yield two frames so React flushes loading state before the heavy await
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
       await onClick();
     } finally {
@@ -23,7 +22,7 @@ export default function SubmitButton({ disabled, loading, onClick }) {
         disabled={disabled || isLoading}
         className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {isLoading ? "Analysing…" : "Submit Answer"}
+        {isLoading ? "Marking…" : "Submit Answer"}
       </button>
       {isLoading && <SubmittingOverlay />}
     </>

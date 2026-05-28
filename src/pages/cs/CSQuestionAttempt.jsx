@@ -1,6 +1,3 @@
-/**
- * Shared CS question attempt UI — uses node-aware grading engine.
- */
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -67,7 +64,6 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
   const handleSubmit = async () => {
     if (submittedRef.current) return;
     submittedRef.current = true;
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const fb = await submit(question, answer);
     if (!fb) { submittedRef.current = false; return; }
@@ -76,7 +72,12 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
     if (marksEarned < question.total_marks) {
       csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, answer).catch(() => {});
-      await csAddToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "", first_attempt_answer: answer });
+      await csAddToReviewBank({
+        question_id: question.id, topic: question.topic, question_text: question.text,
+        mark_scheme: "", total_marks: question.total_marks,
+        first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "",
+        first_attempt_answer: answer,
+      });
     }
     goToFeedback(fb, answer);
   };
@@ -85,7 +86,12 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     const marksEarned = fb.marks_earned ?? 0;
     await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
     csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, finalAnswer).catch(() => {});
-    await csAddToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "", first_attempt_answer: finalAnswer });
+    await csAddToReviewBank({
+      question_id: question.id, topic: question.topic, question_text: question.text,
+      mark_scheme: "", total_marks: question.total_marks,
+      first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "",
+      first_attempt_answer: finalAnswer,
+    });
     goToFeedback(fb, finalAnswer);
   };
 
@@ -132,7 +138,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
                   disabled={isEmpty || loading}
                   className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Marking..." : "Submit"}
+                  {loading ? "Marking…" : "Submit"}
                 </button>
               </div>
               {error && <p className="text-center text-sm text-red-400/80">{error}</p>}

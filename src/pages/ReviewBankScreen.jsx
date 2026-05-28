@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Lock, Download, ChevronDown, X } from "lucide-react";
-import { getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
+import { getReviewBank, getGuessReviewBank, getMistakeDna } from "@/lib/topicStore";
 import { generateReviewBankPdf } from "@/lib/generatePdf";
-import { getMistakeDna } from "@/lib/topicStore";
 import { useAuth } from "@/lib/AuthContext";
 
 function getLockStatus(locked_until, now) {
@@ -144,13 +143,36 @@ function DnaTag({ category }) {
   );
 }
 
+/**
+ * Resolves the single best "last attempt" text for a question card.
+ *
+ * Priority:
+ *   1. `first_attempt_answer` saved directly on the review bank entry
+ *      (written by Feedback.jsx / CSQuestionAttempt.jsx)
+ *   2. `student_response` from the *latest* mistake_dna entry for this question_id
+ *      (written by buildMistakeDna — the new structured field)
+ *
+ * Multiple DNA entries for the same question_id are deduplicated: only the
+ * most-recently-dated one is used so the card never shows duplicate blocks.
+ */
+function resolveLastAttempt(q, dnaEntries) {
+  // Priority 1 — review bank's own field (most reliable, set at submission time)
+  if (q.first_attempt_answer?.trim()) {
+    return q.first_attempt_answer.trim();
+  }
+
+  // Priority 2 — latest mistake_dna entry with a student_response for this question
+  const matching = dnaEntries
+    .filter(e => e.question_id === q.question_id && e.student_response?.trim())
+    .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime());
+
+  return matching[0]?.student_response?.trim() ?? null;
+}
+
 // ── "Your Last Attempt" strip ──────────────────────────────────────────────
-function LastAttemptStrip({ answer }) {
-  if (!answer?.trim()) return null;
-  // Truncate to 120 chars for the card preview
-  const display = answer.trim().length > 120
-    ? answer.trim().slice(0, 117) + "…"
-    : answer.trim();
+function LastAttemptStrip({ text }) {
+  if (!text) return null;
+  const display = text.length > 120 ? text.slice(0, 117) + "…" : text;
   return (
     <div className="border-l-2 border-white/10 pl-2.5 py-0.5">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 mb-0.5">
@@ -171,6 +193,9 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
   const dnaForQuestion = dnaEntries.filter(e => e.question_id === q.question_id);
   const uniqueCategories = [...new Set(dnaForQuestion.map(e => e.error_category))].filter(Boolean);
 
+  // Resolve the single best last-attempt text — deduped, latest wins
+  const lastAttemptText = resolveLastAttempt(q, dnaEntries);
+
   if (!locked) {
     const route = QUESTION_ROUTES[q.question_id] ?? "/review";
     return (
@@ -185,7 +210,7 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
           </span>
         </div>
 
-        {/* DNA tags */}
+        {/* DNA error tags */}
         {uniqueCategories.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
@@ -195,8 +220,8 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
         {/* Question preview */}
         <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
 
-        {/* ── Last attempt answer ── */}
-        <LastAttemptStrip answer={q.first_attempt_answer} />
+        {/* Last attempt — single resolved text, never duplicated */}
+        <LastAttemptStrip text={lastAttemptText} />
 
         <div className="flex justify-end">
           <button
@@ -232,8 +257,8 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
 
       <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview}</p>
 
-      {/* ── Last attempt answer (dimmed when locked) ── */}
-      <LastAttemptStrip answer={q.first_attempt_answer} />
+      {/* Last attempt — single resolved text, never duplicated */}
+      <LastAttemptStrip text={lastAttemptText} />
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-amber-400/80">

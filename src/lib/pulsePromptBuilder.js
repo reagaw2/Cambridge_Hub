@@ -1,6 +1,5 @@
 /**
- * pulsePromptBuilder.js — 3-Layer Pulse Answer Engine prompt builder.
- * Enforces a subject-agnostic structured response for all Cambridge subjects.
+ * pulsePromptBuilder.js — 6-Step Cambridge Feedback Protocol prompt builder.
  */
 
 const SUBJECT_CONFIG = {
@@ -22,12 +21,7 @@ const SUBJECT_CONFIG = {
 };
 
 /**
- * Wraps any existing mark-scheme prompt into the 3-layer Pulse format.
- *
- * @param {string} basePrompt   - The original per-question marking prompt
- * @param {object} schema       - The existing response_json_schema
- * @param {string} subject      - "physics" | "cs" | "math"
- * @returns {{ prompt: string, schema: object }}
+ * Wraps any existing mark-scheme prompt into the 6-step protocol format.
  */
 export function buildPulsePrompt(basePrompt, schema, subject = "physics") {
   const cfg = SUBJECT_CONFIG[subject] ?? SUBJECT_CONFIG.physics;
@@ -35,21 +29,36 @@ export function buildPulsePrompt(basePrompt, schema, subject = "physics") {
   const pulsePrompt = `${basePrompt}
 
 ---
-IMPORTANT: After completing your normal JSON evaluation above, you MUST also populate THREE additional fields in your JSON response:
+IMPORTANT: After completing your normal JSON evaluation above, you MUST also populate SIX additional fields following the Cambridge Feedback Protocol:
 
-"pulse_layer_1": A single punchy sentence of MAXIMUM 20 words that gives the student the core linguistic trap, trick word, or key constraint they must remember for this question type. ${cfg.heuristicExample}. This is the EXAM HACK — make it memorable and direct.
+"step1_system": One to two sentences — state the core question clearly and define what the system is trying to accomplish or measure. What physics/CS engine is running underneath this question?
 
-"pulse_layer_2_marks": An array of mark objects already captured in your mark_1, mark_2, etc. fields. Summarise each mark as: { "notation": "${cfg.notation} label", "description": "what was needed", "earned": true/false, "examiner_note": "one precise sentence on what Cambridge looks for here" }.
+"step2_phrase_breakdown": Two to four sentences — dissect the text of the question phrase-by-phrase, explaining the hidden mechanics behind specific wording choices. Why did Cambridge phrase it exactly this way?
 
-"pulse_layer_3": An optional 2–4 sentence deep-dive conceptual explanation or derivation for students who want to fully understand the underlying principle. If the question is straightforward, still provide a useful extension insight.
+"step3_tipping_point": One to two sentences — identify the exact boundary or structural constraint where the rules of the system shift. This is the core logic pivot point of the question.
 
-These three fields are MANDATORY. Do not omit them. Respond only in JSON.`;
+"step4_math_visual": Two to three sentences — run the key mathematical reasoning step-by-step and describe a visual diagram or graph that models the physics/CS engine of this problem. Include numbers where relevant.
 
-  // Extend the existing schema with the 3 pulse fields
+"step5_edge_case": Two to three sentences — flip the variables or geometry to show the polar opposite scenario. If the question is about X, show what changes when you invert the key parameter. Map the entire conceptual boundary.
+
+"step6_takeaway": One punchy sentence of MAXIMUM 20 words — a highly optimised, reusable mental script or algorithmic rule deployable across any future Cambridge variant of this problem.
+
+"pulse_layer_1": Same as step6_takeaway — the single most important exam hack.
+"pulse_layer_2_marks": Array already captured in mark_1, mark_2, etc. — summarise each as { "notation": "${cfg.notation}", "description": "what was needed", "earned": true/false, "examiner_note": "one precise sentence" }.
+"pulse_layer_3": Summary of steps 4 and 5 combined for the deep-dive panel.
+
+ALL NINE fields are MANDATORY. Respond only in JSON.`;
+
   const extendedSchema = {
     ...schema,
     properties: {
       ...(schema.properties ?? {}),
+      step1_system: { type: "string" },
+      step2_phrase_breakdown: { type: "string" },
+      step3_tipping_point: { type: "string" },
+      step4_math_visual: { type: "string" },
+      step5_edge_case: { type: "string" },
+      step6_takeaway: { type: "string" },
       pulse_layer_1: { type: "string" },
       pulse_layer_2_marks: {
         type: "array",
@@ -71,7 +80,7 @@ These three fields are MANDATORY. Do not omit them. Respond only in JSON.`;
 }
 
 /**
- * Detects which subject a topic key / topic label belongs to.
+ * Detects which subject a topic key belongs to.
  */
 export function detectSubject(topicKey = "") {
   const k = topicKey.toLowerCase();

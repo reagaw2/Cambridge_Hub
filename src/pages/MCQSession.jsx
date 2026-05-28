@@ -18,13 +18,9 @@ function OptionButton({ letter, text, selected, onSelect }) {
           : "border-border hover:border-border/80"
       }`}
     >
-      <span
-        className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${
-          isSelected ? "text-amber-400" : "text-muted-foreground"
-        }`}
-      >
-        {letter}
-      </span>
+      <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${
+        isSelected ? "text-amber-400" : "text-muted-foreground"
+      }`}>{letter}</span>
       <span className="text-sm text-foreground/90 leading-relaxed flex-1">{text}</span>
     </button>
   );
@@ -70,14 +66,8 @@ export default function MCQSession() {
   const reasoningValid = isGuess || reasoning.trim().length > 0;
 
   async function handleSubmit() {
-    if (!selected) {
-      setNoSelectionError(true);
-      return;
-    }
-    if (!reasoningValid) {
-      setNoReasoningError(true);
-      return;
-    }
+    if (!selected) { setNoSelectionError(true); return; }
+    if (!reasoningValid) { setNoReasoningError(true); return; }
 
     const isCorrect = selected === question.correct;
     const attemptData = {
@@ -92,11 +82,11 @@ export default function MCQSession() {
 
     setLoading(true);
 
-    const chosenText = question.options[selected];
+    const optionsBlock = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
     const correctText = question.options[question.correct];
-    const optionsBlock = OPTION_KEYS.map((k) => `${k}: ${question.options[k]}`).join("\n");
+    const chosenText = question.options[selected];
 
-    const prompt = `You are a Cambridge A Level Physics examiner providing feedback on a multiple-choice question.
+    const prompt = `You are a Cambridge A Level Physics examiner. Follow the 6-step Cambridge Feedback Protocol.
 
 Question: ${question.text}
 
@@ -106,21 +96,25 @@ ${optionsBlock}
 Correct answer: ${question.correct} — ${correctText}
 Student chose: ${selected} — ${chosenText}
 Result: ${isCorrect ? "CORRECT" : "INCORRECT"}
-${attemptData.flagged_as_guess ? "Student flagged this as a guess (no reasoning provided)." : `Student's reasoning: "${attemptData.reasoning ?? "None provided"}"`}
+${isGuess ? "Student flagged this as a guess." : `Student's reasoning: "${attemptData.reasoning ?? "None"}"`}
 
 Respond ONLY in this JSON format, no extra text:
 {
-  "critical_keyword_word": "the single most important physics keyword or concept that unlocks this question (2–6 words)",
-  "critical_keyword_explanation": "one to two sentences explaining why this keyword is central to answering this question correctly",
-  "reasoning_assessment": "${isGuess ? "Student flagged as a guess — no reasoning to assess." : "one to two sentences assessing how close the student's reasoning was to the correct physics — be specific and honest"}",
-  "reasoning_sound": ${isGuess ? "null" : "true or false — true if the reasoning demonstrates correct physics understanding, false if flawed or incomplete"},
-  "answer_explanation": "two to three sentences explaining why the correct answer is right and why common wrong answers fail, using precise Cambridge language",
-  "next_step": "one sentence telling the student exactly what to review or practise next",
-  "pulse_layer_1": "single punchy sentence of max 20 words — the exam hack or key trick that unlocks this question type for future questions",
+  "step1_system": "one to two sentences — what system or concept does this question test and what is it measuring?",
+  "step2_phrase_breakdown": "two to four sentences — dissect specific phrases in the question that carry hidden physics meaning",
+  "step3_tipping_point": "one to two sentences — the exact boundary or constraint where the physics logic shifts in this type of question",
+  "step4_math_visual": "two to three sentences — key mathematical reasoning step-by-step, plus a description of the diagram or graph that models this problem",
+  "step5_edge_case": "two to three sentences — flip the key variable to show the polar opposite scenario and map the full conceptual boundary",
+  "step6_takeaway": "one punchy sentence of max 20 words — reusable mental script for any future Cambridge variant of this problem",
+  "pulse_layer_1": "same as step6_takeaway",
   "pulse_layer_2_marks": [
     { "notation": "Key Point", "description": "what the correct answer requires the student to know", "earned": ${isCorrect}, "examiner_note": "one precise sentence on what Cambridge is testing here" }
   ],
-  "pulse_layer_3": "two to four sentences of deep-dive conceptual explanation — the underlying physics principle that makes this question work"
+  "pulse_layer_3": "combined summary of steps 4 and 5 for the deep-dive panel",
+  "cambridge_insight": "two sentences on what Cambridge is looking for and why",
+  "next_step": "one sentence on what to review next",
+  "reasoning_assessment": "${isGuess ? "Flagged as guess." : "one to two sentences assessing the student reasoning"}",
+  "reasoning_sound": ${isGuess ? "null" : "true or false"}
 }`;
 
     const feedback = await base44.integrations.Core.InvokeLLM({
@@ -129,21 +123,24 @@ Respond ONLY in this JSON format, no extra text:
       response_json_schema: {
         type: "object",
         properties: {
-          critical_keyword_word: { type: "string" },
-          critical_keyword_explanation: { type: "string" },
-          reasoning_assessment: { type: "string" },
-          reasoning_sound: { type: "boolean" },
-          answer_explanation: { type: "string" },
-          next_step: { type: "string" },
+          step1_system: { type: "string" },
+          step2_phrase_breakdown: { type: "string" },
+          step3_tipping_point: { type: "string" },
+          step4_math_visual: { type: "string" },
+          step5_edge_case: { type: "string" },
+          step6_takeaway: { type: "string" },
           pulse_layer_1: { type: "string" },
           pulse_layer_2_marks: { type: "array", items: { type: "object" } },
           pulse_layer_3: { type: "string" },
+          cambridge_insight: { type: "string" },
+          next_step: { type: "string" },
+          reasoning_assessment: { type: "string" },
+          reasoning_sound: { type: "boolean" },
         },
       },
     }).catch(() => null);
 
     setLoading(false);
-
     await recordAttempt(question.topic, isCorrect ? 1 : 0, { total_marks: 1, question_id: question.id });
 
     navigate("/mcq-feedback", {
@@ -164,30 +161,23 @@ Respond ONLY in this JSON format, no extra text:
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button
-            onClick={() => navigate("/physics")}
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] -ml-2 rounded-lg hover:bg-secondary transition-colors"
-          >
+          <button onClick={() => navigate("/physics")}
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] -ml-2 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {question.source}
-          </span>
+          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{question.source}</span>
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* Mode pill */}
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-widest text-amber-900 bg-amber-400/80 px-3 py-1 rounded-full">
               Multiple Choice
             </span>
           </div>
 
-          {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
@@ -200,36 +190,22 @@ Respond ONLY in this JSON format, no extra text:
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
           </div>
 
-          {/* Answer options */}
           <div className="flex flex-col gap-2.5">
-            {OPTION_KEYS.map((key) => (
-              <OptionButton
-                key={key}
-                letter={key}
-                text={question.options[key]}
-                selected={selected}
-                onSelect={handleSelect}
-              />
+            {OPTION_KEYS.map(key => (
+              <OptionButton key={key} letter={key} text={question.options[key]} selected={selected} onSelect={handleSelect} />
             ))}
           </div>
 
-          {noSelectionError && (
-            <p className="text-sm text-red-400/80 text-center -mt-1">Select an answer first</p>
-          )}
+          {noSelectionError && <p className="text-sm text-red-400/80 text-center -mt-1">Select an answer first</p>}
 
-          {/* Reasoning */}
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Why did you choose this?
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Why did you choose this?</p>
             {isGuess ? (
-              <p className="text-xs text-muted-foreground/50 italic py-2">
-                Flagged as a guess — no reasoning required
-              </p>
+              <p className="text-xs text-muted-foreground/50 italic py-2">Flagged as a guess — no reasoning required</p>
             ) : (
               <textarea
                 value={reasoning}
-                onChange={(e) => { setReasoning(e.target.value); if (noReasoningError) setNoReasoningError(false); }}
+                onChange={e => { setReasoning(e.target.value); if (noReasoningError) setNoReasoningError(false); }}
                 placeholder="Brief reason — one or two sentences is enough"
                 rows={3}
                 className="w-full bg-card border border-border rounded-xl p-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
@@ -237,18 +213,13 @@ Respond ONLY in this JSON format, no extra text:
             )}
           </div>
 
-          {noReasoningError && (
-            <p className="text-sm text-amber-400/90 text-center -mt-1">Please explain your reasoning or tap Just a guess</p>
-          )}
+          {noReasoningError && <p className="text-sm text-amber-400/90 text-center -mt-1">Please explain your reasoning or tap Just a guess</p>}
 
-          {/* Submit row */}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { setIsGuess((g) => !g); if (noReasoningError) setNoReasoningError(false); }}
+              onClick={() => { setIsGuess(g => !g); if (noReasoningError) setNoReasoningError(false); }}
               className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
-                isGuess
-                  ? "bg-amber-400 text-amber-900"
-                  : "bg-secondary text-secondary-foreground hover:brightness-110"
+                isGuess ? "bg-amber-400 text-amber-900" : "bg-secondary text-secondary-foreground hover:brightness-110"
               }`}
             >
               🎲 Just a guess
@@ -257,10 +228,8 @@ Respond ONLY in this JSON format, no extra text:
               onClick={handleSubmit}
               disabled={loading}
               className={`flex-1 bg-primary text-primary-foreground font-semibold text-sm py-2.5 rounded-xl transition-all ${
-                reasoningValid && !loading
-                  ? "hover:brightness-110 active:scale-[0.98] opacity-100 cursor-pointer"
-                  : "opacity-50 cursor-not-allowed"
-              } disabled:opacity-40 disabled:cursor-not-allowed`}
+                reasoningValid && !loading ? "hover:brightness-110 active:scale-[0.98]" : "opacity-50 cursor-not-allowed"
+              } disabled:opacity-40`}
             >
               {loading ? "Analysing..." : "Submit Answer"}
             </button>

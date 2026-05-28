@@ -52,7 +52,6 @@ export default function MCQFeedback() {
   const chosen_option = attemptData?.chosen_option;
   const correct_option = attemptData?.correct_option;
 
-  // Save attempt to DB on mount
   useEffect(() => {
     if (!feedback || !attemptData || !question) return;
     sessionStorage.setItem("review_gate_attempt", "1");
@@ -76,32 +75,39 @@ export default function MCQFeedback() {
 
   async function handleNext() {
     if (guessReviewMode) {
-      if (flagged_as_guess || !correct) {
-        await resetGuessReviewBankLock(attemptData.question_id);
-      }
+      if (flagged_as_guess || !correct) await resetGuessReviewBankLock(attemptData.question_id);
       navigate("/guess-review-bank");
     } else {
       navigate("/mcq", { state: { topic, sessionIndex: nextSessionIndex ?? 1 } });
     }
   }
 
-  // Build a PulseFeedback-compatible object from the MCQ feedback
+  // Build PulseFeedback-compatible object — passes all 6 step fields through
   const pulseFeedback = {
     marks_earned: correct ? 1 : 0,
+    // Standard mark breakdown
     mark_1: {
       earned: !!correct,
-      keyword: feedback.critical_keyword_word ?? question.options[correct_option],
+      keyword: feedback.step6_takeaway ?? question.options[correct_option],
       found: !!correct,
-      feedback: feedback.critical_keyword_explanation ?? "",
+      feedback: feedback.step1_system ?? feedback.cambridge_insight ?? "",
     },
-    cambridge_insight: feedback.answer_explanation ?? "",
+    cambridge_insight: feedback.cambridge_insight ?? feedback.step1_system ?? "",
     next_step: feedback.next_step ?? "",
-    pulse_layer_1: feedback.pulse_layer_1 ?? feedback.critical_keyword_word ?? "",
+    // 6-step protocol fields
+    step1_system: feedback.step1_system ?? "",
+    step2_phrase_breakdown: feedback.step2_phrase_breakdown ?? "",
+    step3_tipping_point: feedback.step3_tipping_point ?? "",
+    step4_math_visual: feedback.step4_math_visual ?? "",
+    step5_edge_case: feedback.step5_edge_case ?? "",
+    step6_takeaway: feedback.step6_takeaway ?? "",
+    // Pulse layers
+    pulse_layer_1: feedback.pulse_layer_1 ?? feedback.step6_takeaway ?? "",
     pulse_layer_2_marks: feedback.pulse_layer_2_marks ?? [],
-    pulse_layer_3: feedback.pulse_layer_3 ?? "",
+    pulse_layer_3: feedback.pulse_layer_3 ?? [feedback.step4_math_visual, feedback.step5_edge_case].filter(Boolean).join("\n\n") ?? "",
   };
 
-  // Add reasoning as a second mark point if student provided reasoning
+  // Add reasoning as a second mark point if student reasoned
   if (!flagged_as_guess && attemptData.reasoning && feedback.reasoning_assessment) {
     pulseFeedback.mark_2 = {
       earned: feedback.reasoning_sound === true,
@@ -115,42 +121,34 @@ export default function MCQFeedback() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button
-            onClick={() => navigate("/physics")}
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] -ml-2 rounded-lg hover:bg-secondary transition-colors"
-          >
+          <button onClick={() => navigate("/physics")}
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] -ml-2 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {question.source}
-          </span>
+          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{question.source}</span>
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* Result banner */}
           <ResultBanner correct={correct} isGuess={flagged_as_guess} />
 
-          {/* Options recap — show correct vs chosen */}
+          {/* Options recap */}
           <div className="bg-card border border-border rounded-xl p-4 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Options</p>
-            {OPTION_KEYS.map((key) => {
+            {OPTION_KEYS.map(key => {
               const isCorrectOption = key === correct_option;
-              const isChosen = key === chosen_option;
-              const isWrongChosen = isChosen && !correct && !isCorrectOption;
-
-              let borderClass = "border-border/40";
-              let labelColor = "text-muted-foreground";
-              let bgClass = "bg-secondary/30";
-              if (isCorrectOption) { borderClass = "border-l-4 border-green-500/70"; labelColor = "text-green-400"; bgClass = "bg-green-500/8"; }
-              if (isWrongChosen) { borderClass = "border-l-4 border-red-400/70"; labelColor = "text-red-400"; bgClass = "bg-red-500/8"; }
-
+              const isWrongChosen = key === chosen_option && !correct && !isCorrectOption;
               return (
-                <div key={key} className={`flex items-start gap-3 p-2.5 rounded-lg border ${borderClass} ${bgClass}`}>
-                  <span className={`font-mono text-xs font-bold shrink-0 mt-0.5 ${labelColor}`}>{key}</span>
+                <div key={key} className={`flex items-start gap-3 p-2.5 rounded-lg border ${
+                  isCorrectOption ? "border-l-4 border-green-500/70 bg-green-500/8"
+                  : isWrongChosen ? "border-l-4 border-red-400/70 bg-red-500/8"
+                  : "border-border/40 bg-secondary/30"
+                }`}>
+                  <span className={`font-mono text-xs font-bold shrink-0 mt-0.5 ${
+                    isCorrectOption ? "text-green-400" : isWrongChosen ? "text-red-400" : "text-muted-foreground"
+                  }`}>{key}</span>
                   <span className="text-xs text-foreground/80 leading-relaxed">{question.options[key]}</span>
                   {isCorrectOption && <span className="ml-auto text-[10px] text-green-400 font-bold shrink-0">✓ correct</span>}
                   {isWrongChosen && <span className="ml-auto text-[10px] text-red-400 font-bold shrink-0">✗ chosen</span>}
@@ -159,7 +157,7 @@ export default function MCQFeedback() {
             })}
           </div>
 
-          {/* PulseFeedback — all 3 layers */}
+          {/* 3-layer PulseFeedback with all 6 steps embedded */}
           <PulseFeedback
             feedback={pulseFeedback}
             subject="physics"
@@ -173,18 +171,13 @@ export default function MCQFeedback() {
             }
           />
 
-          {/* Next button */}
-          <button
-            onClick={handleNext}
-            className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-          >
+          <button onClick={handleNext}
+            className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
             Next question →
           </button>
 
-          <button
-            onClick={() => navigate("/physics")}
-            className="w-full bg-transparent border border-border text-muted-foreground font-medium text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-          >
+          <button onClick={() => navigate("/physics")}
+            className="w-full bg-transparent border border-border text-muted-foreground font-medium text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
             Switch to written
           </button>
 

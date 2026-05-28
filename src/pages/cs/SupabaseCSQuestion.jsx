@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Database, ChevronRight, SkipForward } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Database } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 import QuestionDiagram from "@/components/QuestionDiagram";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import { base44 } from "@/api/base44Client";
-import { useSupabaseQuestions, buildSupabasePrompt, buildSupabaseSchema } from "@/hooks/useSupabaseQuestions";
+import { useSupabaseQuestions } from "@/hooks/useSupabaseQuestions";
 import CSQuestionAttempt from "./CSQuestionAttempt";
 
 function splitIntoParts(questionText, markSchemeText) {
@@ -73,6 +73,8 @@ function extractMarksFromText(text) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+const PROGRESS_KEY_PREFIX = "supabase_q_idx_cs_";
+
 export default function SupabaseCSQuestion({
   topicKey,
   topicLabel,
@@ -83,14 +85,19 @@ export default function SupabaseCSQuestion({
 }) {
   const navigate = useNavigate();
   const { questions, loading, getCurrentQuestion, advance, getProgress } = useSupabaseQuestions(topicKey, "cs");
+
+  // Local question index — keeps track within the component without needing reload
+  const [localIdx, setLocalIdx] = useState(() => {
+    const stored = sessionStorage.getItem(`${PROGRESS_KEY_PREFIX}${topicKey}`);
+    return stored ? parseInt(stored, 10) : 0;
+  });
+
   const [answers, setAnswers] = useState({});
   const [partIndex, setPartIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [partFeedbacks, setPartFeedbacks] = useState([]);
   const [fallbackOverride, setFallbackOverride] = useState(null);
-  const [showSkipPanel, setShowSkipPanel] = useState(false);
-  const [skipInput, setSkipInput] = useState("");
 
   if (loading) {
     return (
@@ -116,8 +123,19 @@ export default function SupabaseCSQuestion({
     );
   }
 
-  const question = getCurrentQuestion();
-  const { idx, total } = getProgress();
+  const clampedIdx = Math.max(0, Math.min(localIdx, questions.length - 1));
+  const question = questions[clampedIdx];
+  const total = questions.length;
+
+  function goToQuestion(newIdx) {
+    const clamped = Math.max(0, Math.min(newIdx, questions.length - 1));
+    sessionStorage.setItem(`${PROGRESS_KEY_PREFIX}${topicKey}`, String(clamped));
+    setLocalIdx(clamped);
+    setAnswers({});
+    setPartIndex(0);
+    setPartFeedbacks([]);
+    setSubmitError(null);
+  }
 
   if (!question) {
     return (
@@ -133,25 +151,6 @@ export default function SupabaseCSQuestion({
   const totalParts = parts.length;
   const isLastPart = partIndex === totalParts - 1;
   const showDiagram = partIndex === 0 && question.diagram_svg;
-
-  function resetForNewQuestion() {
-    setAnswers({});
-    setPartIndex(0);
-    setPartFeedbacks([]);
-    setSubmitError(null);
-  }
-
-  function handleSkipToQuestion(targetIdx) {
-    const clampedIdx = Math.max(0, Math.min(targetIdx, questions.length - 1));
-    // Write the target index to sessionStorage so useSupabaseQuestions picks it up
-    const progressKey = `supabase_q_idx_cs_${topicKey}`;
-    sessionStorage.setItem(progressKey, String(clampedIdx));
-    resetForNewQuestion();
-    setShowSkipPanel(false);
-    setSkipInput("");
-    // Force re-render by triggering a state update
-    window.location.reload();
-  }
 
   async function handleSubmitPart() {
     if (!currentAnswer.trim() || submitting) return;
@@ -221,7 +220,8 @@ export default function SupabaseCSQuestion({
       const totalEarned = newFeedbacks.reduce((s, f) => s + f.marksEarned, 0);
       const totalAvailable = newFeedbacks.reduce((s, f) => s + f.partMarks, 0);
 
-      advance();
+      // Advance stored index
+      goToQuestion(clampedIdx + 1);
 
       navigate("/cs/feedback", {
         state: {
@@ -250,7 +250,7 @@ export default function SupabaseCSQuestion({
           dashRoute: "/cs",
           paperRef: question.paper_ref,
           topicLabel,
-          isLastQuestion: false,
+          isLastQuestion: clampedIdx >= questions.length - 1,
         },
       });
     } else {
@@ -270,93 +270,60 @@ export default function SupabaseCSQuestion({
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-base font-bold tracking-wide text-foreground">CAIE Computer Science</span>
+            <span className="text-sm font-bold tracking-wide text-foreground">CAIE Computer Science</span>
             <div className="flex items-center gap-1 bg-blue-500/10 border border-blue-500/20 rounded-full px-2 py-0.5">
               <Database className="w-2.5 h-2.5 text-blue-400" />
               <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Live</span>
             </div>
           </div>
-          <button
-            onClick={() => setShowSkipPanel(p => !p)}
-            className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground bg-secondary border border-border px-2.5 py-1 rounded-lg hover:brightness-110 transition-all"
-          >
-            <SkipForward className="w-3 h-3" />
-            Skip
-          </button>
+          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
+            {question.paper_ref ?? "9618"}
+          </span>
         </div>
 
-        {/* Skip panel */}
-        {showSkipPanel && (
-          <div className="mx-4 mt-3 bg-card border border-border rounded-xl p-4 space-y-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Jump to question</p>
+        {/* Question navigation bar */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 bg-card/50">
+          <button
+            onClick={() => goToQuestion(clampedIdx - 1)}
+            disabled={clampedIdx === 0}
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-secondary"
+          >
+            <ChevronLeft className="w-4 h-4" /> Prev
+          </button>
 
-            {/* Quick-jump grid */}
-            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-              {questions.map((q, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSkipToQuestion(i)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all hover:brightness-110 ${
-                    i === idx
-                      ? "bg-primary/20 border-primary text-primary ring-1 ring-primary/40"
-                      : "bg-secondary border-border text-muted-foreground"
-                  }`}
-                  title={q.question_text?.slice(0, 60)}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-
-            {/* Manual number input */}
-            <div className="flex gap-2">
-              <input
-                type="number"
-                min={1}
-                max={questions.length}
-                value={skipInput}
-                onChange={e => setSkipInput(e.target.value)}
-                placeholder={`1 – ${questions.length}`}
-                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
-                onKeyDown={e => { if (e.key === "Enter" && skipInput) handleSkipToQuestion(parseInt(skipInput, 10) - 1); }}
-              />
-              <button
-                onClick={() => skipInput && handleSkipToQuestion(parseInt(skipInput, 10) - 1)}
-                disabled={!skipInput}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:brightness-110 transition-all disabled:opacity-40"
-              >
-                Go
-              </button>
-            </div>
-
-            <p className="text-[10px] text-muted-foreground/50">
-              Currently on Q{idx + 1} · {questions.length} questions total
-            </p>
-          </div>
-        )}
-
-        <div className="flex-1 flex flex-col gap-4 p-4">
-
-          {/* Progress */}
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-mono">Q{idx + 1} of {total}</span>
+          {/* Question counter + part dots */}
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xs font-bold text-foreground font-mono">
+              Q{clampedIdx + 1} <span className="text-muted-foreground font-normal">of {total}</span>
+            </span>
             {totalParts > 1 && (
-              <div className="flex items-center gap-1.5">
-                {parts.map((p, i) => (
-                  <div key={i} className={`h-1.5 rounded-full transition-all ${
-                    i < partIndex ? "w-6 bg-green-500/60"
-                    : i === partIndex ? "w-8 bg-primary"
-                    : "w-4 bg-border"
+              <div className="flex items-center gap-1">
+                {parts.map((_, i) => (
+                  <div key={i} className={`rounded-full transition-all ${
+                    i < partIndex ? "w-4 h-1.5 bg-green-500/60"
+                    : i === partIndex ? "w-5 h-1.5 bg-primary"
+                    : "w-3 h-1.5 bg-border"
                   }`} />
                 ))}
-                <span className="text-[11px] text-muted-foreground font-mono ml-1">
+                <span className="text-[10px] text-muted-foreground font-mono ml-1">
                   Part {partIndex + 1}/{totalParts}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Previously answered parts */}
+          <button
+            onClick={() => goToQuestion(clampedIdx + 1)}
+            disabled={clampedIdx >= total - 1}
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-secondary"
+          >
+            Next <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col gap-4 p-4">
+
+          {/* Previously answered parts summary */}
           {partFeedbacks.length > 0 && (
             <div className="space-y-2">
               {partFeedbacks.map((f, i) => (
@@ -385,7 +352,7 @@ export default function SupabaseCSQuestion({
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
-                {question.label ?? `Question ${idx + 1}`}{currentPart.label ? ` ${currentPart.label}` : ""}
+                {question.label ?? `Question ${clampedIdx + 1}`}{currentPart.label ? ` ${currentPart.label}` : ""}
               </span>
               <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
                 {question.topic}
@@ -413,9 +380,9 @@ export default function SupabaseCSQuestion({
                   {question.difficulty}
                 </span>
               )}
-              {currentPart.markScheme && (
+              {currentPart.markScheme && extractMarksFromText(currentPart.markScheme) && (
                 <span className="font-mono text-xs text-muted-foreground ml-auto">
-                  {extractMarksFromText(currentPart.markScheme) ? `[${extractMarksFromText(currentPart.markScheme)} mark${extractMarksFromText(currentPart.markScheme) !== 1 ? "s" : ""}]` : ""}
+                  [{extractMarksFromText(currentPart.markScheme)} mark{extractMarksFromText(currentPart.markScheme) !== 1 ? "s" : ""}]
                 </span>
               )}
             </div>

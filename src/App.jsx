@@ -87,11 +87,11 @@ import AstroQuestion8ai from './pages/astrophysics/Question8ai';
 import AstroQuestion11a from './pages/astrophysics/Question11a';
 import NuclearQuestion9a from './pages/nuclear/Question9a';
 import NuclearQuestion9cii from './pages/nuclear/Question9cii';
+import SchemeWhispererAdmin from './pages/admin/SchemeWhispererAdmin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, isLoadingProgress, authError, navigateToLogin, isAuthenticated, user } = useAuth();
 
-  // Show loading spinner while checking app public settings, auth, or fetching progress
   if (isLoadingPublicSettings || isLoadingAuth || isLoadingProgress) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-background">
@@ -103,12 +103,10 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Handle authentication errors
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Show welcome screen — let user choose to sign up or log in
       return (
         <Routes>
           <Route path="/welcome" element={<Welcome />} />
@@ -118,7 +116,6 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Not authenticated — show welcome screen
   if (!isAuthenticated) {
     return (
       <Routes>
@@ -128,7 +125,6 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // First-time onboarding — show once, before dashboard (scoped per user)
   const localOnboardingDone = localStorage.getItem(`cambridge_hub_onboarding_completed_${user?.id}`) === "true";
   if (isAuthenticated && !user?.onboarding_completed && !localOnboardingDone) {
     return (
@@ -138,7 +134,6 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Render the main app
   return (
     <Routes>
       <Route element={<AppLayout />}>
@@ -221,6 +216,7 @@ const AuthenticatedApp = () => {
         <Route path="/exam/session" element={<ExamSession />} />
         <Route path="/exam/results" element={<ExamResults />} />
         <Route path="/welcome" element={<Welcome />} />
+        <Route path="/admin/scheme-whisperer" element={<SchemeWhispererAdmin />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

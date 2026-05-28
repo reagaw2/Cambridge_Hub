@@ -1,17 +1,16 @@
 /**
  * PulseFeedback — 3-Layer Pulse Answer Engine feedback display.
- * Layer 2 missed marks now show the student's answer inline + Challenge button.
  *
  * Props:
  *   feedback      — full parsed feedback object from Claude
  *   subject       — "physics" | "cs" | "math"
  *   marksTotal    — number
- *   questionId    — string (optional, used to key Socratic threads)
+ *   questionId    — string (optional)
  *   questionText  — string (optional)
  *   studentAnswer — string (optional)
  */
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Zap, BookOpen, Microscope, CheckCircle2, XCircle, Scale, Quote } from "lucide-react";
+import { ChevronDown, ChevronUp, Zap, BookOpen, Microscope, CheckCircle2, XCircle, Scale } from "lucide-react";
 import SocraticPanel from "./SocraticPanel";
 
 const SUBJECT_THEME = {
@@ -61,15 +60,12 @@ const SUBJECT_THEME = {
 function inferNotation(markKey, feedbackObj) {
   const idx = parseInt(markKey.replace("mark_", ""), 10);
   const keyword = (feedbackObj[markKey]?.keyword ?? "").toLowerCase();
-
   if (keyword.startsWith("m1") || keyword.includes("mandatory") || keyword.includes("must")) return "M1";
   if (keyword.startsWith("a1") || keyword.includes("accuracy") || keyword.includes("consequentially")) return "A1";
   if (keyword.startsWith("c1") || keyword.includes("conclusion") || keyword.includes("communication")) return "C1";
-
   const insight = (feedbackObj.cambridge_insight ?? "").toLowerCase();
   if (idx === 1 && insight.includes("m1")) return "M1";
   if (idx === 2 && insight.includes("a1")) return "A1";
-
   return "B1";
 }
 
@@ -82,7 +78,6 @@ function buildMarkRows(feedback) {
       note: m.examiner_note ?? m.feedback ?? "",
     }));
   }
-
   return Object.entries(feedback)
     .filter(([k]) => /^mark_\d+$/.test(k))
     .sort(([a], [b]) => parseInt(a.split("_")[1]) - parseInt(b.split("_")[1]))
@@ -97,34 +92,30 @@ function buildMarkRows(feedback) {
 /**
  * extractRelevantSnippet
  *
- * For short answers (≤ 200 chars) returns the full answer.
- * For longer answers, attempts to find a sentence containing any word
- * from the missed keyword — falls back to the first 160 chars.
+ * Returns the full answer for short texts (≤ 220 chars).
+ * For longer answers, finds the most relevant sentence containing a word
+ * from the missed keyword, falling back to the first 180 chars.
  */
 function extractRelevantSnippet(studentAnswer, missedKeyword) {
   if (!studentAnswer) return null;
   const answer = studentAnswer.trim();
   if (!answer) return null;
 
-  // Short answer — show everything
-  if (answer.length <= 200) return answer;
+  if (answer.length <= 220) return answer;
 
-  // Try to find the most relevant sentence
   if (missedKeyword) {
     const words = missedKeyword
       .toLowerCase()
       .split(/\s+/)
-      .filter(w => w.length > 3); // skip short filler words
-
+      .filter(w => w.length > 3);
     const sentences = answer.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
     for (const word of words) {
       const hit = sentences.find(s => s.toLowerCase().includes(word));
-      if (hit) return hit.length > 160 ? hit.slice(0, 157) + "…" : hit;
+      if (hit) return hit.length > 180 ? hit.slice(0, 177) + "…" : hit;
     }
   }
 
-  // Fallback — first 160 chars
-  return answer.slice(0, 157) + "…";
+  return answer.slice(0, 177) + "…";
 }
 
 // ── Score ring ─────────────────────────────────────────────────────────────
@@ -188,19 +179,16 @@ function PulseSkeleton({ subject }) {
 // ── LAYER 1: Exam Hack ─────────────────────────────────────────────────────
 function Layer1({ feedback, subject }) {
   const theme = SUBJECT_THEME[subject] ?? SUBJECT_THEME.physics;
-
   const content =
     feedback.pulse_layer_1?.trim() ||
     feedback.next_step?.trim() ||
     feedback.cambridge_insight?.trim() ||
     null;
-
   if (!content) return null;
 
   return (
     <div className={`relative rounded-2xl border ${theme.accentBorder} bg-gradient-to-br ${theme.accentGradient} ${theme.accentGlow} p-5 overflow-hidden`}>
       <div className={`pointer-events-none absolute -top-6 -right-6 w-28 h-28 rounded-full ${theme.accentBg} blur-2xl`} />
-
       <div className="flex items-center gap-2.5 mb-3 relative">
         <div className={`w-7 h-7 rounded-xl ${theme.accentBg} border ${theme.accentBorder} flex items-center justify-center shrink-0`}>
           <Zap className={`w-3.5 h-3.5 ${theme.accent}`} />
@@ -210,33 +198,38 @@ function Layer1({ feedback, subject }) {
           <p className={`text-[11px] font-bold ${theme.accent} leading-none`}>{theme.label} · {theme.sublabel}</p>
         </div>
       </div>
-
-      <p className="text-base font-bold text-white leading-snug relative">
-        {content}
-      </p>
+      <p className="text-base font-bold text-white leading-snug relative">{content}</p>
     </div>
   );
 }
 
-// ── Inline "Your Response" strip ────────────────────────────────────────────
-function YourResponseStrip({ snippet }) {
+// ── Inline "Your Response" block ───────────────────────────────────────────
+// Always visible — no tooltip, no hover, no collapse.
+function YourResponseBlock({ snippet }) {
   if (!snippet) return null;
   return (
-    <div className="flex items-start gap-2 bg-[#1a0a0a]/80 border-l-2 border-red-500/50 rounded-r-lg px-3 py-2.5">
-      <Quote className="w-3 h-3 text-red-400/50 shrink-0 mt-0.5" />
-      <div className="min-w-0">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-red-400/50 mb-1 leading-none">
-          Your response
-        </p>
-        <p className="text-[11px] italic text-white/50 leading-relaxed font-mono break-words">
-          "{snippet}"
+    <div className="rounded-lg border border-red-500/40 bg-red-950/30 overflow-hidden">
+      {/* Label bar */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border-b border-red-500/25">
+        <XCircle className="w-3 h-3 text-red-400 shrink-0" />
+        <span className="text-[9px] font-black uppercase tracking-widest text-red-400">
+          Your Response
+        </span>
+      </div>
+      {/* Student text — always visible, full contrast */}
+      <div className="px-3 py-2.5">
+        <p
+          className="text-sm text-red-100/80 leading-relaxed break-words"
+          style={{ fontFamily: "var(--font-mono, ui-monospace, monospace)" }}
+        >
+          {snippet}
         </p>
       </div>
     </div>
   );
 }
 
-// ── LAYER 2: Mark Scheme Breakdown (with inline answer + Challenge buttons) ─
+// ── LAYER 2: Mark Scheme Breakdown ─────────────────────────────────────────
 function Layer2({ feedback, subject, questionId, questionText, studentAnswer, cambridgeInsight }) {
   const [open, setOpen] = useState(true);
   const [socraticMark, setSocraticMark] = useState(null);
@@ -275,7 +268,7 @@ function Layer2({ feedback, subject, questionId, questionText, studentAnswer, ca
 
         {/* Mark rows */}
         {open && (
-          <div className="px-4 pb-4 pt-1 space-y-2 border-t border-white/5">
+          <div className="px-4 pb-4 pt-1 space-y-3 border-t border-white/5">
             {marks.map((m, i) => {
               const snippet = !m.earned
                 ? extractRelevantSnippet(studentAnswer, m.description)
@@ -284,52 +277,60 @@ function Layer2({ feedback, subject, questionId, questionText, studentAnswer, ca
               return (
                 <div
                   key={i}
-                  className={`flex items-start gap-3 px-3.5 py-3 rounded-xl border transition-all ${
+                  className={`rounded-xl border overflow-hidden ${
                     m.earned
-                      ? "bg-green-500/[0.07] border-green-500/20"
-                      : "bg-red-500/[0.07] border-red-500/20"
+                      ? "border-green-500/25 bg-green-500/[0.07]"
+                      : "border-red-500/25 bg-red-500/[0.07]"
                   }`}
                 >
-                  {/* Cambridge notation tag */}
-                  <div className="shrink-0 flex flex-col items-center gap-1 mt-0.5">
-                    <span className={`font-mono text-[10px] font-black px-1.5 py-0.5 rounded-md border leading-none ${
-                      m.earned
-                        ? "bg-green-500/20 text-green-300 border-green-500/30"
-                        : "bg-red-500/15 text-red-300 border-red-500/25"
-                    }`}>
-                      {m.notation}
-                    </span>
-                    <span className={`text-[8px] font-bold uppercase tracking-widest leading-none ${
-                      m.earned ? "text-green-400" : "text-red-400"
-                    }`}>
-                      {m.earned ? "AWARDED" : "MISSED"}
-                    </span>
-                  </div>
+                  {/* ── Top row: notation + icon + description ── */}
+                  <div className="flex items-start gap-3 px-3.5 pt-3 pb-2">
+                    {/* Cambridge notation tag */}
+                    <div className="shrink-0 flex flex-col items-center gap-1 mt-0.5">
+                      <span className={`font-mono text-[10px] font-black px-1.5 py-0.5 rounded-md border leading-none ${
+                        m.earned
+                          ? "bg-green-500/20 text-green-300 border-green-500/30"
+                          : "bg-red-500/15 text-red-300 border-red-500/25"
+                      }`}>
+                        {m.notation}
+                      </span>
+                      <span className={`text-[8px] font-bold uppercase tracking-widest leading-none ${
+                        m.earned ? "text-green-400" : "text-red-400"
+                      }`}>
+                        {m.earned ? "AWARDED" : "MISSED"}
+                      </span>
+                    </div>
 
-                  {/* Status icon */}
-                  <div className="shrink-0 mt-0.5">
-                    {m.earned
-                      ? <CheckCircle2 className="w-4 h-4 text-green-400" />
-                      : <XCircle className="w-4 h-4 text-red-400/80" />}
-                  </div>
+                    {/* Status icon */}
+                    <div className="shrink-0 mt-0.5">
+                      {m.earned
+                        ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                        : <XCircle className="w-4 h-4 text-red-400/80" />}
+                    </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <p className={`text-xs font-semibold leading-snug ${m.earned ? "text-green-200" : "text-red-200"}`}>
+                    {/* Mark description */}
+                    <p className={`text-xs font-semibold leading-snug flex-1 min-w-0 ${m.earned ? "text-green-200" : "text-red-200"}`}>
                       {m.description}
                     </p>
+                  </div>
 
-                    {m.note && (
+                  {/* ── Missed only: inline "Your Response" block ── */}
+                  {!m.earned && snippet && (
+                    <div className="px-3.5 pb-2">
+                      <YourResponseBlock snippet={snippet} />
+                    </div>
+                  )}
+
+                  {/* ── Examiner note ── */}
+                  {m.note && (
+                    <div className="px-3.5 pb-2">
                       <p className="text-[11px] text-white/40 italic leading-relaxed">{m.note}</p>
-                    )}
+                    </div>
+                  )}
 
-                    {/* ── Inline "Your Response" strip — only on missed marks ── */}
-                    {!m.earned && snippet && (
-                      <YourResponseStrip snippet={snippet} />
-                    )}
-
-                    {/* Challenge button — only for missed marks */}
-                    {!m.earned && (
+                  {/* ── Challenge button (missed only) ── */}
+                  {!m.earned && (
+                    <div className="px-3.5 pb-3">
                       <button
                         onClick={() => handleChallenge(m, i)}
                         className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all ${theme.challengeBtn}`}
@@ -337,8 +338,8 @@ function Layer2({ feedback, subject, questionId, questionText, studentAnswer, ca
                         <Scale className="w-3 h-3" />
                         Challenge this deduction ⚖️
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -368,12 +369,10 @@ function Layer2({ feedback, subject, questionId, questionText, studentAnswer, ca
 function Layer3({ feedback, subject }) {
   const [open, setOpen] = useState(false);
   const theme = SUBJECT_THEME[subject] ?? SUBJECT_THEME.physics;
-
   const content =
     feedback.pulse_layer_3?.trim() ||
     feedback.cambridge_insight?.trim() ||
     null;
-
   if (!content) return null;
 
   return (
@@ -402,7 +401,6 @@ function Layer3({ feedback, subject }) {
             : <ChevronDown className="w-4 h-4 text-white/25 shrink-0" />}
         </div>
       </button>
-
       {open && (
         <div className="px-5 pb-5 border-t border-white/5 pt-4">
           <p className="text-sm text-white/65 leading-relaxed">{content}</p>
@@ -452,10 +450,10 @@ export default function PulseFeedback({
         </div>
       </div>
 
-      {/* ── Layer 1: Exam Hack ── */}
+      {/* ── Layer 1 ── */}
       <Layer1 feedback={feedback} subject={subject} />
 
-      {/* ── Layer 2: Mark Scheme Breakdown (with inline answer + Challenge) ── */}
+      {/* ── Layer 2 ── */}
       <Layer2
         feedback={feedback}
         subject={subject}
@@ -465,7 +463,7 @@ export default function PulseFeedback({
         cambridgeInsight={feedback.cambridge_insight}
       />
 
-      {/* ── Layer 3: Deep Dive ── */}
+      {/* ── Layer 3 ── */}
       <Layer3 feedback={feedback} subject={subject} />
 
     </div>

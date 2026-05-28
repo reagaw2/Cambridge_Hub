@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/AppLayout';
 import Profile from './pages/Profile';
-// Add page imports here
 import Dashboard from './pages/Dashboard.jsx';
 import SubjectSelection from './pages/SubjectSelection.jsx';
 import Reflection from './pages/Reflection';
@@ -88,6 +87,7 @@ import AstroQuestion11a from './pages/astrophysics/Question11a';
 import NuclearQuestion9a from './pages/nuclear/Question9a';
 import NuclearQuestion9cii from './pages/nuclear/Question9cii';
 import SchemeWhispererAdmin from './pages/admin/SchemeWhispererAdmin';
+import BulkPaperIngestor from './pages/admin/BulkPaperIngestor';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, isLoadingProgress, authError, navigateToLogin, isAuthenticated, user } = useAuth();
@@ -217,6 +217,7 @@ const AuthenticatedApp = () => {
         <Route path="/exam/results" element={<ExamResults />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/admin/scheme-whisperer" element={<SchemeWhispererAdmin />} />
+        <Route path="/admin/bulk-ingestor" element={<BulkPaperIngestor />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>
@@ -225,7 +226,6 @@ const AuthenticatedApp = () => {
 
 
 function App() {
-
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>

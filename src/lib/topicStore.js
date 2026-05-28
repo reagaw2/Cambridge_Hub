@@ -34,7 +34,6 @@ const DEFAULT_DATA = () => ({
   mistake_dna: [],
 });
 
-// Module-level state
 let _cache = null;
 let _recordId = null;
 let _userEmail = null;
@@ -60,8 +59,6 @@ function clearAllLocalKeys(email) {
     });
   } catch {}
 }
-
-// ── Core Supabase fetch ────────────────────────────────────────────────────
 
 async function loadFromSupabase(userId) {
   console.log('[topicStore] → fetching from Supabase...');
@@ -97,7 +94,6 @@ async function loadFromSupabase(userId) {
     };
   }
 
-  // No row yet — create one
   console.log('[topicStore] no row found, creating new...');
   const { data: inserted, error: ie } = await supabaseClient
     .from('StudentData')
@@ -111,8 +107,6 @@ async function loadFromSupabase(userId) {
   console.log('[topicStore] ✓ new row created:', inserted[0].id);
   return { id: inserted[0].id, data: DEFAULT_DATA() };
 }
-
-// ── preloadStore — must be awaited on login ────────────────────────────────
 
 export async function preloadStore(userEmail, userId) {
   if (_userEmail !== userEmail) {
@@ -149,8 +143,6 @@ export async function preloadStore(userEmail, userId) {
   }
 }
 
-// ── ensureLoaded ────────────────────────────────────────────────────────────
-
 async function ensureLoaded() {
   if (_supabaseLoaded && _cache) return _cache;
 
@@ -177,8 +169,6 @@ async function ensureLoaded() {
   if (!_cache) _cache = DEFAULT_DATA();
   return _cache;
 }
-
-// ── saveToDB ────────────────────────────────────────────────────────────────
 
 function saveToDB(data) {
   _cache = data;
@@ -221,8 +211,6 @@ async function pushToSupabase(data) {
     }
   }
 }
-
-// ── Streak ─────────────────────────────────────────────────────────────────
 
 export async function recordGlobalQuestionAnswered() {
   const data = await ensureLoaded();
@@ -300,8 +288,6 @@ export async function getStreakData() {
     global_streak_last_date: data.global_streak_last_date,
   };
 }
-
-// ── Topic attempts ─────────────────────────────────────────────────────────
 
 export async function recordAttempt(topicKey, score, { total_marks = 1, question_id = null } = {}) {
   const normKey = normaliseTopicKey(topicKey);
@@ -388,14 +374,8 @@ export async function getTopicData(topicKey) {
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
-// ── Mistake DNA ─────────────────────────────────────────────────────────────
-
-/**
- * writeMistakeDna — call after any partial-credit or zero-score submission.
- * Builds DNA from the Claude feedback object and merges into Supabase.
- */
 export async function writeMistakeDna(feedback, questionId, topic, marksEarned, totalMarks) {
-  if (!feedback || marksEarned >= totalMarks) return; // only write on missed marks
+  if (!feedback || marksEarned >= totalMarks) return;
 
   const data = await ensureLoaded();
   const incoming = buildMistakeDna(feedback, questionId, topic, "physics", marksEarned, totalMarks);
@@ -405,22 +385,35 @@ export async function writeMistakeDna(feedback, questionId, topic, marksEarned, 
   saveToDB(data);
 }
 
-/**
- * getMistakeDna — returns the full mistake DNA array for this student (Physics).
- */
 export async function getMistakeDna() {
   const data = await ensureLoaded();
   return data.mistake_dna ?? [];
 }
 
-// ── Written Review Bank ────────────────────────────────────────────────────
+// ── Written Review Bank ─────────────────────────────────────────────────────
+// Now accepts `first_attempt_answer` — the student's raw submitted text.
 
-export async function addToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
+export async function addToReviewBank({
+  question_id,
+  topic,
+  question_text,
+  mark_scheme,
+  total_marks,
+  first_attempt_score,
+  first_attempt_feedback,
+  first_attempt_answer = "",   // ← new: raw answer string
+}) {
   const data = await ensureLoaded();
   if (data.written_review_bank.find(q => q.question_id === question_id)) return;
   data.written_review_bank.push({
-    question_id, topic, question_text, mark_scheme, total_marks,
-    first_attempt_score, first_attempt_feedback,
+    question_id,
+    topic,
+    question_text,
+    mark_scheme,
+    total_marks,
+    first_attempt_score,
+    first_attempt_feedback,
+    first_attempt_answer: (first_attempt_answer ?? "").slice(0, 600), // cap at 600 chars
     date_added: toDateString(new Date()),
     priority: first_attempt_score === 0 ? 1 : 2,
     locked_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -454,8 +447,6 @@ export async function incrementReviewBankClears() {
   saveToDB(data);
 }
 
-// ── MCQ Review Bank ────────────────────────────────────────────────────────
-
 export async function getGuessReviewBank() {
   const data = await ensureLoaded();
   return (data.mcq_review_bank || []).map(e =>
@@ -478,8 +469,6 @@ export async function resetGuessReviewBankLock(question_id) {
     saveToDB(data);
   }
 }
-
-// ── MCQ Attempts ────────────────────────────────────────────────────────────
 
 export async function saveMCQAttempt({ question_id, topic, source, chosen_option, correct_option, correct, flagged_as_guess, reasoning }) {
   const normKey = normaliseTopicKey(topic);

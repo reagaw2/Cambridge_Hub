@@ -5,7 +5,6 @@ import { recordAttempt, addToReviewBank, writeMistakeDna } from "../lib/topicSto
 import PulseFeedback from "@/components/PulseFeedback";
 import { detectSubject } from "@/lib/pulsePromptBuilder";
 
-// Question metadata map — used to add questions to the review bank
 const QUESTION_META = {
   "9702-22-W19-Q1a": { question_id: "9702-22-W19-Q1a", topic: "Physical Quantities & Units", question_text: "Distinguish between vector and scalar quantities.", mark_scheme: "B1: a scalar quantity has magnitude only. B1: a vector quantity has both magnitude and direction.", total_marks: 2 },
   "9702-41-W19-Q2a": { question_id: "9702-41-W19-Q2a", topic: "Thermal Physics", question_text: "State the assumption of kinetic theory that is related to the volume of the molecules of the gas.", mark_scheme: "M1: volume of molecules is negligible. A1: compared with the volume occupied by the gas.", total_marks: 2 },
@@ -54,24 +53,10 @@ const QUESTION_META = {
   "9702-43-S23-Q2a": { question_id: "9702-43-S23-Q2a", topic: "Circular Motion", question_text: "Explain why the length of the spring when the system is rotating is greater than when stationary.", mark_scheme: "B1: horizontal force causes centripetal acceleration. B1: components combine to give greater tension. B1: greater tension so greater extension.", total_marks: 3 },
   "9702-22-ON17-Q4a": { question_id: "9702-22-ON17-Q4a", topic: "Waves", question_text: "State the conditions required for the formation of a stationary wave.", mark_scheme: "B1: two waves travelling at the same speed in opposite directions overlap. B1: the waves are the same type and have the same frequency or wavelength.", total_marks: 2 },
   "9702-23-S17-Q3a": { question_id: "9702-23-S17-Q3a", topic: "Electric Fields", question_text: "Define electric field strength.", mark_scheme: "B1: force per unit positive charge.", total_marks: 1 },
-  "9702-23-S17-Q3c": { question_id: "9702-23-S17-Q3c", topic: "Electric Fields", question_text: "An α-particle moves from A to B in the electric field. Describe and explain how the change in the kinetic energy of the α-particle compares with that of the electron.", mark_scheme: "B1: charge on alpha is opposite to electron. B1: KE change of alpha is negative. B1: charge of alpha is greater so larger change in KE.", total_marks: 3 },
-  "9702-23-W19-Q3a-i": { question_id: "9702-23-W19-Q3a-i", topic: "Electric Fields", question_text: "State the property of an object that experiences a force when the object is placed in a gravitational field.", mark_scheme: "B1: mass.", total_marks: 1 },
-  "9702-23-W19-Q3a-ii": { question_id: "9702-23-W19-Q3a-ii", topic: "Electric Fields", question_text: "State the property of an object that experiences a force when the object is placed in an electric field.", mark_scheme: "B1: charge.", total_marks: 1 },
   "9702-23-W18-Q6a": { question_id: "9702-23-W18-Q6a", topic: "Electric Fields", question_text: "Define the coulomb.", mark_scheme: "B1: the coulomb is an ampere second.", total_marks: 1 },
-  "9702-21-S18-Q7c": { question_id: "9702-21-S18-Q7c", topic: "Electric Fields", question_text: "State and briefly explain whether β⁻ particles from the same source will all follow the same path inside the electric field.", mark_scheme: "M1: beta particles have range of different speeds/energies. A1: so they follow different paths.", total_marks: 2 },
-  "9702-23-W17-Q5a": { question_id: "9702-23-W17-Q5a", topic: "Electric Fields", question_text: "Define electric field strength.", mark_scheme: "B1: force per unit positive charge.", total_marks: 1 },
-  "9702-23-W21-Q4f-ii": { question_id: "9702-23-W21-Q4f-ii", topic: "Electric Fields", question_text: "State and explain the differences between the electric force on the β⁻ particle and the electric force on the α-particle in the electric field.", mark_scheme: "B1: particles have opposite charges. B1: forces in opposite directions. B1: beta has less charge so less force.", total_marks: 3 },
-  "9702-22-W17-Q5a": { question_id: "9702-22-W17-Q5a", topic: "Electric Fields", question_text: "Define the coulomb.", mark_scheme: "B1: the coulomb is an ampere second.", total_marks: 1 },
-  "9702-22-S19-Q6a": { question_id: "9702-22-S19-Q6a", topic: "Electric Fields", question_text: "State what is meant by a field line in an electric field.", mark_scheme: "B1: the path or direction in which a free positive charge will move.", total_marks: 1 },
-  "9702-22-S19-Q6b": { question_id: "9702-22-S19-Q6b", topic: "Electric Fields", question_text: "An electric field has two regions X and Y. The field strength in X is less than in Y. Describe a difference between the pattern of field lines in X and Y.", mark_scheme: "B1: lines closer together in Y / further apart in X.", total_marks: 1 },
   "9702-21-W18-Q5a": { question_id: "9702-21-W18-Q5a", topic: "Electric Fields", question_text: "State what is meant by an electric field.", mark_scheme: "B1: a region of space where a force acts on a stationary charge.", total_marks: 1 },
-  "9702-21-W17-Q6a": { question_id: "9702-21-W17-Q6a", topic: "Electric Fields", question_text: "Define electric field strength.", mark_scheme: "B1: force per unit positive charge.", total_marks: 1 },
-  "9702-21-W19-Q6a": { question_id: "9702-21-W19-Q6a", topic: "Electric Fields", question_text: "Define electric potential difference.", mark_scheme: "B1: work done per unit charge.", total_marks: 1 },
-  "9702-22-M19-Q4a": { question_id: "9702-22-M19-Q4a", topic: "Electric Fields", question_text: "Define electric field strength.", mark_scheme: "B1: force per unit positive charge.", total_marks: 1 },
   "9702-23-W21-Q4f-iii": { question_id: "9702-23-W21-Q4f-iii", topic: "Nuclear Physics", question_text: "State the name of another lepton that is produced at the same time as the β⁻ particle.", mark_scheme: "B1: electron antineutrino.", total_marks: 1 },
-  "9702-21-W18-Q5c-ii": { question_id: "9702-21-W18-Q5c-ii", topic: "Nuclear Physics", question_text: "The total mass of the plutonium nucleus and the α-particle is less than that of the original nucleus X. Explain this difference in mass.", mark_scheme: "B1: mass-energy is conserved. B1: energy released as gamma radiation / KE of alpha / KE of plutonium.", total_marks: 2 },
   "9702-22-ON19-Q2a": { question_id: "9702-22-ON19-Q2a", topic: "Kinematics", question_text: "Define acceleration.", mark_scheme: "B1: change in velocity divided by time taken.", total_marks: 1 },
-  "9702-22-ON19-Q2bi": { question_id: "9702-22-ON19-Q2bi", topic: "Forces & Equilibrium", question_text: "Explain why the force due to air resistance acting on the ball may be neglected.", mark_scheme: "B1: weight much greater than air resistance.", total_marks: 1 },
   "q1": { question_id: "q1", topic: "Gravitational Fields", question_text: "Describe the gravitational field in the region close to the surface of a planet.", mark_scheme: "B1: radial field. B1: directed towards centre of planet.", total_marks: 2 },
   "q2": { question_id: "q2", topic: "Gravitational Fields", question_text: "Explain why the gravitational field strength g can be considered constant close to the surface of a planet.", mark_scheme: "B1: changes in height are much smaller than radius of planet. B1: so (radius + height)² ≈ radius².", total_marks: 2 },
   "q3": { question_id: "q3", topic: "Gravitational Fields", question_text: "State what is meant by gravitational field strength.", mark_scheme: "B1: force per unit mass.", total_marks: 1 },
@@ -131,7 +116,6 @@ export default function Feedback() {
         recordAttempt(resolvedTopicKey, marksEarned, { total_marks: maxMarks, question_id: questionId });
 
         if (!fullMarks) {
-          // Persist Mistake DNA to Supabase
           writeMistakeDna(feedback, questionId, metaEntry?.topic ?? resolvedTopicKey, marksEarned, maxMarks).catch(() => {});
 
           if (questionId && QUESTION_META[questionId]) {
@@ -139,6 +123,7 @@ export default function Feedback() {
               ...QUESTION_META[questionId],
               first_attempt_score: marksEarned,
               first_attempt_feedback: feedback.cambridge_insight ?? "",
+              first_attempt_answer: answer ?? "",  // ← pass the raw answer
             });
           }
         }

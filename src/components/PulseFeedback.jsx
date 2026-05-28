@@ -7,7 +7,7 @@
  *   marksTotal    — number
  *   questionId    — string (optional)
  *   questionText  — string (optional)
- *   studentAnswer — string (optional)
+ *   studentAnswer — string (optional, passed through to Socratic panel only)
  */
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Zap, BookOpen, Microscope, CheckCircle2, XCircle, Scale } from "lucide-react";
@@ -55,8 +55,6 @@ const SUBJECT_THEME = {
   },
 };
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function inferNotation(markKey, feedbackObj) {
   const idx = parseInt(markKey.replace("mark_", ""), 10);
   const keyword = (feedbackObj[markKey]?.keyword ?? "").toLowerCase();
@@ -87,35 +85,6 @@ function buildMarkRows(feedback) {
       earned: !!val?.earned,
       note: val?.feedback ?? "",
     }));
-}
-
-/**
- * extractRelevantSnippet
- *
- * Returns the full answer for short texts (≤ 220 chars).
- * For longer answers, finds the most relevant sentence containing a word
- * from the missed keyword, falling back to the first 180 chars.
- */
-function extractRelevantSnippet(studentAnswer, missedKeyword) {
-  if (!studentAnswer) return null;
-  const answer = studentAnswer.trim();
-  if (!answer) return null;
-
-  if (answer.length <= 220) return answer;
-
-  if (missedKeyword) {
-    const words = missedKeyword
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(w => w.length > 3);
-    const sentences = answer.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
-    for (const word of words) {
-      const hit = sentences.find(s => s.toLowerCase().includes(word));
-      if (hit) return hit.length > 180 ? hit.slice(0, 177) + "…" : hit;
-    }
-  }
-
-  return answer.slice(0, 177) + "…";
 }
 
 // ── Score ring ─────────────────────────────────────────────────────────────
@@ -176,7 +145,7 @@ function PulseSkeleton({ subject }) {
   );
 }
 
-// ── LAYER 1: Exam Hack ─────────────────────────────────────────────────────
+// ── LAYER 1 ────────────────────────────────────────────────────────────────
 function Layer1({ feedback, subject }) {
   const theme = SUBJECT_THEME[subject] ?? SUBJECT_THEME.physics;
   const content =
@@ -203,33 +172,7 @@ function Layer1({ feedback, subject }) {
   );
 }
 
-// ── Inline "Your Response" block ───────────────────────────────────────────
-// Always visible — no tooltip, no hover, no collapse.
-function YourResponseBlock({ snippet }) {
-  if (!snippet) return null;
-  return (
-    <div className="rounded-lg border border-red-500/40 bg-red-950/30 overflow-hidden">
-      {/* Label bar */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border-b border-red-500/25">
-        <XCircle className="w-3 h-3 text-red-400 shrink-0" />
-        <span className="text-[9px] font-black uppercase tracking-widest text-red-400">
-          Your Response
-        </span>
-      </div>
-      {/* Student text — always visible, full contrast */}
-      <div className="px-3 py-2.5">
-        <p
-          className="text-sm text-red-100/80 leading-relaxed break-words"
-          style={{ fontFamily: "var(--font-mono, ui-monospace, monospace)" }}
-        >
-          {snippet}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── LAYER 2: Mark Scheme Breakdown ─────────────────────────────────────────
+// ── LAYER 2 ────────────────────────────────────────────────────────────────
 function Layer2({ feedback, subject, questionId, questionText, studentAnswer, cambridgeInsight }) {
   const [open, setOpen] = useState(true);
   const [socraticMark, setSocraticMark] = useState(null);
@@ -247,7 +190,6 @@ function Layer2({ feedback, subject, questionId, questionText, studentAnswer, ca
   return (
     <>
       <div className="rounded-2xl border border-white/8 bg-white/[0.03] backdrop-blur-sm overflow-hidden">
-        {/* Header */}
         <button
           onClick={() => setOpen(o => !o)}
           className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.025] transition-all"
@@ -266,88 +208,64 @@ function Layer2({ feedback, subject, questionId, questionText, studentAnswer, ca
             : <ChevronDown className="w-4 h-4 text-white/25 shrink-0" />}
         </button>
 
-        {/* Mark rows */}
         {open && (
-          <div className="px-4 pb-4 pt-1 space-y-3 border-t border-white/5">
-            {marks.map((m, i) => {
-              const snippet = !m.earned
-                ? extractRelevantSnippet(studentAnswer, m.description)
-                : null;
-
-              return (
-                <div
-                  key={i}
-                  className={`rounded-xl border overflow-hidden ${
+          <div className="px-4 pb-4 pt-1 space-y-2 border-t border-white/5">
+            {marks.map((m, i) => (
+              <div
+                key={i}
+                className={`flex items-start gap-3 px-3.5 py-3 rounded-xl border ${
+                  m.earned
+                    ? "bg-green-500/[0.07] border-green-500/20"
+                    : "bg-red-500/[0.07] border-red-500/20"
+                }`}
+              >
+                {/* Notation tag */}
+                <div className="shrink-0 flex flex-col items-center gap-1 mt-0.5">
+                  <span className={`font-mono text-[10px] font-black px-1.5 py-0.5 rounded-md border leading-none ${
                     m.earned
-                      ? "border-green-500/25 bg-green-500/[0.07]"
-                      : "border-red-500/25 bg-red-500/[0.07]"
-                  }`}
-                >
-                  {/* ── Top row: notation + icon + description ── */}
-                  <div className="flex items-start gap-3 px-3.5 pt-3 pb-2">
-                    {/* Cambridge notation tag */}
-                    <div className="shrink-0 flex flex-col items-center gap-1 mt-0.5">
-                      <span className={`font-mono text-[10px] font-black px-1.5 py-0.5 rounded-md border leading-none ${
-                        m.earned
-                          ? "bg-green-500/20 text-green-300 border-green-500/30"
-                          : "bg-red-500/15 text-red-300 border-red-500/25"
-                      }`}>
-                        {m.notation}
-                      </span>
-                      <span className={`text-[8px] font-bold uppercase tracking-widest leading-none ${
-                        m.earned ? "text-green-400" : "text-red-400"
-                      }`}>
-                        {m.earned ? "AWARDED" : "MISSED"}
-                      </span>
-                    </div>
+                      ? "bg-green-500/20 text-green-300 border-green-500/30"
+                      : "bg-red-500/15 text-red-300 border-red-500/25"
+                  }`}>
+                    {m.notation}
+                  </span>
+                  <span className={`text-[8px] font-bold uppercase tracking-widest leading-none ${
+                    m.earned ? "text-green-400" : "text-red-400"
+                  }`}>
+                    {m.earned ? "AWARDED" : "MISSED"}
+                  </span>
+                </div>
 
-                    {/* Status icon */}
-                    <div className="shrink-0 mt-0.5">
-                      {m.earned
-                        ? <CheckCircle2 className="w-4 h-4 text-green-400" />
-                        : <XCircle className="w-4 h-4 text-red-400/80" />}
-                    </div>
+                {/* Status icon */}
+                <div className="shrink-0 mt-0.5">
+                  {m.earned
+                    ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    : <XCircle className="w-4 h-4 text-red-400/80" />}
+                </div>
 
-                    {/* Mark description */}
-                    <p className={`text-xs font-semibold leading-snug flex-1 min-w-0 ${m.earned ? "text-green-200" : "text-red-200"}`}>
-                      {m.description}
-                    </p>
-                  </div>
-
-                  {/* ── Missed only: inline "Your Response" block ── */}
-                  {!m.earned && snippet && (
-                    <div className="px-3.5 pb-2">
-                      <YourResponseBlock snippet={snippet} />
-                    </div>
-                  )}
-
-                  {/* ── Examiner note ── */}
+                {/* Content */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  <p className={`text-xs font-semibold leading-snug ${m.earned ? "text-green-200" : "text-red-200"}`}>
+                    {m.description}
+                  </p>
                   {m.note && (
-                    <div className="px-3.5 pb-2">
-                      <p className="text-[11px] text-white/40 italic leading-relaxed">{m.note}</p>
-                    </div>
+                    <p className="text-[11px] text-white/40 italic leading-relaxed">{m.note}</p>
                   )}
-
-                  {/* ── Challenge button (missed only) ── */}
                   {!m.earned && (
-                    <div className="px-3.5 pb-3">
-                      <button
-                        onClick={() => handleChallenge(m, i)}
-                        className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all ${theme.challengeBtn}`}
-                      >
-                        <Scale className="w-3 h-3" />
-                        Challenge this deduction ⚖️
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleChallenge(m, i)}
+                      className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all ${theme.challengeBtn}`}
+                    >
+                      <Scale className="w-3 h-3" />
+                      Challenge this deduction ⚖️
+                    </button>
                   )}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Socratic Panel */}
       {socraticMark && (
         <SocraticPanel
           open={socraticOpen}
@@ -365,7 +283,7 @@ function Layer2({ feedback, subject, questionId, questionText, studentAnswer, ca
   );
 }
 
-// ── LAYER 3: Deep Dive ─────────────────────────────────────────────────────
+// ── LAYER 3 ────────────────────────────────────────────────────────────────
 function Layer3({ feedback, subject }) {
   const [open, setOpen] = useState(false);
   const theme = SUBJECT_THEME[subject] ?? SUBJECT_THEME.physics;
@@ -422,10 +340,7 @@ export default function PulseFeedback({
 }) {
   const theme = SUBJECT_THEME[subject] ?? SUBJECT_THEME.physics;
 
-  if (isStreaming && !feedback) {
-    return <PulseSkeleton subject={subject} />;
-  }
-
+  if (isStreaming && !feedback) return <PulseSkeleton subject={subject} />;
   if (!feedback) return null;
 
   const marksEarned = feedback.marks_earned ?? 0;
@@ -433,8 +348,6 @@ export default function PulseFeedback({
 
   return (
     <div className="space-y-3">
-
-      {/* ── Score header ── */}
       <div className="flex items-center gap-4 bg-white/[0.03] border border-white/8 rounded-2xl px-4 py-3.5">
         <ScoreRing earned={marksEarned} total={marksTotal} subject={subject} />
         <div className="flex-1 space-y-1">
@@ -442,18 +355,12 @@ export default function PulseFeedback({
           <p className={`text-lg font-black tabular-nums ${theme.scoreColor(pct)}`}>
             {marksEarned} <span className="text-sm font-medium text-white/30">/ {marksTotal}</span>
           </p>
-          {marksEarned >= marksTotal ? (
-            <p className="text-[11px] text-green-400 font-semibold">Full marks ✓</p>
-          ) : (
-            <p className="text-[11px] text-white/30">{pct}% — keep going</p>
-          )}
+          {marksEarned >= marksTotal
+            ? <p className="text-[11px] text-green-400 font-semibold">Full marks ✓</p>
+            : <p className="text-[11px] text-white/30">{pct}% — keep going</p>}
         </div>
       </div>
-
-      {/* ── Layer 1 ── */}
       <Layer1 feedback={feedback} subject={subject} />
-
-      {/* ── Layer 2 ── */}
       <Layer2
         feedback={feedback}
         subject={subject}
@@ -462,10 +369,7 @@ export default function PulseFeedback({
         studentAnswer={studentAnswer}
         cambridgeInsight={feedback.cambridge_insight}
       />
-
-      {/* ── Layer 3 ── */}
       <Layer3 feedback={feedback} subject={subject} />
-
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Lock, Download, ChevronDown, X } from "lucide-react";
-import { getReviewBank, getGuessReviewBank, resetReviewBankLock } from "@/lib/topicStore";
+import { getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { generateReviewBankPdf } from "@/lib/generatePdf";
 import { getMistakeDna } from "@/lib/topicStore";
 import { useAuth } from "@/lib/AuthContext";
@@ -21,7 +21,6 @@ function formatCountdown(ms) {
   return `Unlocks in ${minutes}m`;
 }
 
-// Route map to navigate directly to a specific question
 const QUESTION_ROUTES = {
   "9702-22-W19-Q1a": "/physicalquantities/question",
   "9702-41-W19-Q2a": "/thermal/question",
@@ -124,7 +123,6 @@ const QUESTION_ROUTES = {
   "9702-41-ALA26-Q9cii": "/nuclear/q9cii",
 };
 
-// Styling config per error category
 const DNA_CATEGORY_STYLE = {
   "Precision Phrasing Flaw":      { pill: "bg-amber-500/15 border-amber-500/30 text-amber-300",  dot: "bg-amber-400" },
   "Missing Keyword":              { pill: "bg-red-500/15 border-red-500/30 text-red-300",         dot: "bg-red-400" },
@@ -136,8 +134,6 @@ const DNA_CATEGORY_STYLE = {
   "Logical Gap":                  { pill: "bg-slate-500/15 border-slate-500/30 text-slate-300",   dot: "bg-slate-400" },
 };
 
-const ALL_CATEGORIES = Object.keys(DNA_CATEGORY_STYLE);
-
 function DnaTag({ category }) {
   const style = DNA_CATEGORY_STYLE[category] ?? { pill: "bg-white/8 border-white/15 text-white/50", dot: "bg-white/40" };
   return (
@@ -148,12 +144,30 @@ function DnaTag({ category }) {
   );
 }
 
+// ── "Your Last Attempt" strip ──────────────────────────────────────────────
+function LastAttemptStrip({ answer }) {
+  if (!answer?.trim()) return null;
+  // Truncate to 120 chars for the card preview
+  const display = answer.trim().length > 120
+    ? answer.trim().slice(0, 117) + "…"
+    : answer.trim();
+  return (
+    <div className="border-l-2 border-white/10 pl-2.5 py-0.5">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 mb-0.5">
+        Your last attempt
+      </p>
+      <p className="text-[11px] text-muted-foreground/50 italic leading-relaxed break-words">
+        "{display}"
+      </p>
+    </div>
+  );
+}
+
 function QuestionCard({ q, dnaEntries, now, navigate }) {
   const { locked, msRemaining } = getLockStatus(q.locked_until, now);
   const preview = q.question_text?.slice(0, 80) + (q.question_text?.length > 80 ? "…" : "");
   const [lockedMsg, setLockedMsg] = useState(false);
 
-  // Get unique error categories for this question from the DNA store
   const dnaForQuestion = dnaEntries.filter(e => e.question_id === q.question_id);
   const uniqueCategories = [...new Set(dnaForQuestion.map(e => e.error_category))].filter(Boolean);
 
@@ -161,7 +175,7 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
     const route = QUESTION_ROUTES[q.question_id] ?? "/review";
     return (
       <div className="bg-card border border-l-4 border-border border-l-green-500/70 rounded-xl p-4 space-y-2.5">
-        {/* Header row: topic + lock status */}
+        {/* Topic + score */}
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-green-400/80 bg-green-500/10 px-2 py-0.5 rounded-full">
             {q.topic}
@@ -178,7 +192,11 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
           </div>
         )}
 
+        {/* Question preview */}
         <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
+
+        {/* ── Last attempt answer ── */}
+        <LastAttemptStrip answer={q.first_attempt_answer} />
 
         <div className="flex justify-end">
           <button
@@ -206,7 +224,6 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
         </span>
       </div>
 
-      {/* DNA tags (dimmed when locked) */}
       {uniqueCategories.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
@@ -214,6 +231,9 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
       )}
 
       <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview}</p>
+
+      {/* ── Last attempt answer (dimmed when locked) ── */}
+      <LastAttemptStrip answer={q.first_attempt_answer} />
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-amber-400/80">
@@ -272,9 +292,6 @@ export default function ReviewBankScreen() {
     );
   }
 
-  // ── Filtering ────────────────────────────────────────────────────────────
-
-  // Collect all categories that actually appear in this student's DNA
   const presentCategories = [...new Set(dnaEntries.map(e => e.error_category).filter(Boolean))].sort();
 
   function questionMatchesFilter(q) {
@@ -286,7 +303,6 @@ export default function ReviewBankScreen() {
   const locked = bank.filter(q => getLockStatus(q.locked_until, now).locked && questionMatchesFilter(q));
   const sortedLocked = [...locked].sort((a, b) => new Date(a.locked_until) - new Date(b.locked_until));
   const nextUnlock = sortedLocked[0];
-
   const filteredTotal = unlocked.length + locked.length;
   const filterLabel = activeFilter === "all" ? "All error types" : activeFilter;
 
@@ -294,7 +310,6 @@ export default function ReviewBankScreen() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -319,7 +334,7 @@ export default function ReviewBankScreen() {
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* Two bank cards at top */}
+          {/* Bank summary cards */}
           {(bank.length > 0 || mcqBank.length > 0) && (
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -343,7 +358,7 @@ export default function ReviewBankScreen() {
             </div>
           )}
 
-          {/* ── DNA Filter Row ── */}
+          {/* DNA Filter Row */}
           {bank.length > 0 && presentCategories.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -360,7 +375,6 @@ export default function ReviewBankScreen() {
                 )}
               </div>
 
-              {/* Custom dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setFilterOpen(o => !o)}
@@ -384,7 +398,6 @@ export default function ReviewBankScreen() {
 
                 {filterOpen && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-2xl z-20 overflow-hidden">
-                    {/* All option */}
                     <button
                       onClick={() => { setActiveFilter("all"); setFilterOpen(false); }}
                       className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-secondary transition-all border-b border-border/50 ${
@@ -395,8 +408,6 @@ export default function ReviewBankScreen() {
                       All error types
                       <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">{bank.length}</span>
                     </button>
-
-                    {/* Category options — only show ones that exist in this student's DNA */}
                     {presentCategories.map(cat => {
                       const style = DNA_CATEGORY_STYLE[cat] ?? { dot: "bg-white/40" };
                       const count = bank.filter(q =>
@@ -421,7 +432,6 @@ export default function ReviewBankScreen() {
                 )}
               </div>
 
-              {/* Active filter info */}
               {activeFilter !== "all" && (
                 <p className="text-[11px] text-muted-foreground/60 px-1">
                   Showing {filteredTotal} question{filteredTotal !== 1 ? "s" : ""} with <span className="text-foreground/80 font-medium">{activeFilter}</span> errors
@@ -447,10 +457,7 @@ export default function ReviewBankScreen() {
               <p className="text-base font-semibold text-foreground leading-relaxed">
                 No questions match this filter.
               </p>
-              <button
-                onClick={() => setActiveFilter("all")}
-                className="text-sm text-primary hover:brightness-110"
-              >
+              <button onClick={() => setActiveFilter("all")} className="text-sm text-primary hover:brightness-110">
                 Show all questions
               </button>
             </div>
@@ -460,7 +467,7 @@ export default function ReviewBankScreen() {
             <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-4">
               <Lock className="w-8 h-8 text-amber-400/60" />
               <p className="text-base font-semibold text-foreground leading-relaxed max-w-xs">
-                All questions are waiting. Come back when they unlock — your brain is consolidating the material.
+                All questions are waiting. Come back when they unlock.
               </p>
               {nextUnlock && (
                 <p className="text-sm text-amber-400 font-medium">
@@ -470,7 +477,6 @@ export default function ReviewBankScreen() {
             </div>
           )}
 
-          {/* Ready to attempt */}
           {unlocked.length > 0 && (
             <div className="space-y-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-green-400">Ready to attempt</p>
@@ -480,7 +486,6 @@ export default function ReviewBankScreen() {
             </div>
           )}
 
-          {/* Waiting */}
           {sortedLocked.length > 0 && (
             <div className="space-y-3">
               <div>
@@ -493,7 +498,6 @@ export default function ReviewBankScreen() {
             </div>
           )}
 
-          {/* Close dropdown on outside click */}
           {filterOpen && (
             <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
           )}

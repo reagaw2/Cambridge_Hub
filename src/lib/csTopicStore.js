@@ -5,6 +5,7 @@
 
 import { supabaseClient } from "@/api/base44Client";
 import { normaliseTopicKey, toDateString, recordGlobalQuestionAnswered } from "./topicStore";
+import { buildMistakeDna, mergeMistakeDna } from "./mistakeDna";
 
 export { normaliseTopicKey, toDateString };
 
@@ -14,6 +15,7 @@ const DEFAULT_CS_DATA = () => ({
   cs_review_bank_clears: 0,
   cs_mcq_attempts: [],
   cs_guess_review_bank: [],
+  cs_mistake_dna: [],
 });
 
 let _cache = null;
@@ -31,14 +33,6 @@ function readLocal(email) {
 
 function writeLocal(email, payload) {
   try { localStorage.setItem(localKey(email), JSON.stringify(payload)); } catch {}
-}
-
-function clearLocal(email) {
-  try {
-    ['hub_cs_progress_', 'hub_cs_progress_v2_', 'hub_cs_v3_'].forEach(p => {
-      localStorage.removeItem(p + email);
-    });
-  } catch {}
 }
 
 async function fetchFromSupabase(userId) {
@@ -66,6 +60,7 @@ async function fetchFromSupabase(userId) {
           cs_review_bank_clears: raw.cs_review_bank_clears ?? 0,
           cs_mcq_attempts: raw.cs_mcq_attempts || [],
           cs_guess_review_bank: raw.cs_guess_review_bank || [],
+          cs_mistake_dna: Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna : [],
         }
       : DEFAULT_CS_DATA();
     return { id: r.id, data };
@@ -246,6 +241,32 @@ export async function csGetTopicData(topicKey) {
 
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
+
+// ── CS Mistake DNA ─────────────────────────────────────────────────────────
+
+/**
+ * csWriteMistakeDna — call after any partial-credit or zero-score CS submission.
+ */
+export async function csWriteMistakeDna(feedback, questionId, topic, marksEarned, totalMarks) {
+  if (!feedback || marksEarned >= totalMarks) return;
+
+  const data = await ensureLoaded();
+  const incoming = buildMistakeDna(feedback, questionId, topic, "cs", marksEarned, totalMarks);
+  if (!incoming.length) return;
+
+  data.cs_mistake_dna = mergeMistakeDna(data.cs_mistake_dna ?? [], incoming);
+  saveToDB(data);
+}
+
+/**
+ * csGetMistakeDna — returns the full CS mistake DNA array for this student.
+ */
+export async function csGetMistakeDna() {
+  const data = await ensureLoaded();
+  return data.cs_mistake_dna ?? [];
+}
+
+// ── CS Review Bank ─────────────────────────────────────────────────────────
 
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback }) {
   const data = await ensureLoaded();

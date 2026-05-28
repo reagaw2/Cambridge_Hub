@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Flame } from "lucide-react";
-import { recordAttempt, addToReviewBank } from "../lib/topicStore";
+import { recordAttempt, addToReviewBank, writeMistakeDna } from "../lib/topicStore";
 import PulseFeedback from "@/components/PulseFeedback";
 import { detectSubject } from "@/lib/pulsePromptBuilder";
 
@@ -71,22 +71,22 @@ const QUESTION_META = {
   "9702-23-W21-Q4f-iii": { question_id: "9702-23-W21-Q4f-iii", topic: "Nuclear Physics", question_text: "State the name of another lepton that is produced at the same time as the β⁻ particle.", mark_scheme: "B1: electron antineutrino.", total_marks: 1 },
   "9702-21-W18-Q5c-ii": { question_id: "9702-21-W18-Q5c-ii", topic: "Nuclear Physics", question_text: "The total mass of the plutonium nucleus and the α-particle is less than that of the original nucleus X. Explain this difference in mass.", mark_scheme: "B1: mass-energy is conserved. B1: energy released as gamma radiation / KE of alpha / KE of plutonium.", total_marks: 2 },
   "9702-22-ON19-Q2a": { question_id: "9702-22-ON19-Q2a", topic: "Kinematics", question_text: "Define acceleration.", mark_scheme: "B1: change in velocity divided by time taken.", total_marks: 1 },
-  "9702-22-ON19-Q2bi": { question_id: "9702-22-ON19-Q2bi", topic: "Forces & Equilibrium", question_text: "Explain why the force due to air resistance acting on the ball may be neglected when calculating the time taken for the ball to reach the beam of light.", mark_scheme: "B1: weight is much greater than force due to air resistance OR air resistance is negligible compared to weight.", total_marks: 1 },
+  "9702-22-ON19-Q2bi": { question_id: "9702-22-ON19-Q2bi", topic: "Forces & Equilibrium", question_text: "Explain why the force due to air resistance acting on the ball may be neglected.", mark_scheme: "B1: weight much greater than air resistance.", total_marks: 1 },
   "q1": { question_id: "q1", topic: "Gravitational Fields", question_text: "Describe the gravitational field in the region close to the surface of a planet.", mark_scheme: "B1: radial field. B1: directed towards centre of planet.", total_marks: 2 },
   "q2": { question_id: "q2", topic: "Gravitational Fields", question_text: "Explain why the gravitational field strength g can be considered constant close to the surface of a planet.", mark_scheme: "B1: changes in height are much smaller than radius of planet. B1: so (radius + height)² ≈ radius².", total_marks: 2 },
-  "q3": { question_id: "q3", topic: "Gravitational Fields", question_text: "A student states that the gravitational field strength at the surface of a planet is 9.81 N kg⁻¹. State what is meant by gravitational field strength.", mark_scheme: "B1: force per unit mass.", total_marks: 1 },
+  "q3": { question_id: "q3", topic: "Gravitational Fields", question_text: "State what is meant by gravitational field strength.", mark_scheme: "B1: force per unit mass.", total_marks: 1 },
   "w25_44_Q8a": { question_id: "w25_44_Q8a", topic: "Nuclear Physics", question_text: "State what is meant by a tracer.", mark_scheme: "B1: radioactive substance introduced into the body. B1: absorbed by tissues being studied.", total_marks: 2 },
   "w25_44_Q1a": { question_id: "w25_44_Q1a", topic: "Gravitational Fields", question_text: "State Newton's law of gravitation.", mark_scheme: "B1: proportional to product of masses. B1: inversely proportional to square of separation.", total_marks: 2 },
-  "w25_44_Q2ai": { question_id: "w25_44_Q2ai", topic: "Thermal Physics", question_text: "The equation of state for an ideal gas is pV = NkT. State the meaning of each of the symbols p, V, N, k and T.", mark_scheme: "B1: p = pressure, V = volume, k = Boltzmann constant. B1: N = number of molecules. B1: T = thermodynamic temperature.", total_marks: 3 },
-  "w25_44_Q3a": { question_id: "w25_44_Q3a", topic: "Thermal Physics", question_text: "With reference to molecular kinetic energy and molecular potential energy, explain what is meant by the internal energy of an ideal gas.", mark_scheme: "B1: total kinetic energy associated with random motion of molecules. B1: potential energy of molecules is zero for an ideal gas.", total_marks: 2 },
-  "w25_44_Q5a": { question_id: "w25_44_Q5a", topic: "Electric Fields", question_text: "Explain why the electric potential near an isolated proton is positive.", mark_scheme: "B1: potential defined as zero at infinity. B1: proton has positive charge and repels another positive charge. B1: work done moving positive charges together.", total_marks: 3 },
-  "w25_44_Q7a": { question_id: "w25_44_Q7a", topic: "Electromagnetic Induction", question_text: "State Lenz's law of electromagnetic induction.", mark_scheme: "M1: direction of induced e.m.f. A1: is such as to produce effects that oppose the change that caused it.", total_marks: 2 },
-  "w25_44_Q9a": { question_id: "w25_44_Q9a", topic: "Quantum Physics", question_text: "State what is meant by the photoelectric effect.", mark_scheme: "M1: emission of electrons from a metal surface. A1: when electromagnetic radiation is incident on the surface.", total_marks: 2 },
-  "w25_44_Q10a": { question_id: "w25_44_Q10a", topic: "Astrophysics", question_text: "State what is meant by redshift.", mark_scheme: "B1: recession of galaxy causes emitted light to shift. B1: increase in observed wavelength or decrease in observed frequency.", total_marks: 2 },
-  "9702-41-ALA26-Q1a": { question_id: "9702-41-ALA26-Q1a", topic: "Gravitational Fields", question_text: "State Newton's law of gravitation.", mark_scheme: "B1: force proportional to product of masses and inversely proportional to square of separation. B1: force acts between point masses.", total_marks: 2 },
-  "9702-41-ALA26-Q3a": { question_id: "9702-41-ALA26-Q3a", topic: "Thermal Physics", question_text: "State what is meant by specific latent heat.", mark_scheme: "B1: thermal energy per unit mass to change state. B1: at constant temperature.", total_marks: 2 },
-  "9702-41-ALA26-Q8ai": { question_id: "9702-41-ALA26-Q8ai", topic: "Astrophysics", question_text: "A distant galaxy is moving away from the Earth. Explain how the positions of the lines in the emission spectrum seen by an observer on the Earth differ from the original positions.", mark_scheme: "B1: movement causes change in observed frequency / redshift. B1: observed frequency lower / lines shift to longer wavelength.", total_marks: 2 },
-  "9702-41-ALA26-Q9a": { question_id: "9702-41-ALA26-Q9a", topic: "Nuclear Physics", question_text: "Polonium-211 decays by alpha emission to form a stable isotope of lead. Write a complete nuclear equation for this decay.", mark_scheme: "B1: Pb-207, proton number 82. B1: alpha particle mass 4, proton number 2.", total_marks: 2 },
+  "w25_44_Q2ai": { question_id: "w25_44_Q2ai", topic: "Thermal Physics", question_text: "State the meaning of each symbol in pV = NkT.", mark_scheme: "B1: p, V, k. B1: N. B1: T thermodynamic.", total_marks: 3 },
+  "w25_44_Q3a": { question_id: "w25_44_Q3a", topic: "Thermal Physics", question_text: "Explain what is meant by the internal energy of an ideal gas.", mark_scheme: "B1: total KE of random motion. B1: PE is zero.", total_marks: 2 },
+  "w25_44_Q5a": { question_id: "w25_44_Q5a", topic: "Electric Fields", question_text: "Explain why the electric potential near an isolated proton is positive.", mark_scheme: "B1: defined as zero at infinity. B1: proton repels positive charge. B1: work done moving positive charges together.", total_marks: 3 },
+  "w25_44_Q7a": { question_id: "w25_44_Q7a", topic: "Electromagnetic Induction", question_text: "State Lenz's law.", mark_scheme: "M1: direction of induced e.m.f. A1: opposes the change that caused it.", total_marks: 2 },
+  "w25_44_Q9a": { question_id: "w25_44_Q9a", topic: "Quantum Physics", question_text: "State what is meant by the photoelectric effect.", mark_scheme: "M1: emission of electrons from metal. A1: when EM radiation is incident.", total_marks: 2 },
+  "w25_44_Q10a": { question_id: "w25_44_Q10a", topic: "Astrophysics", question_text: "State what is meant by redshift.", mark_scheme: "B1: recession causes emitted light to shift. B1: increase in wavelength.", total_marks: 2 },
+  "9702-41-ALA26-Q1a": { question_id: "9702-41-ALA26-Q1a", topic: "Gravitational Fields", question_text: "State Newton's law of gravitation.", mark_scheme: "B1: proportional to product of masses and inversely proportional to square of separation. B1: point masses.", total_marks: 2 },
+  "9702-41-ALA26-Q3a": { question_id: "9702-41-ALA26-Q3a", topic: "Thermal Physics", question_text: "State what is meant by specific latent heat.", mark_scheme: "B1: energy per unit mass to change state. B1: at constant temperature.", total_marks: 2 },
+  "9702-41-ALA26-Q8ai": { question_id: "9702-41-ALA26-Q8ai", topic: "Astrophysics", question_text: "Explain how the emission spectrum lines differ when seen from Earth.", mark_scheme: "B1: movement causes redshift. B1: observed frequency lower.", total_marks: 2 },
+  "9702-41-ALA26-Q9a": { question_id: "9702-41-ALA26-Q9a", topic: "Nuclear Physics", question_text: "Write the nuclear equation for alpha decay of polonium-211.", mark_scheme: "B1: Pb-207, proton 82. B1: alpha 4/2.", total_marks: 2 },
 };
 
 function detectSituationFromFeedback(feedback, isQ3, maxMarks) {
@@ -120,8 +120,6 @@ export default function Feedback() {
   const marksEarned = feedback?.marks_earned ?? 0;
   const fullMarks = marksEarned >= maxMarks;
   const subject = detectSubject(resolvedTopicKey);
-
-  // Question text for Socratic Panel
   const questionText = metaEntry?.question_text ?? "";
 
   const recorded = useRef(false);
@@ -131,12 +129,18 @@ export default function Feedback() {
       recorded.current = true;
       if (!isReview) {
         recordAttempt(resolvedTopicKey, marksEarned, { total_marks: maxMarks, question_id: questionId });
-        if (!fullMarks && questionId && QUESTION_META[questionId]) {
-          addToReviewBank({
-            ...QUESTION_META[questionId],
-            first_attempt_score: marksEarned,
-            first_attempt_feedback: feedback.cambridge_insight ?? "",
-          });
+
+        if (!fullMarks) {
+          // Persist Mistake DNA to Supabase
+          writeMistakeDna(feedback, questionId, metaEntry?.topic ?? resolvedTopicKey, marksEarned, maxMarks).catch(() => {});
+
+          if (questionId && QUESTION_META[questionId]) {
+            addToReviewBank({
+              ...QUESTION_META[questionId],
+              first_attempt_score: marksEarned,
+              first_attempt_feedback: feedback.cambridge_insight ?? "",
+            });
+          }
         }
       }
     }
@@ -176,7 +180,6 @@ export default function Feedback() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate(resolvedBack === "/" ? "/physics" : resolvedBack)}
             className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
@@ -192,7 +195,6 @@ export default function Feedback() {
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* 3-Layer Pulse Feedback — now with Socratic context */}
           <PulseFeedback
             feedback={feedback}
             subject={subject}
@@ -202,7 +204,6 @@ export default function Feedback() {
             studentAnswer={answer ?? ""}
           />
 
-          {/* Prediction feedback (Q3 familiarity check) */}
           {isQ3 && student_prediction && feedback.prediction_feedback && (
             <div className="bg-card border border-l-4 border-border border-l-green-500/60 rounded-xl p-5 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your Prediction</p>
@@ -211,7 +212,6 @@ export default function Feedback() {
             </div>
           )}
 
-          {/* Action button */}
           <button
             onClick={handleNext}
             className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"

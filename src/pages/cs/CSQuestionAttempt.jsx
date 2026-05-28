@@ -7,13 +7,12 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
-import { csRecordAttempt, csAddToReviewBank } from "@/lib/csTopicStore";
+import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import QuestionMedia from "@/components/QuestionMedia";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 
-// Maps topic_key → the registered route path
 const TOPIC_ROUTES = {
   operating_systems: "/cs/operating-systems/question",
   language_translators: "/cs/language-translators/question",
@@ -34,7 +33,6 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
   const [showTeachMe, setShowTeachMe] = useState(false);
   const submittedRef = useRef(false);
 
-  // Guard: if question bank is empty or question is undefined, show a graceful fallback
   if (!question) {
     return (
       <div className="min-h-screen bg-background flex justify-center">
@@ -55,7 +53,6 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     setLoading(true);
     setError(null);
 
-    // Yield two frames so React paints the overlay before the heavy await
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const feedback = await base44.integrations.Core.InvokeLLM({
@@ -74,6 +71,9 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
 
     if (!fullMarks) {
+      // Persist Mistake DNA to Supabase
+      csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks).catch(() => {});
+
       await csAddToReviewBank({
         question_id: question.id,
         topic: question.topic,
@@ -113,7 +113,10 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
     const isLastQuestion = nextIdx >= total;
 
     await csRecordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
-    // Always add to review bank for Teach Me How
+
+    // Always persist DNA for Teach Me How (student needed guided support)
+    csWriteMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks).catch(() => {});
+
     await csAddToReviewBank({
       question_id: question.id,
       topic: question.topic,
@@ -123,6 +126,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
       first_attempt_score: marksEarned,
       first_attempt_feedback: fb.cambridge_insight ?? "",
     });
+
     onAdvance();
     navigate("/cs/feedback", {
       state: {
@@ -185,7 +189,7 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setShowTeachMe(true); }}
+                  onClick={() => setShowTeachMe(true)}
                   disabled={!isEmpty}
                   className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
@@ -208,7 +212,6 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
         </div>
       </div>
 
-      {/* Submitting overlay — same as Physics */}
       {loading && <SubmittingOverlay />}
     </div>
   );

@@ -5,6 +5,7 @@
  */
 
 import { supabaseClient } from "@/api/base44Client";
+import { buildMistakeDna, mergeMistakeDna } from "./mistakeDna";
 
 export function toDateString(date) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -30,6 +31,7 @@ const DEFAULT_DATA = () => ({
   rest_day_passes: 0,
   daily_question_count: null,
   last_session_time: null,
+  mistake_dna: [],
 });
 
 // Module-level state
@@ -37,8 +39,8 @@ let _cache = null;
 let _recordId = null;
 let _userEmail = null;
 let _userId = null;
-let _supabaseLoaded = false;   // true only after Supabase responds
-let _loadPromise = null;        // the in-flight Supabase request
+let _supabaseLoaded = false;
+let _loadPromise = null;
 
 function localKey(e) { return `hub_physics_v4_${e}`; }
 
@@ -90,6 +92,7 @@ async function loadFromSupabase(userId) {
         rest_day_passes: r.rest_day_passes ?? 0,
         daily_question_count: r.daily_question_count ?? null,
         last_session_time: r.last_session_time ?? null,
+        mistake_dna: Array.isArray(r.mistake_dna) ? r.mistake_dna : [],
       },
     };
   }
@@ -112,7 +115,6 @@ async function loadFromSupabase(userId) {
 // ── preloadStore — must be awaited on login ────────────────────────────────
 
 export async function preloadStore(userEmail, userId) {
-  // Reset for new user
   if (_userEmail !== userEmail) {
     _cache = null;
     _recordId = null;
@@ -122,10 +124,8 @@ export async function preloadStore(userEmail, userId) {
     _loadPromise = null;
   }
 
-  // Already loaded from Supabase — nothing to do
   if (_supabaseLoaded) return;
 
-  // Deduplicate concurrent calls
   if (_loadPromise) {
     await _loadPromise;
     return;
@@ -141,28 +141,24 @@ export async function preloadStore(userEmail, userId) {
     _supabaseLoaded = true;
     writeLocal(userEmail, { id: _recordId, data: _cache });
   } else {
-    // Supabase failed — fall back to local cache or default
     const local = readLocal(userEmail);
     _cache = local?.data ?? DEFAULT_DATA();
     if (local?.id) _recordId = local.id;
-    _supabaseLoaded = false; // will retry next call
+    _supabaseLoaded = false;
     console.warn('[topicStore] ⚠ using fallback data (Supabase unavailable)');
   }
 }
 
-// ── ensureLoaded — used by all read/write helpers ──────────────────────────
+// ── ensureLoaded ────────────────────────────────────────────────────────────
 
 async function ensureLoaded() {
-  // If we have confirmed Supabase data, use it
   if (_supabaseLoaded && _cache) return _cache;
 
-  // If a load is in flight, wait for it
   if (_loadPromise) {
     await _loadPromise;
     return _cache ?? DEFAULT_DATA();
   }
 
-  // Need to load — trigger now
   if (_userId) {
     _loadPromise = loadFromSupabase(_userId);
     const result = await _loadPromise;
@@ -182,7 +178,7 @@ async function ensureLoaded() {
   return _cache;
 }
 
-// ── saveToDB — writes in-memory then pushes to Supabase ───────────────────
+// ── saveToDB ────────────────────────────────────────────────────────────────
 
 function saveToDB(data) {
   _cache = data;
@@ -204,6 +200,7 @@ async function pushToSupabase(data) {
     rest_day_passes: data.rest_day_passes,
     daily_question_count: data.daily_question_count,
     last_session_time: data.last_session_time,
+    mistake_dna: data.mistake_dna ?? [],
   };
 
   if (_recordId) {
@@ -389,6 +386,31 @@ export async function getTopicData(topicKey) {
   }
 
   return { trend, streak: currentStreak, lastLabel, attempts };
+}
+
+// ── Mistake DNA ─────────────────────────────────────────────────────────────
+
+/**
+ * writeMistakeDna — call after any partial-credit or zero-score submission.
+ * Builds DNA from the Claude feedback object and merges into Supabase.
+ */
+export async function writeMistakeDna(feedback, questionId, topic, marksEarned, totalMarks) {
+  if (!feedback || marksEarned >= totalMarks) return; // only write on missed marks
+
+  const data = await ensureLoaded();
+  const incoming = buildMistakeDna(feedback, questionId, topic, "physics", marksEarned, totalMarks);
+  if (!incoming.length) return;
+
+  data.mistake_dna = mergeMistakeDna(data.mistake_dna ?? [], incoming);
+  saveToDB(data);
+}
+
+/**
+ * getMistakeDna — returns the full mistake DNA array for this student (Physics).
+ */
+export async function getMistakeDna() {
+  const data = await ensureLoaded();
+  return data.mistake_dna ?? [];
 }
 
 // ── Written Review Bank ────────────────────────────────────────────────────

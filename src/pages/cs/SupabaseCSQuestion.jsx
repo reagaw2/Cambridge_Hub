@@ -3,19 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Database, ChevronRight } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
+import QuestionDiagram from "@/components/QuestionDiagram";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import { base44 } from "@/api/base44Client";
 import { useSupabaseQuestions, buildSupabasePrompt, buildSupabaseSchema } from "@/hooks/useSupabaseQuestions";
 import CSQuestionAttempt from "./CSQuestionAttempt";
 
-/**
- * Splits a multi-part question text into sub-parts.
- * Detects patterns like (a), (b), (c)(i), (c)(ii), (i), (ii) etc.
- * Returns array of { label, text, markScheme } objects.
- * Falls back to treating the whole question as one part if no sub-parts found.
- */
 function splitIntoParts(questionText, markSchemeText) {
-  // Match sub-part labels: (a), (b), (c), (i), (ii), (iii), (c)(i), etc.
   const subPartRegex = /\n?\s*\(([a-z]+|i{1,3}v?|vi{0,3}|ix|x)\)\s*/g;
   const matches = [...questionText.matchAll(subPartRegex)];
 
@@ -33,7 +27,6 @@ function splitIntoParts(questionText, markSchemeText) {
     const end = i + 1 < matches.length ? matches[i + 1].index : questionText.length;
     const text = questionText.slice(start, end).trim();
 
-    // Try to extract matching mark scheme line
     const msPattern = new RegExp(`\\(${match[1]}\\)[^\\n]*\\n?([^\\(]*)`, "i");
     const msMatch = (markSchemeText ?? "").match(msPattern);
     const markScheme = msMatch ? msMatch[0].trim() : "";
@@ -44,15 +37,12 @@ function splitIntoParts(questionText, markSchemeText) {
       markScheme,
       rawText: text,
     });
-    introText = ""; // only prepend context to first part
+    introText = "";
   }
 
   return parts;
 }
 
-/**
- * Builds a targeted prompt for a single sub-part.
- */
 function buildPartPrompt(question, part, answer) {
   const markSchemeBlock = part.markScheme || question.mark_scheme_text || "See mark scheme.";
   const totalMarks = extractMarksFromText(markSchemeBlock) || question.total_marks || 1;
@@ -68,7 +58,7 @@ ${markSchemeBlock}
 
 Student's answer: ${answer}
 
-Analyse the student's answer against the mark scheme. Award marks for each correct point. Respond ONLY in this JSON format:
+Analyse the student's answer against the mark scheme. Respond ONLY in this JSON format:
 {
   "marks_earned": [number 0 to ${totalMarks}],
   "mark_1": { "earned": true or false, "keyword": "key phrase needed", "found": true or false, "feedback": "one sentence" },
@@ -83,12 +73,6 @@ function extractMarksFromText(text) {
   return m ? parseInt(m[1], 10) : null;
 }
 
-/**
- * SupabaseCSQuestion
- *
- * Generic CS question page backed by Supabase.
- * Handles multi-part questions by showing one sub-part at a time.
- */
 export default function SupabaseCSQuestion({
   topicKey,
   topicLabel,
@@ -99,12 +83,11 @@ export default function SupabaseCSQuestion({
 }) {
   const navigate = useNavigate();
   const { questions, loading, getCurrentQuestion, advance, getProgress } = useSupabaseQuestions(topicKey, "cs");
-  const [answers, setAnswers] = useState({}); // keyed by partIndex
+  const [answers, setAnswers] = useState({});
   const [partIndex, setPartIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [partFeedbacks, setPartFeedbacks] = useState([]); // array of feedback per part
-  const [showingSummary, setShowingSummary] = useState(false);
+  const [partFeedbacks, setPartFeedbacks] = useState([]);
   const [fallbackOverride, setFallbackOverride] = useState(null);
 
   if (loading) {
@@ -116,7 +99,6 @@ export default function SupabaseCSQuestion({
     );
   }
 
-  // No Supabase questions — use hardcoded fallback bank
   if (questions.length === 0) {
     const queued = fallbackGetNext();
     const question = fallbackOverride ?? queued.question;
@@ -148,13 +130,14 @@ export default function SupabaseCSQuestion({
   const currentAnswer = answers[partIndex] ?? "";
   const totalParts = parts.length;
   const isLastPart = partIndex === totalParts - 1;
+  // Show diagram only on first sub-part (it applies to the whole question)
+  const showDiagram = partIndex === 0 && question.diagram_svg;
 
   async function handleSubmitPart() {
     if (!currentAnswer.trim() || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
 
-    // Build prompt for this specific sub-part
     const prompt = buildPartPrompt(question, currentPart, currentAnswer);
     const schema = {
       type: "object",
@@ -215,7 +198,6 @@ export default function SupabaseCSQuestion({
     setPartFeedbacks(newFeedbacks);
 
     if (isLastPart) {
-      // All parts done — go to feedback page with aggregated results
       const totalEarned = newFeedbacks.reduce((s, f) => s + f.marksEarned, 0);
       const totalAvailable = newFeedbacks.reduce((s, f) => s + f.partMarks, 0);
 
@@ -227,7 +209,6 @@ export default function SupabaseCSQuestion({
             marks_earned: totalEarned,
             cambridge_insight: newFeedbacks.map(f => f.fb.cambridge_insight).filter(Boolean).join(" "),
             next_step: newFeedbacks[newFeedbacks.length - 1]?.fb.next_step ?? "",
-            // Pass individual part feedbacks for detailed breakdown
             part_feedbacks: newFeedbacks.map(f => ({
               label: f.part.label,
               question: f.part.rawText ?? f.part.text,
@@ -253,7 +234,6 @@ export default function SupabaseCSQuestion({
         },
       });
     } else {
-      // Move to next sub-part
       setPartIndex(p => p + 1);
     }
 
@@ -264,7 +244,6 @@ export default function SupabaseCSQuestion({
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate("/cs")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -283,7 +262,7 @@ export default function SupabaseCSQuestion({
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* Question progress */}
+          {/* Progress */}
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground font-mono">Q{idx + 1} of {total}</span>
             {totalParts > 1 && (
@@ -302,7 +281,7 @@ export default function SupabaseCSQuestion({
             )}
           </div>
 
-          {/* Previously answered parts summary */}
+          {/* Previously answered parts */}
           {partFeedbacks.length > 0 && (
             <div className="space-y-2">
               {partFeedbacks.map((f, i) => (
@@ -327,7 +306,7 @@ export default function SupabaseCSQuestion({
             </div>
           )}
 
-          {/* Current question card */}
+          {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
@@ -337,6 +316,13 @@ export default function SupabaseCSQuestion({
                 {question.topic}
               </span>
             </div>
+
+            {/* Diagram — shown on first part only */}
+            {showDiagram && (
+              <div className="bg-white rounded-xl p-3 border border-border/40 overflow-x-auto">
+                <QuestionDiagram svgString={question.diagram_svg} />
+              </div>
+            )}
 
             <p className="text-[15px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
               {currentPart.text}

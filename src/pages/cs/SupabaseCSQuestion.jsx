@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Calculator, Loader2 } from "lucid
 import AnswerInput from "@/components/AnswerInput";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 import ScientificCalculator from "@/components/ScientificCalculator";
+import PulseFeedback from "@/components/PulseFeedback";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import { base44, supabaseClient } from "@/api/base44Client";
 import { PRELOADED_PAIRS } from "@/lib/ingestorQuestions";
@@ -34,14 +35,14 @@ Analyse the student's answer against the mark scheme. Award marks generously but
   "mark_1": { "earned": true or false, "keyword": "key phrase needed", "found": true or false, "feedback": "one sentence" },
   "mark_2": { "earned": true or false, "keyword": "second key phrase if applicable", "found": true or false, "feedback": "one sentence" },
   "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why",
-  "next_step": "one sentence telling the student exactly what to focus on"
+  "next_step": "one sentence telling the student exactly what to focus on",
+  "pulse_layer_1": "single punchy sentence of max 20 words — the exam hack or key concept that unlocks this question type",
+  "pulse_layer_2_marks": [],
+  "pulse_layer_3": "optional 2-4 sentence deep-dive explanation of the underlying principle"
 }`;
 }
 
-export default function SupabaseCSQuestion({
-  topicKey,
-  topicLabel,
-}) {
+export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
   const navigate = useNavigate();
 
   const [questions, setQuestions] = useState([]);
@@ -49,8 +50,7 @@ export default function SupabaseCSQuestion({
   const [usingFallback, setUsingFallback] = useState(false);
 
   const [localIdx, setLocalIdx] = useState(() => {
-    // Clear stale keys from previous versions
-    ["v2", "v3", "local_q_idx_v2_cs_", "local_q_idx_v3_cs_"].forEach(v => {
+    ["v2", "v3"].forEach(v => {
       const key = `supabase_q_idx_${v}_cs_${topicKey}`;
       if (sessionStorage.getItem(key)) sessionStorage.removeItem(key);
     });
@@ -61,7 +61,7 @@ export default function SupabaseCSQuestion({
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [feedback, setFeedback] = useState(null);
+  const [feedback, setFeedback] = useState(null); // { fb, marksEarned, totalMarks }
   const [showCalc, setShowCalc] = useState(false);
 
   // Fetch from Supabase on mount
@@ -69,23 +69,12 @@ export default function SupabaseCSQuestion({
     setLoading(true);
     supabaseClient
       .from("questions")
-      .select(`
-        id,
-        topic,
-        topic_key,
-        subject,
-        paper_ref,
-        label,
-        question_text,
-        total_marks,
-        difficulty,
-        mark_scheme_text
-      `)
+      .select(`id, topic, topic_key, subject, paper_ref, label, question_text, total_marks, difficulty, mark_scheme_text`)
       .eq("subject", "cs")
       .order("id", { ascending: true })
       .then(({ data, error }) => {
         if (error || !data?.length) {
-          console.warn("[SupabaseCSQuestion] Supabase fetch failed or empty, using fallback:", error?.message);
+          console.warn("[SupabaseCSQuestion] Supabase empty/failed, using fallback:", error?.message);
           setQuestions(PRELOADED_PAIRS.map(p => ({
             id: `local_${p.id}`,
             question_text: p.question,
@@ -94,11 +83,9 @@ export default function SupabaseCSQuestion({
             paper_ref: "9618",
             topic: topicLabel ?? topicKey,
             diagram_svg: p.diagram_svg ?? null,
-            _raw: p,
           })));
           setUsingFallback(true);
         } else {
-          // Merge diagram_svg from PRELOADED_PAIRS by matching question index
           const merged = data.map((row, i) => ({
             ...row,
             diagram_svg: PRELOADED_PAIRS[i]?.diagram_svg ?? null,
@@ -124,6 +111,15 @@ export default function SupabaseCSQuestion({
     setShowCalc(false);
   }
 
+  function handleNext() {
+    if (clampedIdx < total - 1) {
+      goToQuestion(clampedIdx + 1);
+    } else {
+      // End of bank — go back to CS dashboard
+      navigate("/cs");
+    }
+  }
+
   async function handleSubmit() {
     if (!answer.trim() || submitting || !question) return;
     setSubmitting(true);
@@ -142,6 +138,9 @@ export default function SupabaseCSQuestion({
         mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
         cambridge_insight: { type: "string" },
         next_step: { type: "string" },
+        pulse_layer_1: { type: "string" },
+        pulse_layer_2_marks: { type: "array", items: { type: "object" } },
+        pulse_layer_3: { type: "string" },
       },
       required: ["marks_earned", "cambridge_insight", "next_step"],
     };
@@ -212,6 +211,7 @@ export default function SupabaseCSQuestion({
   const markScheme = question.mark_scheme_text ?? "";
   const totalMarks = question.total_marks ?? extractMarksFromText(markScheme) ?? 2;
   const diagramSvg = question.diagram_svg ?? null;
+  const isLastQuestion = clampedIdx >= total - 1;
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -264,7 +264,7 @@ export default function SupabaseCSQuestion({
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col gap-4 p-4">
+        <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
           {/* Calculator */}
           {showCalc && (
@@ -284,7 +284,7 @@ export default function SupabaseCSQuestion({
               )}
             </div>
 
-            {/* Diagram / table if present */}
+            {/* Diagram / table */}
             {diagramSvg && (
               <div
                 className="rounded-xl p-3 border border-border/40 overflow-x-auto bg-white"
@@ -301,68 +301,56 @@ export default function SupabaseCSQuestion({
             </div>
           </div>
 
-          {/* Feedback */}
+          {/* Answer input — only shown before submission */}
+          {!feedback && (
+            <>
+              <AnswerInput value={answer} onChange={setAnswer} />
+              <button
+                onClick={handleSubmit}
+                disabled={!answer.trim() || submitting}
+                className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Submit Answer
+              </button>
+              {submitError && <p className="text-center text-sm text-red-400/80">{submitError}</p>}
+            </>
+          )}
+
+          {/* Pulse feedback — shown after submission */}
           {feedback && (
-            <div className={`rounded-xl border p-4 space-y-3 ${
-              feedback.marksEarned >= feedback.totalMarks
-                ? "bg-green-500/8 border-green-500/25"
-                : "bg-red-500/8 border-red-500/20"
-            }`}>
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-foreground">Feedback</p>
-                <span className={`font-mono text-sm font-bold ${
-                  feedback.marksEarned >= feedback.totalMarks ? "text-green-400" : "text-red-400"
-                }`}>
-                  {feedback.marksEarned}/{feedback.totalMarks}
-                </span>
+            <>
+              {/* Student's answer recap */}
+              <div className="bg-secondary/40 border border-border rounded-xl px-4 py-3 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Your answer</p>
+                <p className="text-sm text-foreground/80 leading-relaxed">{answer}</p>
               </div>
 
-              {/* Show all mark_N fields dynamically */}
-              {Object.entries(feedback.fb)
-                .filter(([k]) => /^mark_\d+$/.test(k))
-                .sort(([a], [b]) => parseInt(a.split("_")[1]) - parseInt(b.split("_")[1]))
-                .map(([key, m]) => m && (
-                  <div key={key} className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg ${
-                    m.earned ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"
-                  }`}>
-                    <span className="font-bold shrink-0">{m.earned ? "✓" : "✗"}</span>
-                    <span>{m.keyword} — {m.feedback}</span>
-                  </div>
-                ))
-              }
+              <PulseFeedback
+                feedback={feedback.fb}
+                subject="cs"
+                marksTotal={feedback.totalMarks}
+                questionId={String(question.id)}
+                questionText={questionText}
+                studentAnswer={answer}
+              />
 
-              {/* Mark scheme reveal */}
+              {/* Mark scheme */}
               {markScheme && (
-                <div className="bg-secondary/60 rounded-lg px-3 py-2.5 space-y-1 border-t border-white/5 pt-3">
+                <div className="bg-secondary/40 border border-border rounded-xl px-4 py-3 space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mark Scheme</p>
                   <p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">{markScheme}</p>
                 </div>
               )}
 
-              {feedback.fb.cambridge_insight && (
-                <div className="bg-primary/8 border border-primary/20 rounded-lg px-3 py-2.5 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Cambridge Insight</p>
-                  <p className="text-xs text-foreground/80 leading-relaxed">{feedback.fb.cambridge_insight}</p>
-                </div>
-              )}
-
-              {feedback.fb.next_step && (
-                <p className="text-[11px] text-muted-foreground/70 italic px-1">{feedback.fb.next_step}</p>
-              )}
-            </div>
+              {/* Next question button */}
+              <button
+                onClick={handleNext}
+                className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                {isLastQuestion ? "Back to CS dashboard →" : "Next question →"}
+              </button>
+            </>
           )}
-
-          <AnswerInput value={answer} onChange={setAnswer} />
-
-          <button
-            onClick={handleSubmit}
-            disabled={!answer.trim() || submitting}
-            className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {submitting ? "Marking…" : feedback ? "Re-submit" : "Submit Answer"}
-          </button>
-
-          {submitError && <p className="text-center text-sm text-red-400/80">{submitError}</p>}
 
         </div>
       </div>

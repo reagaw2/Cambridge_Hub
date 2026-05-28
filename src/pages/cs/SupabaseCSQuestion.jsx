@@ -1,26 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Calculator } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Calculator, Loader2 } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
-import QuestionDiagram from "@/components/QuestionDiagram";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
-import { base44 } from "@/api/base44Client";
+import { base44, supabaseClient } from "@/api/base44Client";
 import { PRELOADED_PAIRS } from "@/lib/ingestorQuestions";
-import CSQuestionAttempt from "./CSQuestionAttempt";
 
-// Bump this when the question bank changes to bust stale sessionStorage
-const BANK_VERSION = "v3";
-const PROGRESS_KEY = (topicKey) => `local_q_idx_${BANK_VERSION}_cs_${topicKey}`;
+const BANK_VERSION = "v4";
+const PROGRESS_KEY = (topicKey) => `supabase_q_idx_${BANK_VERSION}_cs_${topicKey}`;
 
-function buildPrompt(question, answer) {
-  const markScheme = question.markscheme ?? question.mark_scheme_text ?? "See mark scheme.";
-  const totalMarks = extractMarksFromText(markScheme) ?? question.total_marks ?? 2;
+function extractMarksFromText(text) {
+  if (!text) return null;
+  const m = text.match(/\[(\d+)\]/) ?? text.match(/\((\d+)\s*marks?\)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
 
+function buildPrompt(questionText, markScheme, totalMarks, answer) {
   return `You are a Cambridge A Level Computer Science examiner. A student has answered the following question:
 
-Question: "${question.question ?? question.question_text}"
+Question: "${questionText}"
 Marks available: ${totalMarks}
 
 Mark scheme:
@@ -28,7 +28,7 @@ ${markScheme}
 
 Student's answer: ${answer}
 
-Analyse the student's answer against the mark scheme. Respond ONLY in this JSON format, no extra text:
+Analyse the student's answer against the mark scheme. Award marks generously but accurately. Respond ONLY in this JSON format, no extra text:
 {
   "marks_earned": [number 0 to ${totalMarks}],
   "mark_1": { "earned": true or false, "keyword": "key phrase needed", "found": true or false, "feedback": "one sentence" },
@@ -38,31 +38,21 @@ Analyse the student's answer against the mark scheme. Respond ONLY in this JSON 
 }`;
 }
 
-function extractMarksFromText(text) {
-  if (!text) return null;
-  const m = text.match(/\[(\d+)\]/) ?? text.match(/\((\d+)\s*marks?\)/i);
-  return m ? parseInt(m[1], 10) : null;
-}
-
 export default function SupabaseCSQuestion({
   topicKey,
   topicLabel,
-  route,
-  fallbackQuestions,
-  fallbackGetNext,
-  fallbackAdvance,
 }) {
   const navigate = useNavigate();
 
-  // Use PRELOADED_PAIRS directly — no Supabase fetch needed
-  const questions = PRELOADED_PAIRS;
-  const total = questions.length;
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   const [localIdx, setLocalIdx] = useState(() => {
-    // Clear all old keys
-    ["supabase_q_idx_cs_", "supabase_q_idx_v2_cs_", `local_q_idx_v2_cs_`].forEach(prefix => {
-      const key = `${prefix}${topicKey}`;
-      if (sessionStorage.getItem(key) !== null) sessionStorage.removeItem(key);
+    // Clear stale keys from previous versions
+    ["v2", "v3", "local_q_idx_v2_cs_", "local_q_idx_v3_cs_"].forEach(v => {
+      const key = `supabase_q_idx_${v}_cs_${topicKey}`;
+      if (sessionStorage.getItem(key)) sessionStorage.removeItem(key);
     });
     const stored = sessionStorage.getItem(PROGRESS_KEY(topicKey));
     return stored ? parseInt(stored, 10) : 0;
@@ -74,8 +64,55 @@ export default function SupabaseCSQuestion({
   const [feedback, setFeedback] = useState(null);
   const [showCalc, setShowCalc] = useState(false);
 
-  const clampedIdx = Math.max(0, Math.min(localIdx, total - 1));
-  const question = questions[clampedIdx];
+  // Fetch from Supabase on mount
+  useEffect(() => {
+    setLoading(true);
+    supabaseClient
+      .from("questions")
+      .select(`
+        id,
+        topic,
+        topic_key,
+        subject,
+        paper_ref,
+        label,
+        question_text,
+        total_marks,
+        difficulty,
+        mark_scheme_text
+      `)
+      .eq("subject", "cs")
+      .order("id", { ascending: true })
+      .then(({ data, error }) => {
+        if (error || !data?.length) {
+          console.warn("[SupabaseCSQuestion] Supabase fetch failed or empty, using fallback:", error?.message);
+          setQuestions(PRELOADED_PAIRS.map(p => ({
+            id: `local_${p.id}`,
+            question_text: p.question,
+            mark_scheme_text: p.markscheme,
+            total_marks: extractMarksFromText(p.markscheme) ?? 2,
+            paper_ref: "9618",
+            topic: topicLabel ?? topicKey,
+            diagram_svg: p.diagram_svg ?? null,
+            _raw: p,
+          })));
+          setUsingFallback(true);
+        } else {
+          // Merge diagram_svg from PRELOADED_PAIRS by matching question index
+          const merged = data.map((row, i) => ({
+            ...row,
+            diagram_svg: PRELOADED_PAIRS[i]?.diagram_svg ?? null,
+          }));
+          setQuestions(merged);
+          setUsingFallback(false);
+        }
+        setLoading(false);
+      });
+  }, [topicKey]);
+
+  const total = questions.length;
+  const clampedIdx = Math.max(0, Math.min(localIdx, Math.max(total - 1, 0)));
+  const question = questions[clampedIdx] ?? null;
 
   function goToQuestion(newIdx) {
     const clamped = Math.max(0, Math.min(newIdx, total - 1));
@@ -87,25 +124,16 @@ export default function SupabaseCSQuestion({
     setShowCalc(false);
   }
 
-  if (!question) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">No questions available.</p>
-      </div>
-    );
-  }
-
-  const questionText = question.question ?? question.question_text ?? "";
-  const markScheme = question.markscheme ?? question.mark_scheme_text ?? "";
-  const totalMarks = extractMarksFromText(markScheme) ?? question.total_marks ?? 2;
-  const diagramSvg = question.diagram_svg ?? null;
-
   async function handleSubmit() {
-    if (!answer.trim() || submitting) return;
+    if (!answer.trim() || submitting || !question) return;
     setSubmitting(true);
     setSubmitError(null);
 
-    const prompt = buildPrompt(question, answer);
+    const questionText = question.question_text ?? "";
+    const markScheme = question.mark_scheme_text ?? "";
+    const totalMarks = question.total_marks ?? extractMarksFromText(markScheme) ?? 2;
+    const prompt = buildPrompt(questionText, markScheme, totalMarks, answer);
+
     const schema = {
       type: "object",
       properties: {
@@ -142,14 +170,14 @@ export default function SupabaseCSQuestion({
 
     await csRecordAttempt(topicKey, marksEarned, {
       total_marks: totalMarks,
-      question_id: `local_${question.id}`,
+      question_id: String(question.id),
     });
 
     if (marksEarned < totalMarks) {
-      csWriteMistakeDna(fb, `local_${question.id}`, topicLabel ?? topicKey, marksEarned, totalMarks, answer).catch(() => {});
+      csWriteMistakeDna(fb, String(question.id), question.topic ?? topicLabel ?? topicKey, marksEarned, totalMarks, answer).catch(() => {});
       await csAddToReviewBank({
-        question_id: `local_${question.id}`,
-        topic: topicLabel ?? topicKey,
+        question_id: String(question.id),
+        topic: question.topic ?? topicLabel ?? topicKey,
         question_text: questionText,
         mark_scheme: markScheme,
         total_marks: totalMarks,
@@ -163,6 +191,28 @@ export default function SupabaseCSQuestion({
     setSubmitting(false);
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center gap-3">
+        <Loader2 className="w-5 h-5 text-primary animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading questions…</p>
+      </div>
+    );
+  }
+
+  if (!question) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">No questions available.</p>
+      </div>
+    );
+  }
+
+  const questionText = question.question_text ?? "";
+  const markScheme = question.mark_scheme_text ?? "";
+  const totalMarks = question.total_marks ?? extractMarksFromText(markScheme) ?? 2;
+  const diagramSvg = question.diagram_svg ?? null;
+
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
@@ -172,7 +222,12 @@ export default function SupabaseCSQuestion({
           <button onClick={() => navigate("/cs")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
-          <span className="text-sm font-bold tracking-wide text-foreground">CAIE Computer Science</span>
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold tracking-wide text-foreground">CAIE Computer Science</span>
+            {usingFallback && (
+              <span className="text-[9px] text-amber-400/60 font-mono">offline mode</span>
+            )}
+          </div>
           <button
             onClick={() => setShowCalc(c => !c)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
@@ -220,11 +275,11 @@ export default function SupabaseCSQuestion({
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
-                Question {clampedIdx + 1}
+                {question.label ?? `Question ${clampedIdx + 1}`}
               </span>
-              {topicLabel && (
+              {(question.topic ?? topicLabel) && (
                 <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-                  {topicLabel}
+                  {question.topic ?? topicLabel}
                 </span>
               )}
             </div>
@@ -261,26 +316,43 @@ export default function SupabaseCSQuestion({
                   {feedback.marksEarned}/{feedback.totalMarks}
                 </span>
               </div>
-              {[feedback.fb.mark_1, feedback.fb.mark_2].filter(Boolean).map((m, j) => (
-                <div key={j} className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg ${
-                  m.earned ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"
-                }`}>
-                  <span className="font-bold shrink-0">{m.earned ? "✓" : "✗"}</span>
-                  <span>{m.keyword} — {m.feedback}</span>
+
+              {/* Show all mark_N fields dynamically */}
+              {Object.entries(feedback.fb)
+                .filter(([k]) => /^mark_\d+$/.test(k))
+                .sort(([a], [b]) => parseInt(a.split("_")[1]) - parseInt(b.split("_")[1]))
+                .map(([key, m]) => m && (
+                  <div key={key} className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg ${
+                    m.earned ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"
+                  }`}>
+                    <span className="font-bold shrink-0">{m.earned ? "✓" : "✗"}</span>
+                    <span>{m.keyword} — {m.feedback}</span>
+                  </div>
+                ))
+              }
+
+              {/* Mark scheme reveal */}
+              {markScheme && (
+                <div className="bg-secondary/60 rounded-lg px-3 py-2.5 space-y-1 border-t border-white/5 pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mark Scheme</p>
+                  <p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">{markScheme}</p>
                 </div>
-              ))}
+              )}
+
               {feedback.fb.cambridge_insight && (
-                <p className="text-xs text-foreground/70 leading-relaxed italic border-t border-white/10 pt-2">
-                  {feedback.fb.cambridge_insight}
-                </p>
+                <div className="bg-primary/8 border border-primary/20 rounded-lg px-3 py-2.5 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-primary/60">Cambridge Insight</p>
+                  <p className="text-xs text-foreground/80 leading-relaxed">{feedback.fb.cambridge_insight}</p>
+                </div>
+              )}
+
+              {feedback.fb.next_step && (
+                <p className="text-[11px] text-muted-foreground/70 italic px-1">{feedback.fb.next_step}</p>
               )}
             </div>
           )}
 
-          <AnswerInput
-            value={answer}
-            onChange={setAnswer}
-          />
+          <AnswerInput value={answer} onChange={setAnswer} />
 
           <button
             onClick={handleSubmit}

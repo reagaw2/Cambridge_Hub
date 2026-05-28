@@ -34,9 +34,24 @@ async function fetchFromSupabase(userId) {
   if (error) { console.error('[csStore] FETCH ERROR:', error.message); return null; }
   if (rows && rows.length > 0) {
     const r = rows[0];
-    const raw = r.cs_data;
+    const raw = r.cs_data ?? {};
+
+    // ── DIAGNOSTIC: log what came back from Supabase ──────────────────
+    console.log('[csTopicStore] fetched cs_data from Supabase. cs_mistake_dna entries:',
+      Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna.length : 'missing/null',
+      raw.cs_mistake_dna ?? '(field absent)'
+    );
+
     const data = (raw && typeof raw === "object" && Object.keys(raw).length > 0)
-      ? { topics: raw.topics || {}, cs_review_bank: raw.cs_review_bank || [], cs_review_bank_clears: raw.cs_review_bank_clears ?? 0, cs_mcq_attempts: raw.cs_mcq_attempts || [], cs_guess_review_bank: raw.cs_guess_review_bank || [], cs_mistake_dna: Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna : [] }
+      ? {
+          topics: raw.topics || {},
+          cs_review_bank: raw.cs_review_bank || [],
+          cs_review_bank_clears: raw.cs_review_bank_clears ?? 0,
+          cs_mcq_attempts: raw.cs_mcq_attempts || [],
+          cs_guess_review_bank: raw.cs_guess_review_bank || [],
+          // Explicitly parse cs_mistake_dna — falls back to [] if missing
+          cs_mistake_dna: Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna : [],
+        }
       : DEFAULT_CS_DATA();
     return { id: r.id, data };
   }
@@ -155,22 +170,22 @@ export async function csGetTopicData(topicKey) {
 
 // ── CS Mistake DNA ─────────────────────────────────────────────────────────
 
-/**
- * csWriteMistakeDna — now accepts `studentResponse` so every DNA entry includes
- * the student's raw text submission.
- */
 export async function csWriteMistakeDna(feedback, questionId, topic, marksEarned, totalMarks, studentResponse = "") {
   if (!feedback || marksEarned >= totalMarks) return;
   const data = await ensureLoaded();
   const incoming = buildMistakeDna(feedback, questionId, topic, "cs", marksEarned, totalMarks, studentResponse);
   if (!incoming.length) return;
-  data.cs_mistake_dna = mergeMistakeDna(data.cs_mistake_dna ?? [], incoming);
+  if (!Array.isArray(data.cs_mistake_dna)) data.cs_mistake_dna = [];
+  data.cs_mistake_dna = mergeMistakeDna(data.cs_mistake_dna, incoming);
+  console.log('[csTopicStore] csWriteMistakeDna — wrote', incoming.length, 'entries. Total:', data.cs_mistake_dna.length);
   saveToDB(data);
 }
 
 export async function csGetMistakeDna() {
   const data = await ensureLoaded();
-  return data.cs_mistake_dna ?? [];
+  const dna = data.cs_mistake_dna ?? [];
+  console.log('[csTopicStore] csGetMistakeDna — returning', dna.length, 'entries');
+  return dna;
 }
 
 // ── CS Review Bank ─────────────────────────────────────────────────────────

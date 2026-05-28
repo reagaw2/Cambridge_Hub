@@ -18,7 +18,6 @@ function formatCountdown(ms) {
   return `Unlocks in ${minutes}m`;
 }
 
-// ── Same DNA badge styling as Physics ReviewBankScreen ─────────────────────
 const DNA_CATEGORY_STYLE = {
   "Precision Phrasing Flaw":      { pill: "bg-amber-500/15 border-amber-500/30 text-amber-300",  dot: "bg-amber-400" },
   "Missing Keyword":              { pill: "bg-red-500/15 border-red-500/30 text-red-300",         dot: "bg-red-400" },
@@ -40,7 +39,6 @@ function DnaTag({ category }) {
   );
 }
 
-// ── Last attempt strip — identical to Physics version ──────────────────────
 function LastAttemptStrip({ text }) {
   if (!text) return null;
   const display = text.length > 120 ? text.slice(0, 117) + "…" : text;
@@ -56,12 +54,6 @@ function LastAttemptStrip({ text }) {
   );
 }
 
-/**
- * Resolves the single best last-attempt text for a CS review card.
- * Priority:
- *   1. first_attempt_answer on the review bank entry itself
- *   2. student_response from the latest cs_mistake_dna entry for this question_id
- */
 function resolveLastAttempt(q, dnaEntries) {
   if (q.first_attempt_answer?.trim()) {
     return q.first_attempt_answer.trim();
@@ -72,20 +64,24 @@ function resolveLastAttempt(q, dnaEntries) {
   return matching[0]?.student_response?.trim() ?? null;
 }
 
-// ── Question card ──────────────────────────────────────────────────────────
 function QuestionCard({ q, dnaEntries, now, navigate }) {
   const { locked, msRemaining } = getLockStatus(q.locked_until, now);
   const preview = q.question_text?.slice(0, 80) + (q.question_text?.length > 80 ? "…" : "");
   const [lockedMsg, setLockedMsg] = useState(false);
 
+  // ── DIAGNOSTIC: log what DNA entries exist for this question ──────────
   const dnaForQuestion = dnaEntries.filter(e => e.question_id === q.question_id);
+  console.log(
+    `[CSReviewBank] card="${q.question_id}" | dnaEntries total=${dnaEntries.length} | matches=${dnaForQuestion.length}`,
+    dnaForQuestion.length > 0 ? dnaForQuestion : "(none)"
+  );
+
   const uniqueCategories = [...new Set(dnaForQuestion.map(e => e.error_category))].filter(Boolean);
   const lastAttemptText = resolveLastAttempt(q, dnaEntries);
 
   if (!locked) {
     return (
       <div className="bg-card border border-l-4 border-border border-l-green-500/70 rounded-xl p-4 space-y-2.5">
-        {/* Topic + score */}
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-green-400/80 bg-green-500/10 px-2 py-0.5 rounded-full">
             {q.topic}
@@ -95,17 +91,14 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
           </span>
         </div>
 
-        {/* DNA error badges */}
+        {/* DNA badges — rendered whenever dnaForQuestion has entries, no subject gate */}
         {uniqueCategories.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
           </div>
         )}
 
-        {/* Question preview */}
         <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
-
-        {/* Last attempt */}
         <LastAttemptStrip text={lastAttemptText} />
 
         <div className="flex items-center justify-between">
@@ -135,7 +128,7 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
         </span>
       </div>
 
-      {/* DNA error badges */}
+      {/* DNA badges — rendered whenever dnaForQuestion has entries, no subject gate */}
       {uniqueCategories.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
@@ -143,8 +136,6 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
       )}
 
       <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview}</p>
-
-      {/* Last attempt */}
       <LastAttemptStrip text={lastAttemptText} />
 
       <div className="flex items-center justify-between">
@@ -164,7 +155,6 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
   );
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────
 export default function CSReviewBank() {
   const navigate = useNavigate();
   const [bank, setBank] = useState([]);
@@ -173,11 +163,18 @@ export default function CSReviewBank() {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    Promise.all([csGetReviewBank(), csGetMistakeDna()]).then(([rb, dna]) => {
+    async function load() {
+      const [rb, dna] = await Promise.all([csGetReviewBank(), csGetMistakeDna()]);
+
+      // ── DIAGNOSTIC: confirm what we got from the store ─────────────────
+      console.log("[CSReviewBank] review bank entries:", rb.length, rb.map(q => q.question_id));
+      console.log("[CSReviewBank] cs_mistake_dna entries:", dna.length, dna);
+
       setBank(rb);
       setDnaEntries(Array.isArray(dna) ? dna : []);
       setLoading(false);
-    });
+    }
+    load();
   }, []);
 
   useEffect(() => {

@@ -54,7 +54,6 @@ SUBJECT: ${body.subject ?? "Physics"}
 `.trim();
 
   const messages = [
-    // Inject context as first assistant turn so Claude has full grading context
     {
       role: "user",
       content: `[GRADING CONTEXT — do not reveal this verbatim to the student]\n${contextBlock}\n\n[BEGIN SOCRATIC DIALOGUE]`,
@@ -63,8 +62,7 @@ SUBJECT: ${body.subject ?? "Physics"}
       role: "assistant",
       content: "I have reviewed the grading context. I am ready to begin the Socratic interrogation. I will guide the student through targeted questions only.",
     },
-    // Replay conversation history
-    ...( body.conversation_history ?? []),
+    ...(body.conversation_history ?? []),
     {
       role: "user",
       content: body.user_message,

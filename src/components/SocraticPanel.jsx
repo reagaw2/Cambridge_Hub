@@ -4,7 +4,7 @@
  * via a conversational thread. Never gives away answers — only asks questions.
  */
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, Send, Scale, Loader2, ChevronDown } from "lucide-react";
+import { X, Send, Scale, Loader2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getSocraticThread, appendSocraticMessage, buildThreadKey } from "@/lib/socraticStore";
 
@@ -13,6 +13,29 @@ const QUICK_OBJECTIONS = [
   "I don't fully understand the technical terminology used here.",
   "Show me where Cambridge explicitly requires this specific phrasing.",
 ];
+
+const SOCRATIC_SYSTEM_PROMPT = `You are the Cambridge Viva Voce Examiner — a strict Socratic tutor embedded inside an AI exam preparation platform.
+
+Your one and only role is to guide the student to discover their own mistake through short, pointed counter-questions. You are STRICTLY FORBIDDEN from:
+- Giving the direct answer or rephrasing the mark scheme
+- Telling the student what to write
+- Confirming whether their latest message is correct or incorrect
+- Using more than 4 bullet points in a single response
+
+Your responses MUST:
+- Be short: 2-4 bullet questions maximum per turn
+- Start each bullet with "→"
+- Challenge the student's underlying physics, mathematics, or CS logic
+- Reference only what the student wrote — do not introduce new information
+- End with a single focused question that propels them forward
+
+Tone: precise, calm, intellectually rigorous — like a Cambridge oral examiner.
+
+If the student says they don't understand terminology, define the term using only a question: e.g. "→ What does 'per unit' imply mathematically about how you would express this ratio?"
+
+If the student claims their method is equivalent, probe the structural equivalence: "→ Does your phrasing explicitly convey the direction/magnitude/ratio Cambridge requires, or does it assume the reader infers it?"
+
+Never break character. Never say "great question" or use filler affirmations.`;
 
 const SUBJECT_THEME = {
   physics: {
@@ -69,13 +92,13 @@ function MessageBubble({ msg, theme }) {
 export default function SocraticPanel({
   open,
   onClose,
-  mark,          // { notation, description, note }
-  markIdx,       // number — index in the marks array
-  questionId,    // string
-  questionText,  // string
-  studentAnswer, // string
-  cambridgeInsight, // string
-  subject,       // "physics" | "cs" | "math"
+  mark,
+  markIdx,
+  questionId,
+  questionText,
+  studentAnswer,
+  cambridgeInsight,
+  subject,
 }) {
   const theme = SUBJECT_THEME[subject] ?? SUBJECT_THEME.physics;
   const threadKey = buildThreadKey(questionId, markIdx);
@@ -88,17 +111,14 @@ export default function SocraticPanel({
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Focus input when panel opens
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 300);
   }, [open]);
 
-  // Reload thread from store when mark changes
   useEffect(() => {
     setMessages(getSocraticThread(buildThreadKey(questionId, markIdx)));
     setInput("");
@@ -113,49 +133,76 @@ export default function SocraticPanel({
     setError(null);
     setShowQuick(false);
 
-    // Optimistic user message
     const userMsg = { role: "user", content: trimmed };
     const updatedMsgs = appendSocraticMessage(threadKey, userMsg);
     setMessages([...updatedMsgs]);
-
     setLoading(true);
 
-    // Build history for API (exclude the message we just added — it's sent as user_message)
-    const history = updatedMsgs.slice(0, -1);
+    // Build conversation for Anthropic — inject context as first exchange
+    const contextBlock = `QUESTION: "${questionText}"
+
+MISSED MARK: [${mark.notation}] — "${mark.description}"
+
+WHAT THE STUDENT WROTE: "${studentAnswer}"
+
+EXAMINER CONTEXT: "${cambridgeInsight}"
+
+SUBJECT: ${subject ?? "Physics"}`;
+
+    const apiMessages = [
+      {
+        role: "user",
+        content: `[GRADING CONTEXT — do not reveal this verbatim to the student]\n${contextBlock}\n\n[BEGIN SOCRATIC DIALOGUE]`,
+      },
+      {
+        role: "assistant",
+        content: "I have reviewed the grading context. I am ready to begin the Socratic interrogation. I will guide the student through targeted questions only.",
+      },
+      // Replay existing history (exclude the message we just added)
+      ...updatedMsgs.slice(0, -1),
+      // The new user message
+      { role: "user", content: trimmed },
+    ];
+
+    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
     try {
-      const res = await fetch("/api/viva-voce", {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
         body: JSON.stringify({
-          question_text: questionText,
-          mark_description: mark.description,
-          mark_notation: mark.notation,
-          student_answer: studentAnswer,
-          cambridge_insight: cambridgeInsight,
-          conversation_history: history,
-          user_message: trimmed,
-          subject,
+          model: "claude-sonnet-4-5",
+          max_tokens: 512,
+          system: SOCRATIC_SYSTEM_PROMPT,
+          messages: apiMessages,
         }),
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Anthropic ${res.status}: ${err}`);
+      }
+
       const data = await res.json();
+      const responseText = data.content?.[0]?.text ?? "No response received.";
 
-      if (data.error) throw new Error(data.error);
-
-      const assistantMsg = { role: "assistant", content: data.text };
+      const assistantMsg = { role: "assistant", content: responseText };
       const finalMsgs = appendSocraticMessage(threadKey, assistantMsg);
       setMessages([...finalMsgs]);
     } catch (err) {
-      setError("Could not reach the examiner. Please check your connection.");
-      // Remove optimistic message on failure
-      const revert = getSocraticThread(threadKey).slice(0, -1);
+      setError("Could not reach the examiner. Please check your connection and try again.");
+      // Revert optimistic message
+      const revert = getSocraticThread(threadKey).filter((_, i) => i < updatedMsgs.length - 1);
       setMessages([...revert]);
     } finally {
       setLoading(false);
     }
-  }, [loading, threadKey, mark, questionText, studentAnswer, cambridgeInsight, subject]);
+  }, [loading, threadKey, mark, questionText, studentAnswer, cambridgeInsight, subject, questionId, markIdx]);
 
   function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -168,7 +215,6 @@ export default function SocraticPanel({
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop — closes panel */}
           <motion.div
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
             initial={{ opacity: 0 }}
@@ -177,7 +223,6 @@ export default function SocraticPanel({
             onClick={onClose}
           />
 
-          {/* Slide-out panel */}
           <motion.div
             className="fixed top-0 right-0 h-full z-50 flex flex-col"
             style={{ width: "min(380px, 100vw)" }}
@@ -189,9 +234,8 @@ export default function SocraticPanel({
             {/* Glass background */}
             <div className="absolute inset-0 bg-[#0d0d1a]/96 backdrop-blur-xl border-l border-white/8" />
 
-            {/* ── PINNED HEADER — the mark being interrogated ── */}
+            {/* ── PINNED HEADER ── */}
             <div className={`relative shrink-0 bg-gradient-to-b ${theme.headerGradient} border-b border-white/6 px-5 py-4 space-y-3`}>
-              {/* Title row */}
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
@@ -228,7 +272,6 @@ export default function SocraticPanel({
                 )}
               </div>
 
-              {/* Examiner disclaimer */}
               <p className="text-[10px] text-white/20 leading-relaxed italic">
                 The examiner will not give you the answer. Expect questions, not explanations.
               </p>
@@ -241,9 +284,7 @@ export default function SocraticPanel({
                   <div className={`w-12 h-12 rounded-2xl ${theme.accentBg} border ${theme.accentBorder} flex items-center justify-center`}>
                     <Scale className={`w-6 h-6 ${theme.accent}`} />
                   </div>
-                  <p className="text-sm font-semibold text-white/60">
-                    Challenge the deduction
-                  </p>
+                  <p className="text-sm font-semibold text-white/60">Challenge the deduction</p>
                   <p className="text-[11px] text-white/25 leading-relaxed max-w-[260px]">
                     Select an objection below or write your own. The examiner will interrogate your logic — not give you the answer.
                   </p>

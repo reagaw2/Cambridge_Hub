@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, Zap, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Upload, Zap, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
 const DEV_EMAIL = "reaganmungoma@gmail.com";
@@ -37,38 +37,82 @@ function buildQuestionId(code, session, variant, qNum) {
   return `${prefix}-${code}-${session}-${variant}-Q${String(qNum).padStart(2, "0")}`;
 }
 
+/**
+ * Multi-strategy Cambridge question splitter.
+ * Tries several patterns in order of reliability.
+ */
 function splitByQuestions(text) {
-  const parts = [];
-
-  // Strategy 1: "Question 1", "Question 2", etc.
-  const regex = /(?:^|\n)\s*Question\s+(\d{1,2})\b/gm;
-  const matches = [...text.matchAll(regex)];
-  if (matches.length >= 2) {
-    for (let i = 0; i < matches.length; i++) {
-      const start = matches[i].index + matches[i][0].length;
-      const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
-      const qText = text.slice(start, end).trim();
-      if (qText.length > 30) parts.push({ num: parseInt(matches[i][1], 10), text: qText });
+  // Strategy 1: Explicit "Question N" header
+  {
+    const regex = /(?:^|\n)\s*Question\s+(\d{1,2})\b/gm;
+    const matches = [...text.matchAll(regex)];
+    if (matches.length >= 2) {
+      return matches.map((m, i) => {
+        const start = m.index + m[0].length;
+        const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+        return { num: parseInt(m[1], 10), text: text.slice(start, end).trim() };
+      }).filter(q => q.text.length > 30);
     }
-    return parts;
   }
 
-  // Strategy 2: standalone digit lines
-  const numRegex = /(?:^|\n)\s*(\d{1,2})\s*\n/gm;
-  const numMatches = [...text.matchAll(numRegex)];
-  if (numMatches.length >= 2) {
-    for (let i = 0; i < numMatches.length; i++) {
-      const start = numMatches[i].index + numMatches[i][0].length;
-      const end = i + 1 < numMatches.length ? numMatches[i + 1].index : text.length;
-      const qText = text.slice(start, end).trim();
-      if (qText.length > 30) parts.push({ num: parseInt(numMatches[i][1], 10), text: qText });
+  // Strategy 2: Cambridge mark allocation pattern — "1  [N]" or "1\n...\n[N]"
+  // Looks for lines that are just a question number followed shortly by [marks]
+  {
+    const regex = /(?:^|\n)[ \t]*(\d{1,2})[ \t]*\n(?:[\s\S]{0,500}?)(?=\n[ \t]*\d{1,2}[ \t]*\n|\n[ \t]*\d{1,2}[ \t]*\[|$)/gm;
+    const matches = [...text.matchAll(regex)];
+    if (matches.length >= 2) {
+      const parts = [];
+      for (let i = 0; i < matches.length; i++) {
+        const start = matches[i].index + matches[i][0].length - (matches[i][0].match(/\n\s*$/) ? matches[i][0].match(/\n\s*$/)[0].length : 0);
+        const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+        const qText = text.slice(start, end).trim();
+        if (qText.length > 30) parts.push({ num: parseInt(matches[i][1], 10), text: qText });
+      }
+      if (parts.length >= 2) return parts;
     }
-    return parts;
   }
 
-  // Strategy 3: treat entire text as Q1 (single question paper)
+  // Strategy 3: Lines that are ONLY a digit (standalone question number)
+  {
+    const lines = text.split("\n");
+    const questionStarts = [];
+    lines.forEach((line, idx) => {
+      if (/^\s*(\d{1,2})\s*$/.test(line.trim())) {
+        const num = parseInt(line.trim(), 10);
+        if (num >= 1 && num <= 20) questionStarts.push({ num, lineIdx: idx });
+      }
+    });
+    if (questionStarts.length >= 2) {
+      return questionStarts.map((qs, i) => {
+        const startLine = qs.lineIdx + 1;
+        const endLine = i + 1 < questionStarts.length ? questionStarts[i + 1].lineIdx : lines.length;
+        const qText = lines.slice(startLine, endLine).join("\n").trim();
+        return { num: qs.num, text: qText };
+      }).filter(q => q.text.length > 30);
+    }
+  }
+
+  // Strategy 4: Split on [N marks] or [N] annotations — Cambridge papers put these at question ends
+  // Find positions of "\n1 " "\n2 " etc. that appear before content and mark allocations
+  {
+    const regex = /\n(\d{1,2})\s+(?=[A-Z(])/g;
+    const matches = [...text.matchAll(regex)];
+    if (matches.length >= 2) {
+      const parts = [];
+      for (let i = 0; i < matches.length; i++) {
+        const start = matches[i].index + matches[i][0].length - 1;
+        const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+        const qText = text.slice(start, end).trim();
+        if (qText.length > 30) parts.push({ num: parseInt(matches[i][1], 10), text: qText });
+      }
+      if (parts.length >= 2) return parts;
+    }
+  }
+
+  // Strategy 5: AI-assisted — let the AI split it (pass entire text as one block for AI to handle)
+  // Return the whole paper as Q1 and let the AI figure out the structure
   if (text.trim().length > 50) {
-    return [{ num: 1, text: text.trim() }];
+    return [{ num: 1, text: text.trim(), requiresAISplit: true }];
   }
 
   return [];
@@ -85,7 +129,7 @@ function splitMarkSchemeByQuestion(msText, questionNums) {
       const m = msText.match(p);
       if (m) { result[qNum] = m[1].trim(); break; }
     }
-    if (!result[qNum]) result[qNum] = msText; // fallback: use full MS for single-Q papers
+    if (!result[qNum]) result[qNum] = "";
   }
   return result;
 }
@@ -138,6 +182,51 @@ async function extractTextFromFile(file) {
     reader.onerror = () => reject(new Error(`Could not read "${file.name}"`));
     reader.readAsArrayBuffer(file);
   });
+}
+
+/**
+ * If splitByQuestions returns requiresAISplit=true, ask Claude to split the paper.
+ */
+async function aiSplitPaper(fullText, subject, anthropicKey) {
+  const prompt = `You are a Cambridge A Level examiner. The following is the extracted text from a Cambridge ${subject === "physics" ? "Physics (9702)" : "Computer Science (9618)"} exam paper.
+
+Split this into individual top-level questions. For each question, return:
+- The question number (integer)
+- The full text of that question including all sub-parts
+
+PAPER TEXT:
+${fullText.slice(0, 6000)}
+
+Respond ONLY in this JSON format:
+{
+  "questions": [
+    { "num": 1, "text": "full question 1 text including sub-parts" },
+    { "num": 2, "text": "full question 2 text including sub-parts" }
+  ]
+}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-5",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Anthropic error ${res.status}`);
+  const data = await res.json();
+  let text = data.content?.[0]?.text ?? "{}";
+  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+  if (jsonMatch) text = jsonMatch[1].trim();
+  const parsed = JSON.parse(text);
+  return (parsed.questions ?? []).filter(q => q.text?.trim().length > 30);
 }
 
 async function classifyAndGenerateNodes(questionText, markSchemeText, subject, anthropicKey) {
@@ -286,12 +375,9 @@ export default function BulkPaperIngestor() {
   const [subject, setSubject] = useState("physics");
   const [qpFile, setQpFile] = useState(null);
   const [msFile, setMsFile] = useState(null);
-
-  // Manual paper metadata (always shown — no longer dependent on filename)
   const [paperCode, setPaperCode] = useState("9702");
   const [paperSession, setPaperSession] = useState("MJS25");
   const [paperVariant, setPaperVariant] = useState("42");
-
   const [supabaseUrl, setSupabaseUrl] = useState(import.meta.env.VITE_SUPABASE_URL ?? "");
   const [supabaseServiceKey, setSupabaseServiceKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState(import.meta.env.VITE_ANTHROPIC_API_KEY ?? "");
@@ -304,6 +390,8 @@ export default function BulkPaperIngestor() {
   const [useManualText, setUseManualText] = useState(false);
   const [qpText, setQpText] = useState("");
   const [msText, setMsText] = useState("");
+  const [extractedPreview, setExtractedPreview] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   if (user?.email !== DEV_EMAIL) {
     return (
@@ -317,6 +405,17 @@ export default function BulkPaperIngestor() {
     setLogs(prev => [...prev, msg]);
   }
 
+  async function handlePreview() {
+    if (!qpFile) return;
+    try {
+      const text = await extractTextFromFile(qpFile);
+      setExtractedPreview(text);
+      setShowPreview(true);
+    } catch (err) {
+      setErrorMsg(err.message);
+    }
+  }
+
   async function handleRun() {
     if (!supabaseUrl || !supabaseServiceKey) { setErrorMsg("Please provide Supabase URL and Service Role key."); return; }
     if (!anthropicKey) { setErrorMsg("Please provide your Anthropic API key."); return; }
@@ -326,6 +425,7 @@ export default function BulkPaperIngestor() {
     setErrorMsg("");
     setResult(null);
     setLogs([]);
+    setShowPreview(false);
 
     const code = paperCode.trim().toUpperCase();
     const session = paperSession.trim().toUpperCase();
@@ -343,7 +443,7 @@ export default function BulkPaperIngestor() {
         addLog(`✓ Extracted ${qpExtracted.length} chars from question paper`);
 
         if (msFile) {
-          setProgressMsg("Extracting text from Mark Scheme PDF…"); setProgressPct(20);
+          setProgressMsg("Extracting text from Mark Scheme PDF…"); setProgressPct(15);
           addLog("📄 Extracting mark scheme text...");
           msExtracted = await extractTextFromFile(msFile);
           addLog(`✓ Extracted ${msExtracted.length} chars from mark scheme`);
@@ -354,12 +454,23 @@ export default function BulkPaperIngestor() {
 
       addLog(`📋 Paper: ${code}/${variant} · ${session}`);
 
-      setProgressMsg("Splitting paper into questions…"); setProgressPct(30);
-      const questions = splitByQuestions(qpExtracted);
-      addLog(`✓ Split into ${questions.length} question${questions.length !== 1 ? "s" : ""}`);
+      // Try to split using pattern matching first
+      setProgressMsg("Splitting paper into questions…"); setProgressPct(20);
+      let questions = splitByQuestions(qpExtracted);
+
+      // If only 1 result with requiresAISplit, use AI to split
+      if (questions.length === 1 && questions[0].requiresAISplit) {
+        addLog("⚠️ Could not detect question boundaries — using AI to split paper…");
+        setProgressMsg("AI splitting paper into questions…"); setProgressPct(25);
+        questions = await aiSplitPaper(qpExtracted, subject, anthropicKey);
+        addLog(`✓ AI found ${questions.length} questions`);
+      } else {
+        addLog(`✓ Split into ${questions.length} question${questions.length !== 1 ? "s" : ""}`);
+      }
 
       if (questions.length === 0) {
-        setErrorMsg("Could not split the paper. Try Paste Text mode."); setPhase("error"); return;
+        setErrorMsg("Could not split the paper. Try Paste Text mode with clear question numbering.");
+        setPhase("error"); return;
       }
 
       const msChunks = splitMarkSchemeByQuestion(msExtracted ?? "", questions.map(q => q.num));
@@ -448,7 +559,7 @@ export default function BulkPaperIngestor() {
           <div className="space-y-1">
             <h1 className="text-xl font-extrabold text-white">Zero-friction Paper Splitter</h1>
             <p className="text-xs text-white/40 leading-relaxed">
-              Upload any Question Paper + Mark Scheme PDF. Fill in the paper details below — no specific filename required.
+              Upload any Question Paper + Mark Scheme PDF. Fill in the paper details. AI splits, classifies, and seeds mark scheme nodes into Supabase.
             </p>
           </div>
 
@@ -467,33 +578,30 @@ export default function BulkPaperIngestor() {
             </div>
           </div>
 
-          {/* Paper metadata — always shown */}
+          {/* Paper metadata */}
           <div className="bg-white/[0.02] border border-white/8 rounded-2xl p-4 space-y-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Paper Details</p>
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1">
                 <label className="text-[10px] text-white/30">Code</label>
-                <input value={paperCode} onChange={e => setPaperCode(e.target.value)}
-                  placeholder="9702"
+                <input value={paperCode} onChange={e => setPaperCode(e.target.value)} placeholder="9702"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-white/30">Session (e.g. MJS25)</label>
-                <input value={paperSession} onChange={e => setPaperSession(e.target.value)}
-                  placeholder="MJS25"
+                <label className="text-[10px] text-white/30">Session</label>
+                <input value={paperSession} onChange={e => setPaperSession(e.target.value)} placeholder="MJS25"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] text-white/30">Variant</label>
-                <input value={paperVariant} onChange={e => setPaperVariant(e.target.value)}
-                  placeholder="42"
+                <input value={paperVariant} onChange={e => setPaperVariant(e.target.value)} placeholder="42"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
               </div>
             </div>
-            <p className="text-[10px] text-white/20">Session format: MJ=May/Jun, ON=Oct/Nov, FM=Feb/Mar + 2-digit year (e.g. MJS25, ONW24)</p>
+            <p className="text-[10px] text-white/20">Session: MJ=May/Jun, ON=Oct/Nov, FM=Feb/Mar + year (e.g. MJS25, ONW24)</p>
           </div>
 
-          {/* Input mode */}
+          {/* Input mode toggle */}
           <div className="flex items-center gap-3">
             <button onClick={() => setUseManualText(false)}
               className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${!useManualText ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/8 text-white/30"}`}>
@@ -507,19 +615,42 @@ export default function BulkPaperIngestor() {
 
           {!useManualText ? (
             <div className="space-y-3">
-              <FileDropZone label="Question Paper PDF" accept=".pdf" file={qpFile} onFile={setQpFile}
-                hint="Any filename works — use the Paper Details fields above" />
+              <FileDropZone label="Question Paper PDF" accept=".pdf" file={qpFile} onFile={(f) => { setQpFile(f); setExtractedPreview(null); }}
+                hint="Any filename works — fill in Paper Details above" />
+              {qpFile && (
+                <button onClick={handlePreview}
+                  className="flex items-center gap-2 text-xs font-semibold text-amber-400 hover:brightness-110 transition-all">
+                  <Eye className="w-3.5 h-3.5" /> Preview extracted text (check before ingesting)
+                </button>
+              )}
               <FileDropZone label="Mark Scheme PDF (recommended)" accept=".pdf" file={msFile} onFile={setMsFile}
-                hint="Paste text in each question pair for best results" />
+                hint="Provides mark scheme text for each question" />
             </div>
           ) : (
             <div className="space-y-3">
               <textarea value={qpText} onChange={e => setQpText(e.target.value)}
-                placeholder="Paste the full question paper text…" rows={7}
+                placeholder="Paste question paper text. Put each question on a new line starting with its number, e.g.&#10;&#10;1&#10;State what is meant by...&#10;&#10;2&#10;Explain how..."
+                rows={8}
                 className="w-full bg-white/[0.03] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-amber-500/40 font-mono" />
               <textarea value={msText} onChange={e => setMsText(e.target.value)}
-                placeholder="Paste the full mark scheme text (optional)…" rows={5}
+                placeholder="Paste mark scheme text (optional)…" rows={5}
                 className="w-full bg-white/[0.03] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-amber-500/40 font-mono" />
+            </div>
+          )}
+
+          {/* Extracted text preview */}
+          {showPreview && extractedPreview && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Extracted Text Preview</p>
+                <button onClick={() => setShowPreview(false)} className="text-[10px] text-white/30 hover:text-white/60">Hide</button>
+              </div>
+              <pre className="bg-black/40 border border-white/8 rounded-xl p-3 text-[11px] font-mono text-white/60 max-h-60 overflow-y-auto whitespace-pre-wrap break-words">
+                {extractedPreview}
+              </pre>
+              <p className="text-[11px] text-amber-400/70">
+                ⚠️ If you don't see clear question boundaries, switch to Paste Text mode and format the text with each question number on its own line.
+              </p>
             </div>
           )}
 
@@ -616,11 +747,10 @@ export default function BulkPaperIngestor() {
                 : <><Zap className="w-4 h-4" /> Split, Classify & Ingest</>}
           </button>
 
-          {/* SQL hint */}
           <details className="group">
             <summary className="text-[11px] text-white/25 cursor-pointer hover:text-white/40 list-none flex items-center gap-1">
               <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
-              View required SQL migration (run once in Supabase)
+              View required SQL migration
             </summary>
             <pre className="mt-3 bg-white/[0.03] border border-white/8 rounded-xl p-4 text-[10px] font-mono text-white/50 overflow-x-auto whitespace-pre leading-relaxed">
 {`ALTER TABLE questions
@@ -637,11 +767,7 @@ CREATE TABLE IF NOT EXISTS question_topics (
   question_id text REFERENCES questions(id) ON DELETE CASCADE,
   topic_key   text REFERENCES topics(key)   ON DELETE CASCADE,
   PRIMARY KEY (question_id, topic_key)
-);
-
-CREATE INDEX IF NOT EXISTS idx_msn_question ON mark_scheme_nodes(question_id);
-CREATE INDEX IF NOT EXISTS idx_qt_question   ON question_topics(question_id);
-CREATE INDEX IF NOT EXISTS idx_qt_topic      ON question_topics(topic_key);`}
+);`}
             </pre>
           </details>
 

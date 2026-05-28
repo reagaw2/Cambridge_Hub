@@ -1,18 +1,15 @@
-import { useState } from "react";
 import { getNextCompQuestion, advanceCompIndex, COMP_QUESTIONS } from "@/lib/csCompAndCompBank";
-import CSQuestionAttempt from "./CSQuestionAttempt";
+import SupabaseCSQuestion from "./SupabaseCSQuestion";
 
 export default function ComputersAndComponentsQuestion() {
-  const [override, setOverride] = useState(null);
-  const { question: queued, idx: qIdx, total } = getNextCompQuestion();
-  const question = override ?? queued;
-  const idx = override ? 0 : qIdx;
   return (
-    <CSQuestionAttempt
-      question={question} idx={idx} total={override ? 1 : total}
-      onAdvance={() => { setOverride(null); advanceCompIndex(); }}
-      allQuestions={COMP_QUESTIONS}
-      onOverride={(q) => { setOverride(q); }}
+    <SupabaseCSQuestion
+      topicKey="computers_and_components"
+      topicLabel="Computers and Components"
+      route="/cs/computers-and-components/question"
+      fallbackQuestions={COMP_QUESTIONS}
+      fallbackGetNext={getNextCompQuestion}
+      fallbackAdvance={advanceCompIndex}
     />
   );
 }

@@ -1,18 +1,15 @@
-import { useState } from "react";
 import { getNextOSQuestion, advanceOSIndex, OS_QUESTIONS } from "@/lib/csOSBank";
-import CSQuestionAttempt from "./CSQuestionAttempt";
+import SupabaseCSQuestion from "./SupabaseCSQuestion";
 
 export default function OperatingSystemsQuestion() {
-  const [override, setOverride] = useState(null);
-  const { question: queued, idx: qIdx, total } = getNextOSQuestion();
-  const question = override ?? queued;
-  const idx = override ? 0 : qIdx;
   return (
-    <CSQuestionAttempt
-      question={question} idx={idx} total={override ? 1 : total}
-      onAdvance={() => { setOverride(null); advanceOSIndex(); }}
-      allQuestions={OS_QUESTIONS}
-      onOverride={(q) => { setOverride(q); }}
+    <SupabaseCSQuestion
+      topicKey="operating_systems"
+      topicLabel="Operating Systems"
+      route="/cs/operating-systems/question"
+      fallbackQuestions={OS_QUESTIONS}
+      fallbackGetNext={getNextOSQuestion}
+      fallbackAdvance={advanceOSIndex}
     />
   );
 }

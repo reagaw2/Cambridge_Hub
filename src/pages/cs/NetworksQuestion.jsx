@@ -1,18 +1,15 @@
-import { useState } from "react";
 import { getNextNetworksQuestion, advanceNetworksIndex, NETWORKS_QUESTIONS } from "@/lib/csNetworksBank";
-import CSQuestionAttempt from "./CSQuestionAttempt";
+import SupabaseCSQuestion from "./SupabaseCSQuestion";
 
 export default function NetworksQuestion() {
-  const [override, setOverride] = useState(null);
-  const { question: queued, idx: qIdx, total } = getNextNetworksQuestion();
-  const question = override ?? queued;
-  const idx = override ? 0 : qIdx;
   return (
-    <CSQuestionAttempt
-      question={question} idx={idx} total={override ? 1 : total}
-      onAdvance={() => { setOverride(null); advanceNetworksIndex(); }}
-      allQuestions={NETWORKS_QUESTIONS}
-      onOverride={(q) => { setOverride(q); }}
+    <SupabaseCSQuestion
+      topicKey="networks_and_the_internet"
+      topicLabel="Networks and the Internet"
+      route="/cs/networks/question"
+      fallbackQuestions={NETWORKS_QUESTIONS}
+      fallbackGetNext={getNextNetworksQuestion}
+      fallbackAdvance={advanceNetworksIndex}
     />
   );
 }

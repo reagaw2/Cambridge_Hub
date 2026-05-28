@@ -84,19 +84,20 @@ export default function SupabaseCSQuestion({
   fallbackAdvance,
 }) {
   const navigate = useNavigate();
-  const { questions, loading, getCurrentQuestion, advance, getProgress } = useSupabaseQuestions(topicKey, "cs");
+  const { questions, loading } = useSupabaseQuestions(topicKey, "cs");
 
-  // Local question index — keeps track within the component without needing reload
   const [localIdx, setLocalIdx] = useState(() => {
     const stored = sessionStorage.getItem(`${PROGRESS_KEY_PREFIX}${topicKey}`);
     return stored ? parseInt(stored, 10) : 0;
   });
 
+  // answers keyed by questionIdx_partIndex so they persist when browsing
   const [answers, setAnswers] = useState({});
   const [partIndex, setPartIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [partFeedbacks, setPartFeedbacks] = useState([]);
+  // feedbacks keyed by questionIdx_partIndex
+  const [feedbacks, setFeedbacks] = useState({});
   const [fallbackOverride, setFallbackOverride] = useState(null);
 
   if (loading) {
@@ -131,9 +132,14 @@ export default function SupabaseCSQuestion({
     const clamped = Math.max(0, Math.min(newIdx, questions.length - 1));
     sessionStorage.setItem(`${PROGRESS_KEY_PREFIX}${topicKey}`, String(clamped));
     setLocalIdx(clamped);
-    setAnswers({});
     setPartIndex(0);
-    setPartFeedbacks([]);
+    setSubmitError(null);
+  }
+
+  function goToPart(newPartIdx) {
+    const parts = splitIntoParts(question.question_text, question.mark_scheme_text);
+    const clamped = Math.max(0, Math.min(newPartIdx, parts.length - 1));
+    setPartIndex(clamped);
     setSubmitError(null);
   }
 
@@ -147,10 +153,15 @@ export default function SupabaseCSQuestion({
 
   const parts = splitIntoParts(question.question_text, question.mark_scheme_text);
   const currentPart = parts[partIndex];
-  const currentAnswer = answers[partIndex] ?? "";
   const totalParts = parts.length;
   const isLastPart = partIndex === totalParts - 1;
-  const showDiagram = partIndex === 0 && question.diagram_svg;
+  const isFirstPart = partIndex === 0;
+  const showDiagram = question.diagram_svg;
+
+  // Keys for per-question-per-part storage
+  const answerKey = `${clampedIdx}_${partIndex}`;
+  const currentAnswer = answers[answerKey] ?? "";
+  const currentFeedback = feedbacks[answerKey] ?? null;
 
   async function handleSubmitPart() {
     if (!currentAnswer.trim() || submitting) return;
@@ -213,52 +224,20 @@ export default function SupabaseCSQuestion({
       });
     }
 
-    const newFeedbacks = [...partFeedbacks, { part: currentPart, answer: currentAnswer, fb, marksEarned, partMarks }];
-    setPartFeedbacks(newFeedbacks);
-
-    if (isLastPart) {
-      const totalEarned = newFeedbacks.reduce((s, f) => s + f.marksEarned, 0);
-      const totalAvailable = newFeedbacks.reduce((s, f) => s + f.partMarks, 0);
-
-      // Advance stored index
-      goToQuestion(clampedIdx + 1);
-
-      navigate("/cs/feedback", {
-        state: {
-          feedback: {
-            marks_earned: totalEarned,
-            cambridge_insight: newFeedbacks.map(f => f.fb.cambridge_insight).filter(Boolean).join(" "),
-            next_step: newFeedbacks[newFeedbacks.length - 1]?.fb.next_step ?? "",
-            part_feedbacks: newFeedbacks.map(f => ({
-              label: f.part.label,
-              question: f.part.rawText ?? f.part.text,
-              answer: f.answer,
-              marks_earned: f.marksEarned,
-              total_marks: f.partMarks,
-              mark_1: f.fb.mark_1,
-              mark_2: f.fb.mark_2,
-              cambridge_insight: f.fb.cambridge_insight,
-              next_step: f.fb.next_step,
-            })),
-          },
-          answer: newFeedbacks.map(f => `${f.part.label ?? ""} ${f.answer}`).join("\n\n"),
-          topicKey: resolvedTopicKey,
-          questionId: question.id,
-          totalMarks: totalAvailable,
-          topicRoute: route,
-          backRoute: route,
-          dashRoute: "/cs",
-          paperRef: question.paper_ref,
-          topicLabel,
-          isLastQuestion: clampedIdx >= questions.length - 1,
-        },
-      });
-    } else {
-      setPartIndex(p => p + 1);
-    }
-
+    // Store feedback for this specific part
+    setFeedbacks(prev => ({ ...prev, [answerKey]: { fb, marksEarned, partMarks } }));
     setSubmitting(false);
   }
+
+  // Build summary of all submitted parts for this question
+  const submittedParts = parts.map((p, i) => {
+    const key = `${clampedIdx}_${i}`;
+    return feedbacks[key] ? { ...feedbacks[key], part: p, answer: answers[key] ?? "" } : null;
+  }).filter(Boolean);
+
+  const allPartsSubmitted = submittedParts.length === totalParts;
+  const totalEarned = submittedParts.reduce((s, f) => s + f.marksEarned, 0);
+  const totalAvailable = submittedParts.reduce((s, f) => s + f.partMarks, 0);
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -281,7 +260,7 @@ export default function SupabaseCSQuestion({
           </span>
         </div>
 
-        {/* Question navigation bar */}
+        {/* Question navigation */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 bg-card/50">
           <button
             onClick={() => goToQuestion(clampedIdx - 1)}
@@ -291,26 +270,9 @@ export default function SupabaseCSQuestion({
             <ChevronLeft className="w-4 h-4" /> Prev
           </button>
 
-          {/* Question counter + part dots */}
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-xs font-bold text-foreground font-mono">
-              Q{clampedIdx + 1} <span className="text-muted-foreground font-normal">of {total}</span>
-            </span>
-            {totalParts > 1 && (
-              <div className="flex items-center gap-1">
-                {parts.map((_, i) => (
-                  <div key={i} className={`rounded-full transition-all ${
-                    i < partIndex ? "w-4 h-1.5 bg-green-500/60"
-                    : i === partIndex ? "w-5 h-1.5 bg-primary"
-                    : "w-3 h-1.5 bg-border"
-                  }`} />
-                ))}
-                <span className="text-[10px] text-muted-foreground font-mono ml-1">
-                  Part {partIndex + 1}/{totalParts}
-                </span>
-              </div>
-            )}
-          </div>
+          <span className="text-xs font-bold text-foreground font-mono">
+            Q{clampedIdx + 1} <span className="text-muted-foreground font-normal">of {total}</span>
+          </span>
 
           <button
             onClick={() => goToQuestion(clampedIdx + 1)}
@@ -321,32 +283,53 @@ export default function SupabaseCSQuestion({
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col gap-4 p-4">
+        {/* Part navigation — only shown when question has multiple parts */}
+        {totalParts > 1 && (
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border/20 bg-card/30">
+            <button
+              onClick={() => goToPart(partIndex - 1)}
+              disabled={isFirstPart}
+              className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-secondary"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Part
+            </button>
 
-          {/* Previously answered parts summary */}
-          {partFeedbacks.length > 0 && (
-            <div className="space-y-2">
-              {partFeedbacks.map((f, i) => (
-                <div key={i} className={`rounded-xl border px-4 py-2.5 flex items-center justify-between ${
-                  f.marksEarned >= f.partMarks
-                    ? "bg-green-500/8 border-green-500/25"
-                    : "bg-amber-500/8 border-amber-500/25"
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold ${f.marksEarned >= f.partMarks ? "text-green-400" : "text-amber-400"}`}>
-                      {f.part.label ?? `Part ${i + 1}`}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground truncate max-w-[180px]">
-                      {f.answer.slice(0, 40)}{f.answer.length > 40 ? "…" : ""}
-                    </span>
-                  </div>
-                  <span className={`font-mono text-xs font-bold shrink-0 ${f.marksEarned >= f.partMarks ? "text-green-400" : "text-amber-400"}`}>
-                    {f.marksEarned}/{f.partMarks}
-                  </span>
-                </div>
-              ))}
+            {/* Part dots */}
+            <div className="flex items-center gap-1.5">
+              {parts.map((p, i) => {
+                const key = `${clampedIdx}_${i}`;
+                const submitted = !!feedbacks[key];
+                const isActive = i === partIndex;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => goToPart(i)}
+                    className={`flex items-center justify-center rounded-full font-mono font-bold transition-all ${
+                      isActive
+                        ? "w-7 h-7 bg-primary text-primary-foreground text-[10px] scale-110"
+                        : submitted
+                          ? "w-6 h-6 bg-green-500/20 border border-green-500/40 text-green-400 text-[9px] hover:scale-105"
+                          : "w-6 h-6 bg-secondary border border-border text-muted-foreground text-[9px] hover:scale-105"
+                    }`}
+                    title={p.label ?? `Part ${i + 1}`}
+                  >
+                    {p.label ? p.label.replace(/[()]/g, "") : i + 1}
+                  </button>
+                );
+              })}
             </div>
-          )}
+
+            <button
+              onClick={() => goToPart(partIndex + 1)}
+              disabled={isLastPart}
+              className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-secondary"
+            >
+              Part <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col gap-4 p-4">
 
           {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
@@ -359,7 +342,7 @@ export default function SupabaseCSQuestion({
               </span>
             </div>
 
-            {/* Diagram — shown on first part only */}
+            {/* Diagram — shown on every part since they all share the same diagram */}
             {showDiagram && (
               <div className="bg-white rounded-xl p-3 border border-border/40 overflow-x-auto">
                 <QuestionDiagram svgString={question.diagram_svg} />
@@ -388,24 +371,75 @@ export default function SupabaseCSQuestion({
             </div>
           </div>
 
+          {/* Per-part feedback (shown after submitting this part) */}
+          {currentFeedback && (
+            <div className={`rounded-xl border p-4 space-y-3 ${
+              currentFeedback.marksEarned >= currentFeedback.partMarks
+                ? "bg-green-500/8 border-green-500/25"
+                : "bg-red-500/8 border-red-500/20"
+            }`}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-foreground">Feedback</p>
+                <span className={`font-mono text-sm font-bold ${
+                  currentFeedback.marksEarned >= currentFeedback.partMarks ? "text-green-400" : "text-red-400"
+                }`}>
+                  {currentFeedback.marksEarned}/{currentFeedback.partMarks}
+                </span>
+              </div>
+              {[currentFeedback.fb.mark_1, currentFeedback.fb.mark_2].filter(Boolean).map((m, j) => (
+                <div key={j} className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg ${
+                  m.earned ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"
+                }`}>
+                  <span className="font-bold shrink-0">{m.earned ? "✓" : "✗"}</span>
+                  <span>{m.keyword} — {m.feedback}</span>
+                </div>
+              ))}
+              {currentFeedback.fb.cambridge_insight && (
+                <p className="text-xs text-foreground/70 leading-relaxed italic border-t border-white/10 pt-2">
+                  {currentFeedback.fb.cambridge_insight}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Answer box */}
           <AnswerInput
             value={currentAnswer}
-            onChange={(v) => setAnswers(prev => ({ ...prev, [partIndex]: v }))}
+            onChange={(v) => setAnswers(prev => ({ ...prev, [answerKey]: v }))}
           />
 
           {/* Submit button */}
           <button
             onClick={handleSubmitPart}
             disabled={!currentAnswer.trim() || submitting}
-            className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {submitting ? "Marking…" : isLastPart ? "Submit & See Results" : (
-              <>Submit Part {partIndex + 1} <ChevronRight className="w-4 h-4" /></>
-            )}
+            {submitting ? "Marking…" : currentFeedback ? "Re-submit" : "Submit Answer"}
           </button>
 
           {submitError && <p className="text-center text-sm text-red-400/80">{submitError}</p>}
+
+          {/* All-parts summary once everything is submitted */}
+          {allPartsSubmitted && totalParts > 1 && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-foreground">Question Total</p>
+                <span className={`font-mono text-sm font-bold ${
+                  totalEarned >= totalAvailable ? "text-green-400" : "text-amber-400"
+                }`}>
+                  {totalEarned}/{totalAvailable}
+                </span>
+              </div>
+              {submittedParts.map((f, i) => (
+                <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{f.part.label ?? `Part ${i + 1}`}</span>
+                  <span className={`font-mono font-bold ${
+                    f.marksEarned >= f.partMarks ? "text-green-400" : "text-red-400"
+                  }`}>{f.marksEarned}/{f.partMarks}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
         </div>
       </div>

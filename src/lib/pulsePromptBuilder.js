@@ -1,53 +1,24 @@
 /**
  * pulsePromptBuilder.js — 6-Step Cambridge Feedback Protocol prompt builder.
+ * Kept lean to minimise latency: no verbose field instructions, just concise JSON spec.
  */
-
-const SUBJECT_CONFIG = {
-  physics: {
-    accentLabel: "Physics Hack",
-    notation: "B1, M1, A1 marks",
-    heuristicExample: 'e.g. "Negligible air resistance = constant horizontal velocity"',
-  },
-  cs: {
-    accentLabel: "CS Hack",
-    notation: "B1 marks",
-    heuristicExample: 'e.g. "Validation checks reasonableness, verification checks accuracy"',
-  },
-  math: {
-    accentLabel: "Maths Hack",
-    notation: "B1, M1, A1, C1 marks",
-    heuristicExample: 'e.g. "Modulus = geometric distance — always non-negative"',
-  },
-};
 
 /**
  * Wraps any existing mark-scheme prompt into the 6-step protocol format.
  */
 export function buildPulsePrompt(basePrompt, schema, subject = "physics") {
-  const cfg = SUBJECT_CONFIG[subject] ?? SUBJECT_CONFIG.physics;
-
   const pulsePrompt = `${basePrompt}
 
----
-IMPORTANT: After completing your normal JSON evaluation above, you MUST also populate SIX additional fields following the Cambridge Feedback Protocol:
-
-"step1_system": One to two sentences — state the core question clearly and define what the system is trying to accomplish or measure. What physics/CS engine is running underneath this question?
-
-"step2_phrase_breakdown": Two to four sentences — dissect the text of the question phrase-by-phrase, explaining the hidden mechanics behind specific wording choices. Why did Cambridge phrase it exactly this way?
-
-"step3_tipping_point": One to two sentences — identify the exact boundary or structural constraint where the rules of the system shift. This is the core logic pivot point of the question.
-
-"step4_math_visual": Two to three sentences — run the key mathematical reasoning step-by-step and describe a visual diagram or graph that models the physics/CS engine of this problem. Include numbers where relevant.
-
-"step5_edge_case": Two to three sentences — flip the variables or geometry to show the polar opposite scenario. If the question is about X, show what changes when you invert the key parameter. Map the entire conceptual boundary.
-
-"step6_takeaway": One punchy sentence of MAXIMUM 20 words — a highly optimised, reusable mental script or algorithmic rule deployable across any future Cambridge variant of this problem.
-
-"pulse_layer_1": Same as step6_takeaway — the single most important exam hack.
-"pulse_layer_2_marks": Array already captured in mark_1, mark_2, etc. — summarise each as { "notation": "${cfg.notation}", "description": "what was needed", "earned": true/false, "examiner_note": "one precise sentence" }.
-"pulse_layer_3": Summary of steps 4 and 5 combined for the deep-dive panel.
-
-ALL NINE fields are MANDATORY. Respond only in JSON.`;
+Also populate these six fields (be concise — each is 1-3 sentences max):
+"step1_system": What is this question fundamentally testing? One sentence.
+"step2_phrase_breakdown": Which specific words in the question carry hidden meaning? 1-2 sentences.
+"step3_tipping_point": The exact logical boundary or constraint that determines the correct answer. One sentence.
+"step4_math_visual": Key calculation or diagram description that proves the answer. 1-2 sentences.
+"step5_edge_case": What if you flipped the key variable — how would the answer change? One sentence.
+"step6_takeaway": The reusable rule for any Cambridge variant of this question. Max 15 words.
+"pulse_layer_1": Same as step6_takeaway.
+"pulse_layer_2_marks": Array of { "notation", "description", "earned": bool, "examiner_note" } — one entry per mark point.
+"pulse_layer_3": One sentence combining steps 4 and 5.`;
 
   const extendedSchema = {
     ...schema,

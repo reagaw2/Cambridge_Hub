@@ -83,37 +83,29 @@ export default function MCQSession() {
     setLoading(true);
 
     const optionsBlock = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
-    const correctText = question.options[question.correct];
-    const chosenText = question.options[selected];
 
-    const prompt = `You are a Cambridge A Level Physics examiner. Follow the 6-step Cambridge Feedback Protocol.
+    const prompt = `Cambridge A Level Physics MCQ examiner. Mark this attempt and provide feedback.
 
-Question: ${question.text}
+Q: ${question.text}
+Options: ${optionsBlock}
+Correct: ${question.correct} (${question.options[question.correct]})
+Chosen: ${selected} (${question.options[selected]}) — ${isCorrect ? "CORRECT" : "WRONG"}
+${isGuess ? "Flagged as guess." : `Reasoning: "${attemptData.reasoning ?? "none"}"`}
 
-Options:
-${optionsBlock}
-
-Correct answer: ${question.correct} — ${correctText}
-Student chose: ${selected} — ${chosenText}
-Result: ${isCorrect ? "CORRECT" : "INCORRECT"}
-${isGuess ? "Student flagged this as a guess." : `Student's reasoning: "${attemptData.reasoning ?? "None"}"`}
-
-Respond ONLY in this JSON format, no extra text:
+JSON response (be concise, 1-2 sentences per field):
 {
-  "step1_system": "one to two sentences — what system or concept does this question test and what is it measuring?",
-  "step2_phrase_breakdown": "two to four sentences — dissect specific phrases in the question that carry hidden physics meaning",
-  "step3_tipping_point": "one to two sentences — the exact boundary or constraint where the physics logic shifts in this type of question",
-  "step4_math_visual": "two to three sentences — key mathematical reasoning step-by-step, plus a description of the diagram or graph that models this problem",
-  "step5_edge_case": "two to three sentences — flip the key variable to show the polar opposite scenario and map the full conceptual boundary",
-  "step6_takeaway": "one punchy sentence of max 20 words — reusable mental script for any future Cambridge variant of this problem",
+  "step1_system": "what concept is tested",
+  "step2_phrase_breakdown": "hidden meaning in key words",
+  "step3_tipping_point": "the logical boundary that determines the answer",
+  "step4_math_visual": "key calculation or diagram",
+  "step5_edge_case": "what if you flipped the main variable",
+  "step6_takeaway": "reusable rule, max 15 words",
   "pulse_layer_1": "same as step6_takeaway",
-  "pulse_layer_2_marks": [
-    { "notation": "Key Point", "description": "what the correct answer requires the student to know", "earned": ${isCorrect}, "examiner_note": "one precise sentence on what Cambridge is testing here" }
-  ],
-  "pulse_layer_3": "combined summary of steps 4 and 5 for the deep-dive panel",
-  "cambridge_insight": "two sentences on what Cambridge is looking for and why",
-  "next_step": "one sentence on what to review next",
-  "reasoning_assessment": "${isGuess ? "Flagged as guess." : "one to two sentences assessing the student reasoning"}",
+  "pulse_layer_2_marks": [{"notation":"Key Point","description":"what was needed","earned":${isCorrect},"examiner_note":"one sentence"}],
+  "pulse_layer_3": "one sentence combining steps 4 and 5",
+  "cambridge_insight": "why this trips students up",
+  "next_step": "what to review",
+  "reasoning_assessment": "${isGuess ? "Guess — no reasoning." : "assess the reasoning in one sentence"}",
   "reasoning_sound": ${isGuess ? "null" : "true or false"}
 }`;
 

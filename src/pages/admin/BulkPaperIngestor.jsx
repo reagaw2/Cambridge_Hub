@@ -45,7 +45,7 @@ ${(markSchemeText || "").slice(0, 1500)}
 
 AVAILABLE TOPICS: ${topicList}
 
-Respond ONLY in valid JSON:
+Respond ONLY in valid JSON — no markdown, no extra text:
 {
   "topics": ["1-2 matching topics from the list"],
   "total_marks": <integer>,
@@ -139,7 +139,16 @@ export default function BulkPaperIngestor() {
   const [paperCode, setPaperCode] = useState("9608");
   const [paperSession, setPaperSession] = useState("MIX");
   const [paperVariant, setPaperVariant] = useState("DR");
-  const [pairs, setPairs] = useState(PRELOADED_PAIRS.map(p => ({ ...p })));
+
+  // Initialise directly from PRELOADED_PAIRS — no lazy init needed
+  const [pairs, setPairs] = useState(
+    PRELOADED_PAIRS.map(p => ({
+      id: p.id,
+      question: p.question,
+      markscheme: p.markscheme,
+    }))
+  );
+
   const [supabaseUrl, setSupabaseUrl] = useState(import.meta.env.VITE_SUPABASE_URL ?? "");
   const [supabaseServiceKey, setSupabaseServiceKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState(import.meta.env.VITE_ANTHROPIC_API_KEY ?? "");
@@ -167,7 +176,8 @@ export default function BulkPaperIngestor() {
   };
 
   const removePair = (id) => setPairs(prev => prev.filter(p => p.id !== id));
-  const updatePair = (id, field, value) => setPairs(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+  const updatePair = (id, field, value) =>
+    setPairs(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
 
   async function handleRun() {
     if (!supabaseUrl || !supabaseServiceKey) { setErrorMsg("Supabase URL and Service Role key are required."); return; }
@@ -221,7 +231,12 @@ export default function BulkPaperIngestor() {
             analysis.nodes.map(n => ({ ...n, question_id: questionId })));
         }
 
-        results.push({ questionId, qNum, topics: analysis.topics ?? [], nodeCount: analysis.nodes?.length ?? 0, totalMarks: analysis.total_marks ?? 1 });
+        results.push({
+          questionId, qNum,
+          topics: analysis.topics ?? [],
+          nodeCount: analysis.nodes?.length ?? 0,
+          totalMarks: analysis.total_marks ?? 1,
+        });
         addLog(`✓ Q${qNum}: [${(analysis.topics ?? []).join(", ")}] ${analysis.total_marks}m ${analysis.nodes?.length ?? 0}nodes`);
 
         if (i < activePairs.length - 1) await new Promise(r => setTimeout(r, 500));
@@ -232,7 +247,13 @@ export default function BulkPaperIngestor() {
     }
 
     setProgressMsg("Done!"); setProgressPct(100);
-    setResult({ paperId: `${code}/${variant}/${session}`, questionsFound: activePairs.length, questionsProcessed: results.length, errors, results });
+    setResult({
+      paperId: `${code}/${variant}/${session}`,
+      questionsFound: activePairs.length,
+      questionsProcessed: results.length,
+      errors,
+      results,
+    });
     setPhase("done");
   }
 
@@ -257,19 +278,33 @@ export default function BulkPaperIngestor() {
             <Database className="w-4 h-4 text-amber-400" />
             <span className="text-sm font-bold text-white">Bulk Paper Ingestor</span>
           </div>
-          <span className="text-[10px] text-amber-400/60 font-mono bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
-            {activePairCount} Qs
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+            activePairCount > 0
+              ? "text-green-400 bg-green-500/10 border-green-500/20"
+              : "text-amber-400/60 bg-amber-500/10 border-amber-500/20"
+          }`}>
+            {activePairCount} Qs loaded
           </span>
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4 pt-5 pb-10">
 
-          {/* Pre-load banner */}
-          <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 flex items-center gap-3">
-            <span className="text-xl shrink-0">📦</span>
+          {/* Status banner */}
+          <div className={`rounded-xl p-3 flex items-center gap-3 border ${
+            activePairCount > 0
+              ? "bg-green-500/8 border-green-500/20"
+              : "bg-red-500/8 border-red-500/20"
+          }`}>
+            <span className="text-xl shrink-0">{activePairCount > 0 ? "✅" : "⚠️"}</span>
             <div>
-              <p className="text-sm font-semibold text-amber-300">40 questions pre-loaded</p>
-              <p className="text-xs text-white/40">Fill in credentials below and click Ingest.</p>
+              <p className={`text-sm font-semibold ${activePairCount > 0 ? "text-green-300" : "text-red-300"}`}>
+                {activePairCount > 0 ? `${activePairCount} questions loaded and ready` : "No questions loaded"}
+              </p>
+              <p className="text-xs text-white/40 mt-0.5">
+                {activePairCount > 0
+                  ? "Fill in credentials below and click Ingest."
+                  : "Check that ingestorQuestions.js exported correctly."}
+              </p>
             </div>
           </div>
 
@@ -285,7 +320,7 @@ export default function BulkPaperIngestor() {
             ))}
           </div>
 
-          {/* Paper details + credentials in one box */}
+          {/* Paper details + credentials */}
           <div className="bg-white/[0.02] border border-white/8 rounded-2xl p-4 space-y-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Paper Details</p>
             <div className="grid grid-cols-3 gap-2">
@@ -299,7 +334,7 @@ export default function BulkPaperIngestor() {
             </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 pt-1">Credentials</p>
             <input value={supabaseUrl} onChange={e => setSupabaseUrl(e.target.value)}
-              placeholder="Supabase URL"
+              placeholder="Supabase URL (https://xxx.supabase.co)"
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/40" />
             <input value={supabaseServiceKey} onChange={e => setSupabaseServiceKey(e.target.value)}
               placeholder="service_role key (eyJ…)" type="password"
@@ -383,10 +418,12 @@ export default function BulkPaperIngestor() {
             </div>
           )}
 
-          {/* Divider */}
-          <div className="border-t border-white/5 pt-4 space-y-2">
+          {/* Collapsible Q+MS editor */}
+          <div className="space-y-2 pt-2 border-t border-white/5">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">Review / Edit Questions</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">
+                Review / Edit Questions ({pairs.length})
+              </p>
               <button onClick={addPair}
                 className="flex items-center gap-1 text-xs text-amber-400/60 hover:text-amber-400 transition-colors">
                 <Plus className="w-3 h-3" /> Add
@@ -400,7 +437,9 @@ export default function BulkPaperIngestor() {
                   className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-white/[0.02] transition-all">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="text-[10px] font-mono font-bold text-amber-400/60 shrink-0">Q{idx + 1}</span>
-                    <p className="text-xs text-white/50 truncate">{pair.question.slice(0, 60)}…</p>
+                    <p className="text-xs text-white/50 truncate">
+                      {pair.question ? pair.question.slice(0, 60) + "…" : "(empty)"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {pairs.length > 1 && (

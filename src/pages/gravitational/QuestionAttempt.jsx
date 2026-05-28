@@ -14,7 +14,7 @@ export default function GravitationalQuestionAttempt() {
   const [answer, setAnswer] = useState("");
   const [overrideQuestion, setOverrideQuestion] = useState(null);
   const [showTeachMe, setShowTeachMe] = useState(false);
-  const { submit, loading, timedOut, error, setError } = useNodeAwareSubmit();
+  const { submit, loading, error, setError } = useNodeAwareSubmit();
 
   const queued = getNextGravitationalQuestion();
   const question = overrideQuestion ?? queued.question;
@@ -96,7 +96,7 @@ export default function GravitationalQuestionAttempt() {
           <DevQuestionJumper allQuestions={GRAVITATIONAL_QUESTIONS} onJump={(q) => { setOverrideQuestion(q); setAnswer(""); setShowTeachMe(false); setError(null); }} />
         </div>
       </div>
-      {loading && <SubmittingOverlay timedOut={timedOut} />}
+      {loading && <SubmittingOverlay />}
     </div>
   );
 }

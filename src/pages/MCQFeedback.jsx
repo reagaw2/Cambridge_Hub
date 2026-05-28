@@ -1,25 +1,26 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
-import { saveMCQAttempt, getGuessReviewBank, resetGuessReviewBankLock } from "@/lib/topicStore";
+import { saveMCQAttempt, resetGuessReviewBankLock } from "@/lib/topicStore";
+import PulseFeedback from "@/components/PulseFeedback";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
 function ResultBanner({ correct, isGuess }) {
   if (correct && !isGuess) {
     return (
-      <div className="w-full bg-primary/15 border border-primary/40 rounded-xl p-5 flex items-center gap-4">
-        <CheckCircle2 className="w-8 h-8 text-primary shrink-0" />
-        <p className="text-xl font-bold text-primary">Correct</p>
+      <div className="w-full bg-primary/15 border border-primary/40 rounded-xl p-4 flex items-center gap-4">
+        <CheckCircle2 className="w-7 h-7 text-primary shrink-0" />
+        <p className="text-lg font-bold text-primary">Correct</p>
       </div>
     );
   }
   if (correct && isGuess) {
     return (
-      <div className="w-full bg-amber-400/15 border border-amber-400/40 rounded-xl p-5 space-y-1">
+      <div className="w-full bg-amber-400/15 border border-amber-400/40 rounded-xl p-4 space-y-1">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🎲</span>
-          <p className="text-lg font-bold text-amber-400">Correct — but flagged as a guess</p>
+          <p className="text-base font-bold text-amber-400">Correct — but flagged as a guess</p>
         </div>
         <p className="text-xs text-amber-400/70 pl-9">Getting it right matters. Knowing why matters more.</p>
       </div>
@@ -27,17 +28,16 @@ function ResultBanner({ correct, isGuess }) {
   }
   if (!correct && isGuess) {
     return (
-      <div className="w-full bg-red-400/15 border border-red-400/40 rounded-xl p-5 flex items-center gap-4">
+      <div className="w-full bg-red-400/15 border border-red-400/40 rounded-xl p-4 flex items-center gap-4">
         <span className="text-2xl">🎲</span>
-        <p className="text-lg font-bold text-red-400">Incorrect — and flagged as a guess</p>
+        <p className="text-base font-bold text-red-400">Incorrect — and flagged as a guess</p>
       </div>
     );
   }
-  // incorrect, not a guess
   return (
-    <div className="w-full bg-red-400/15 border border-red-400/40 rounded-xl p-5 flex items-center gap-4">
-      <XCircle className="w-8 h-8 text-red-400 shrink-0" />
-      <p className="text-xl font-bold text-red-400">Incorrect</p>
+    <div className="w-full bg-red-400/15 border border-red-400/40 rounded-xl p-4 flex items-center gap-4">
+      <XCircle className="w-7 h-7 text-red-400 shrink-0" />
+      <p className="text-lg font-bold text-red-400">Incorrect</p>
     </div>
   );
 }
@@ -51,12 +51,10 @@ export default function MCQFeedback() {
   const flagged_as_guess = attemptData?.flagged_as_guess;
   const chosen_option = attemptData?.chosen_option;
   const correct_option = attemptData?.correct_option;
-  const reasoning = attemptData?.reasoning;
 
-  // Save attempt to DB immediately on mount — must be before any early return
+  // Save attempt to DB on mount
   useEffect(() => {
     if (!feedback || !attemptData || !question) return;
-    // Signal review gate
     sessionStorage.setItem("review_gate_attempt", "1");
     saveMCQAttempt({
       question_id: question.id,
@@ -78,7 +76,6 @@ export default function MCQFeedback() {
 
   async function handleNext() {
     if (guessReviewMode) {
-      // If student guessed again or got it wrong — reset the 12-hour lock
       if (flagged_as_guess || !correct) {
         await resetGuessReviewBankLock(attemptData.question_id);
       }
@@ -88,16 +85,31 @@ export default function MCQFeedback() {
     }
   }
 
-  function handleSwitchToWritten() {
-    navigate("/physics");
-  }
+  // Build a PulseFeedback-compatible object from the MCQ feedback
+  const pulseFeedback = {
+    marks_earned: correct ? 1 : 0,
+    mark_1: {
+      earned: !!correct,
+      keyword: feedback.critical_keyword_word ?? question.options[correct_option],
+      found: !!correct,
+      feedback: feedback.critical_keyword_explanation ?? "",
+    },
+    cambridge_insight: feedback.answer_explanation ?? "",
+    next_step: feedback.next_step ?? "",
+    pulse_layer_1: feedback.pulse_layer_1 ?? feedback.critical_keyword_word ?? "",
+    pulse_layer_2_marks: feedback.pulse_layer_2_marks ?? [],
+    pulse_layer_3: feedback.pulse_layer_3 ?? "",
+  };
 
-  // Determine reasoning border colour from Claude's assessment
-  const reasoningBorder = feedback.reasoning_sound === true
-    ? "border-l-green-500/70"
-    : feedback.reasoning_sound === false
-    ? "border-l-red-400/70"
-    : "border-l-border";
+  // Add reasoning as a second mark point if student provided reasoning
+  if (!flagged_as_guess && attemptData.reasoning && feedback.reasoning_assessment) {
+    pulseFeedback.mark_2 = {
+      earned: feedback.reasoning_sound === true,
+      keyword: "Correct reasoning / physics logic",
+      found: feedback.reasoning_sound === true,
+      feedback: feedback.reasoning_assessment,
+    };
+  }
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -119,83 +131,58 @@ export default function MCQFeedback() {
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* SECTION 1 — Result banner */}
+          {/* Result banner */}
           <ResultBanner correct={correct} isGuess={flagged_as_guess} />
 
-          {/* SECTION 2 — Critical keyword */}
-          <div className="bg-card border border-l-4 border-border border-l-amber-400 rounded-xl p-5 space-y-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Key word in this question
-            </p>
-            <span className="inline-block bg-amber-400 text-amber-900 font-bold text-base px-4 py-1.5 rounded-full">
-              {feedback.critical_keyword_word}
-            </span>
-            <p className="text-sm text-foreground/80 leading-relaxed">
-              {feedback.critical_keyword_explanation}
-            </p>
+          {/* Options recap — show correct vs chosen */}
+          <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Options</p>
+            {OPTION_KEYS.map((key) => {
+              const isCorrectOption = key === correct_option;
+              const isChosen = key === chosen_option;
+              const isWrongChosen = isChosen && !correct && !isCorrectOption;
+
+              let borderClass = "border-border/40";
+              let labelColor = "text-muted-foreground";
+              let bgClass = "bg-secondary/30";
+              if (isCorrectOption) { borderClass = "border-l-4 border-green-500/70"; labelColor = "text-green-400"; bgClass = "bg-green-500/8"; }
+              if (isWrongChosen) { borderClass = "border-l-4 border-red-400/70"; labelColor = "text-red-400"; bgClass = "bg-red-500/8"; }
+
+              return (
+                <div key={key} className={`flex items-start gap-3 p-2.5 rounded-lg border ${borderClass} ${bgClass}`}>
+                  <span className={`font-mono text-xs font-bold shrink-0 mt-0.5 ${labelColor}`}>{key}</span>
+                  <span className="text-xs text-foreground/80 leading-relaxed">{question.options[key]}</span>
+                  {isCorrectOption && <span className="ml-auto text-[10px] text-green-400 font-bold shrink-0">✓ correct</span>}
+                  {isWrongChosen && <span className="ml-auto text-[10px] text-red-400 font-bold shrink-0">✗ chosen</span>}
+                </div>
+              );
+            })}
           </div>
 
-          {/* SECTION 3 — Your reasoning (only if not a guess) */}
-          {!flagged_as_guess && reasoning && (
-            <div className={`bg-card border border-l-4 border-border ${reasoningBorder} rounded-xl p-5 space-y-3`}>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Your reasoning
-              </p>
-              <p className="text-sm text-muted-foreground italic leading-relaxed">"{reasoning}"</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">
-                {feedback.reasoning_assessment}
-              </p>
-            </div>
-          )}
+          {/* PulseFeedback — all 3 layers */}
+          <PulseFeedback
+            feedback={pulseFeedback}
+            subject="physics"
+            marksTotal={1}
+            questionId={question.id}
+            questionText={question.text}
+            studentAnswer={
+              flagged_as_guess
+                ? `Guessed: ${chosen_option}`
+                : `Chose ${chosen_option}. Reasoning: ${attemptData.reasoning ?? ""}`
+            }
+          />
 
-          {/* SECTION 4 — Answer explanation */}
-          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Why option {correct_option} is correct
-            </p>
-            <div className="flex flex-col gap-2">
-              {OPTION_KEYS.map((key) => {
-                const isCorrectOption = key === correct_option;
-                const isChosen = key === chosen_option;
-                const isWrongChosen = isChosen && !correct && !isCorrectOption;
-
-                let borderClass = "border-border";
-                let labelClass = "text-muted-foreground";
-                if (isCorrectOption) { borderClass = "border-l-4 border-green-500/70"; labelClass = "text-green-500"; }
-                if (isWrongChosen) { borderClass = "border-l-4 border-red-400/70"; labelClass = "text-red-400"; }
-                // If student was correct their chosen IS the correct option — already green above
-
-                return (
-                  <div
-                    key={key}
-                    className={`flex items-start gap-3 p-3 rounded-lg border bg-secondary/30 ${borderClass}`}
-                  >
-                    <span className={`font-mono text-xs font-bold shrink-0 mt-0.5 ${labelClass}`}>{key}</span>
-                    <span className="text-xs text-foreground/80 leading-relaxed">{question.options[key]}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-sm text-foreground/80 leading-relaxed pt-1">
-              {feedback.answer_explanation}
-            </p>
-          </div>
-
-          {/* SECTION 5 — Next step */}
-          <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary/70">Next Step</p>
-            <p className="text-sm text-primary leading-relaxed font-medium">{feedback.next_step}</p>
-          </div>
-
-          {/* SECTION 6 — Buttons */}
+          {/* Next button */}
           <button
             onClick={handleNext}
             className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
           >
             Next question →
           </button>
+
           <button
-            onClick={handleSwitchToWritten}
+            onClick={() => navigate("/physics")}
             className="w-full bg-transparent border border-border text-muted-foreground font-medium text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
           >
             Switch to written

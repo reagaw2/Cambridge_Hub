@@ -36,7 +36,6 @@ export default function MCQSession() {
   const topic = state?.topic;
   const guessReviewMode = state?.guessReviewMode ?? false;
   const guessReviewBank = state?.guessReviewBank ?? [];
-  // sessionIndex is the current question index passed via navigation state
   const sessionIndex = state?.sessionIndex ?? 0;
 
   const [questions, setQuestions] = useState([]);
@@ -93,7 +92,6 @@ export default function MCQSession() {
 
     setLoading(true);
 
-    // Build the LLM prompt
     const chosenText = question.options[selected];
     const correctText = question.options[question.correct];
     const optionsBlock = OPTION_KEYS.map((k) => `${k}: ${question.options[k]}`).join("\n");
@@ -114,10 +112,15 @@ Respond ONLY in this JSON format, no extra text:
 {
   "critical_keyword_word": "the single most important physics keyword or concept that unlocks this question (2–6 words)",
   "critical_keyword_explanation": "one to two sentences explaining why this keyword is central to answering this question correctly",
-  "reasoning_assessment": "${isGuess ? "null — student flagged as a guess" : "one to two sentences assessing how close the student's reasoning was to the correct physics — be specific and honest"}",
+  "reasoning_assessment": "${isGuess ? "Student flagged as a guess — no reasoning to assess." : "one to two sentences assessing how close the student's reasoning was to the correct physics — be specific and honest"}",
   "reasoning_sound": ${isGuess ? "null" : "true or false — true if the reasoning demonstrates correct physics understanding, false if flawed or incomplete"},
   "answer_explanation": "two to three sentences explaining why the correct answer is right and why common wrong answers fail, using precise Cambridge language",
-  "next_step": "one sentence telling the student exactly what to review or practise next"
+  "next_step": "one sentence telling the student exactly what to review or practise next",
+  "pulse_layer_1": "single punchy sentence of max 20 words — the exam hack or key trick that unlocks this question type for future questions",
+  "pulse_layer_2_marks": [
+    { "notation": "Key Point", "description": "what the correct answer requires the student to know", "earned": ${isCorrect}, "examiner_note": "one precise sentence on what Cambridge is testing here" }
+  ],
+  "pulse_layer_3": "two to four sentences of deep-dive conceptual explanation — the underlying physics principle that makes this question work"
 }`;
 
     const feedback = await base44.integrations.Core.InvokeLLM({
@@ -132,6 +135,9 @@ Respond ONLY in this JSON format, no extra text:
           reasoning_sound: { type: "boolean" },
           answer_explanation: { type: "string" },
           next_step: { type: "string" },
+          pulse_layer_1: { type: "string" },
+          pulse_layer_2_marks: { type: "array", items: { type: "object" } },
+          pulse_layer_3: { type: "string" },
         },
       },
     }).catch(() => null);
@@ -158,7 +164,7 @@ Respond ONLY in this JSON format, no extra text:
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* 1. Top bar */}
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button
             onClick={() => navigate("/physics")}
@@ -174,14 +180,14 @@ Respond ONLY in this JSON format, no extra text:
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* 2. Mode pill */}
+          {/* Mode pill */}
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-widest text-amber-900 bg-amber-400/80 px-3 py-1 rounded-full">
               Multiple Choice
             </span>
           </div>
 
-          {/* 3. Question card */}
+          {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
@@ -194,7 +200,7 @@ Respond ONLY in this JSON format, no extra text:
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
           </div>
 
-          {/* 4. Answer options */}
+          {/* Answer options */}
           <div className="flex flex-col gap-2.5">
             {OPTION_KEYS.map((key) => (
               <OptionButton
@@ -207,12 +213,11 @@ Respond ONLY in this JSON format, no extra text:
             ))}
           </div>
 
-          {/* No selection error */}
           {noSelectionError && (
             <p className="text-sm text-red-400/80 text-center -mt-1">Select an answer first</p>
           )}
 
-          {/* 5 & 7. Reasoning section */}
+          {/* Reasoning */}
           <div className="space-y-2">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
               Why did you choose this?
@@ -232,12 +237,11 @@ Respond ONLY in this JSON format, no extra text:
             )}
           </div>
 
-          {/* Reasoning validation message */}
           {noReasoningError && (
             <p className="text-sm text-amber-400/90 text-center -mt-1">Please explain your reasoning or tap Just a guess</p>
           )}
 
-          {/* 6. Just a guess + Submit row */}
+          {/* Submit row */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => { setIsGuess((g) => !g); if (noReasoningError) setNoReasoningError(false); }}

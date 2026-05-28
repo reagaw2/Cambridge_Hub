@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabaseClient } from "@/api/base44Client";
+
+// Bump this whenever the question bank changes to bust stale caches
+const BANK_VERSION = "v2";
 
 /**
  * useSupabaseQuestions
@@ -14,7 +17,15 @@ export function useSupabaseQuestions(topicKey, subject = "cs") {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const progressKey = `supabase_q_idx_${subject}_${topicKey}`;
+  const progressKey = `supabase_q_idx_${BANK_VERSION}_${subject}_${topicKey}`;
+
+  // Clear any old-version keys for this topic on mount
+  useEffect(() => {
+    const oldKey = `supabase_q_idx_${subject}_${topicKey}`;
+    if (sessionStorage.getItem(oldKey) !== null) {
+      sessionStorage.removeItem(oldKey);
+    }
+  }, [topicKey, subject]);
 
   useEffect(() => {
     let cancelled = false;

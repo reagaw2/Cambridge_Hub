@@ -10,6 +10,10 @@ import { base44 } from "@/api/base44Client";
 import { useSupabaseQuestions } from "@/hooks/useSupabaseQuestions";
 import CSQuestionAttempt from "./CSQuestionAttempt";
 
+// Bump this when the question bank changes to bust stale sessionStorage
+const BANK_VERSION = "v2";
+const PROGRESS_KEY_PREFIX = `supabase_q_idx_${BANK_VERSION}_cs_`;
+
 function splitIntoParts(questionText, markSchemeText) {
   const subPartRegex = /\n?\s*\(([a-z]+|i{1,3}v?|vi{0,3}|ix|x)\)\s*/g;
   const matches = [...questionText.matchAll(subPartRegex)];
@@ -74,8 +78,6 @@ function extractMarksFromText(text) {
   return m ? parseInt(m[1], 10) : null;
 }
 
-const PROGRESS_KEY_PREFIX = "supabase_q_idx_cs_";
-
 export default function SupabaseCSQuestion({
   topicKey,
   topicLabel,
@@ -88,6 +90,11 @@ export default function SupabaseCSQuestion({
   const { questions, loading } = useSupabaseQuestions(topicKey, "cs");
 
   const [localIdx, setLocalIdx] = useState(() => {
+    // Clear any old (non-versioned) key
+    const oldKey = `supabase_q_idx_cs_${topicKey}`;
+    if (sessionStorage.getItem(oldKey) !== null) {
+      sessionStorage.removeItem(oldKey);
+    }
     const stored = sessionStorage.getItem(`${PROGRESS_KEY_PREFIX}${topicKey}`);
     return stored ? parseInt(stored, 10) : 0;
   });
@@ -290,7 +297,7 @@ export default function SupabaseCSQuestion({
           </button>
         </div>
 
-        {/* Part navigation — only shown when question has multiple parts */}
+        {/* Part navigation */}
         {totalParts > 1 && (
           <div className="flex items-center justify-between px-4 py-2 border-b border-border/20 bg-card/30">
             <button
@@ -301,7 +308,6 @@ export default function SupabaseCSQuestion({
               <ChevronLeft className="w-3.5 h-3.5" /> Part
             </button>
 
-            {/* Part dots */}
             <div className="flex items-center gap-1.5">
               {parts.map((p, i) => {
                 const key = `${clampedIdx}_${i}`;
@@ -338,7 +344,6 @@ export default function SupabaseCSQuestion({
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* Scientific Calculator — inline, shown/hidden via toggle */}
           {showCalc && (
             <ScientificCalculator onClose={() => setShowCalc(false)} />
           )}
@@ -413,13 +418,11 @@ export default function SupabaseCSQuestion({
             </div>
           )}
 
-          {/* Answer box */}
           <AnswerInput
             value={currentAnswer}
             onChange={(v) => setAnswers(prev => ({ ...prev, [answerKey]: v }))}
           />
 
-          {/* Submit button */}
           <button
             onClick={handleSubmitPart}
             disabled={!currentAnswer.trim() || submitting}
@@ -430,7 +433,6 @@ export default function SupabaseCSQuestion({
 
           {submitError && <p className="text-center text-sm text-red-400/80">{submitError}</p>}
 
-          {/* All-parts summary */}
           {allPartsSubmitted && totalParts > 1 && (
             <div className="bg-card border border-border rounded-xl p-4 space-y-2">
               <div className="flex items-center justify-between">

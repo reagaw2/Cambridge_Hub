@@ -1,11 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { getQuestionsForTopic, getQuestionsByIds } from "@/lib/mcqBank";
 import { recordAttempt } from "@/lib/topicStore";
 import { base44 } from "@/api/base44Client";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
+const FULL_TIMEOUT_MS = 10_000;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve({ timedOut: true }), ms)),
+  ]);
+}
 
 function OptionButton({ letter, text, selected, onSelect }) {
   const isSelected = selected === letter;
@@ -13,14 +21,10 @@ function OptionButton({ letter, text, selected, onSelect }) {
     <button
       onClick={() => onSelect(letter)}
       className={`w-full flex items-start gap-3 p-4 rounded-xl border transition-all text-left min-h-[56px] ${
-        isSelected
-          ? "border-l-4 border-amber-400 bg-amber-400/8"
-          : "border-border hover:border-border/80"
+        isSelected ? "border-l-4 border-amber-400 bg-amber-400/8" : "border-border hover:border-border/80"
       }`}
     >
-      <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${
-        isSelected ? "text-amber-400" : "text-muted-foreground"
-      }`}>{letter}</span>
+      <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${isSelected ? "text-amber-400" : "text-muted-foreground"}`}>{letter}</span>
       <span className="text-sm text-foreground/90 leading-relaxed flex-1">{text}</span>
     </button>
   );
@@ -41,6 +45,7 @@ export default function MCQSession() {
   const [noSelectionError, setNoSelectionError] = useState(false);
   const [noReasoningError, setNoReasoningError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     if (guessReviewMode) {
@@ -81,10 +86,11 @@ export default function MCQSession() {
     };
 
     setLoading(true);
+    setTimedOut(false);
 
     const optionsBlock = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
 
-    const prompt = `Cambridge A Level Physics MCQ examiner. Mark this attempt and provide feedback.
+    const fullPrompt = `Cambridge A Level Physics MCQ examiner. Mark this attempt and provide feedback.
 
 Q: ${question.text}
 Options: ${optionsBlock}
@@ -109,35 +115,63 @@ JSON response (be concise, 1-2 sentences per field):
   "reasoning_sound": ${isGuess ? "null" : "true or false"}
 }`;
 
-    const feedback = await base44.integrations.Core.InvokeLLM({
-      prompt,
-      model: "claude_sonnet_4_6",
-      response_json_schema: {
-        type: "object",
-        properties: {
-          step1_system: { type: "string" },
-          step2_phrase_breakdown: { type: "string" },
-          step3_tipping_point: { type: "string" },
-          step4_math_visual: { type: "string" },
-          step5_edge_case: { type: "string" },
-          step6_takeaway: { type: "string" },
-          pulse_layer_1: { type: "string" },
-          pulse_layer_2_marks: { type: "array", items: { type: "object" } },
-          pulse_layer_3: { type: "string" },
-          cambridge_insight: { type: "string" },
-          next_step: { type: "string" },
-          reasoning_assessment: { type: "string" },
-          reasoning_sound: { type: "boolean" },
-        },
+    const fullSchema = {
+      type: "object",
+      properties: {
+        step1_system: { type: "string" },
+        step2_phrase_breakdown: { type: "string" },
+        step3_tipping_point: { type: "string" },
+        step4_math_visual: { type: "string" },
+        step5_edge_case: { type: "string" },
+        step6_takeaway: { type: "string" },
+        pulse_layer_1: { type: "string" },
+        pulse_layer_2_marks: { type: "array", items: { type: "object" } },
+        pulse_layer_3: { type: "string" },
+        cambridge_insight: { type: "string" },
+        next_step: { type: "string" },
+        reasoning_assessment: { type: "string" },
+        reasoning_sound: { type: "boolean" },
       },
-    }).catch(() => null);
+    };
+
+    // Try full call with timeout
+    const fullCallPromise = base44.integrations.Core.InvokeLLM({
+      prompt: fullPrompt,
+      model: "claude_sonnet_4_6",
+      response_json_schema: fullSchema,
+    }).then(r => r?.response ?? r).catch(() => null);
+
+    let feedback = await withTimeout(fullCallPromise, FULL_TIMEOUT_MS);
+
+    // Fell back — run fast marks-only call
+    if (!feedback || feedback.timedOut) {
+      setTimedOut(true);
+
+      const fastPrompt = `Cambridge A Level Physics MCQ examiner. Q: ${question.text}. Correct: ${question.correct}. Chosen: ${selected}. Result: ${isCorrect ? "CORRECT" : "WRONG"}. JSON: {"cambridge_insight":"why","next_step":"what to review","reasoning_assessment":"${isGuess ? "Guess." : "one sentence"}","reasoning_sound":${isGuess ? "null" : isCorrect}}`;
+
+      feedback = await base44.integrations.Core.InvokeLLM({
+        prompt: fastPrompt,
+        model: "claude_sonnet_4_6",
+        response_json_schema: {
+          type: "object",
+          properties: {
+            cambridge_insight: { type: "string" },
+            next_step: { type: "string" },
+            reasoning_assessment: { type: "string" },
+            reasoning_sound: { type: "boolean" },
+          },
+        },
+      }).then(r => r?.response ?? r).catch(() => null);
+
+      setTimedOut(false);
+    }
 
     setLoading(false);
     await recordAttempt(question.topic, isCorrect ? 1 : 0, { total_marks: 1, question_id: question.id });
 
     navigate("/mcq-feedback", {
       state: {
-        feedback: feedback?.response ?? feedback,
+        feedback: feedback ?? {},
         attemptData,
         question,
         nextSessionIndex: sessionIndex + 1,
@@ -148,6 +182,8 @@ JSON response (be concise, 1-2 sentences per field):
       },
     });
   }
+
+  const loadingLabel = timedOut ? "Still thinking…" : loading ? "Analysing…" : "Submit Answer";
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -163,7 +199,6 @@ JSON response (be concise, 1-2 sentences per field):
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
-
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-widest text-amber-900 bg-amber-400/80 px-3 py-1 rounded-full">
               Multiple Choice
@@ -172,12 +207,8 @@ JSON response (be concise, 1-2 sentences per field):
 
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-                {question.topic}
-              </span>
-              <span className="text-[11px] text-muted-foreground font-mono">
-                Q{(idx % questions.length) + 1} of {questions.length}
-              </span>
+              <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">{question.topic}</span>
+              <span className="text-[11px] text-muted-foreground font-mono">Q{(idx % questions.length) + 1} of {questions.length}</span>
             </div>
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
           </div>
@@ -219,11 +250,12 @@ JSON response (be concise, 1-2 sentences per field):
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className={`flex-1 bg-primary text-primary-foreground font-semibold text-sm py-2.5 rounded-xl transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground font-semibold text-sm py-2.5 rounded-xl transition-all ${
                 reasoningValid && !loading ? "hover:brightness-110 active:scale-[0.98]" : "opacity-50 cursor-not-allowed"
               } disabled:opacity-40`}
             >
-              {loading ? "Analysing..." : "Submit Answer"}
+              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {loadingLabel}
             </button>
           </div>
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Database, ChevronRight } from "lucide-react";
+import { ArrowLeft, Database, ChevronRight, SkipForward } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 import QuestionDiagram from "@/components/QuestionDiagram";
@@ -89,6 +89,8 @@ export default function SupabaseCSQuestion({
   const [submitError, setSubmitError] = useState(null);
   const [partFeedbacks, setPartFeedbacks] = useState([]);
   const [fallbackOverride, setFallbackOverride] = useState(null);
+  const [showSkipPanel, setShowSkipPanel] = useState(false);
+  const [skipInput, setSkipInput] = useState("");
 
   if (loading) {
     return (
@@ -130,8 +132,26 @@ export default function SupabaseCSQuestion({
   const currentAnswer = answers[partIndex] ?? "";
   const totalParts = parts.length;
   const isLastPart = partIndex === totalParts - 1;
-  // Show diagram only on first sub-part (it applies to the whole question)
   const showDiagram = partIndex === 0 && question.diagram_svg;
+
+  function resetForNewQuestion() {
+    setAnswers({});
+    setPartIndex(0);
+    setPartFeedbacks([]);
+    setSubmitError(null);
+  }
+
+  function handleSkipToQuestion(targetIdx) {
+    const clampedIdx = Math.max(0, Math.min(targetIdx, questions.length - 1));
+    // Write the target index to sessionStorage so useSupabaseQuestions picks it up
+    const progressKey = `supabase_q_idx_cs_${topicKey}`;
+    sessionStorage.setItem(progressKey, String(clampedIdx));
+    resetForNewQuestion();
+    setShowSkipPanel(false);
+    setSkipInput("");
+    // Force re-render by triggering a state update
+    window.location.reload();
+  }
 
   async function handleSubmitPart() {
     if (!currentAnswer.trim() || submitting) return;
@@ -244,6 +264,7 @@ export default function SupabaseCSQuestion({
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate("/cs")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -255,10 +276,64 @@ export default function SupabaseCSQuestion({
               <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Live</span>
             </div>
           </div>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {question.paper_ref ?? "9618"}
-          </span>
+          <button
+            onClick={() => setShowSkipPanel(p => !p)}
+            className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground bg-secondary border border-border px-2.5 py-1 rounded-lg hover:brightness-110 transition-all"
+          >
+            <SkipForward className="w-3 h-3" />
+            Skip
+          </button>
         </div>
+
+        {/* Skip panel */}
+        {showSkipPanel && (
+          <div className="mx-4 mt-3 bg-card border border-border rounded-xl p-4 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Jump to question</p>
+
+            {/* Quick-jump grid */}
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              {questions.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSkipToQuestion(i)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all hover:brightness-110 ${
+                    i === idx
+                      ? "bg-primary/20 border-primary text-primary ring-1 ring-primary/40"
+                      : "bg-secondary border-border text-muted-foreground"
+                  }`}
+                  title={q.question_text?.slice(0, 60)}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+
+            {/* Manual number input */}
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={questions.length}
+                value={skipInput}
+                onChange={e => setSkipInput(e.target.value)}
+                placeholder={`1 – ${questions.length}`}
+                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                onKeyDown={e => { if (e.key === "Enter" && skipInput) handleSkipToQuestion(parseInt(skipInput, 10) - 1); }}
+              />
+              <button
+                onClick={() => skipInput && handleSkipToQuestion(parseInt(skipInput, 10) - 1)}
+                disabled={!skipInput}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:brightness-110 transition-all disabled:opacity-40"
+              >
+                Go
+              </button>
+            </div>
+
+            <p className="text-[10px] text-muted-foreground/50">
+              Currently on Q{idx + 1} · {questions.length} questions total
+            </p>
+          </div>
+        )}
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 

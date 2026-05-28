@@ -7,7 +7,6 @@ import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csT
 import { base44 } from "@/api/base44Client";
 import { useSupabaseQuestions, buildSupabasePrompt, buildSupabaseSchema } from "@/hooks/useSupabaseQuestions";
 
-// Fallback: hardcoded bank (used if Supabase has no questions for this topic)
 import { getNextDataRepQuestion, advanceDataRepIndex, DATA_REP_QUESTIONS } from "@/lib/csDataRepBank";
 import CSQuestionAttempt from "./CSQuestionAttempt";
 
@@ -21,7 +20,6 @@ export default function DataRepresentationQuestion() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  // While loading, show a spinner
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center gap-3">
@@ -31,7 +29,6 @@ export default function DataRepresentationQuestion() {
     );
   }
 
-  // If Supabase has no questions for this topic, fall back to hardcoded bank
   if (!loading && questions.length === 0) {
     const [override, setOverride] = useState(null);
     const queued = getNextDataRepQuestion();
@@ -134,7 +131,6 @@ export default function DataRepresentationQuestion() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate("/cs")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -153,7 +149,6 @@ export default function DataRepresentationQuestion() {
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
@@ -192,14 +187,6 @@ export default function DataRepresentationQuestion() {
           </button>
 
           {submitError && <p className="text-center text-sm text-red-400/80">{submitError}</p>}
-
-          {/* Skip button */}
-          <button
-            onClick={() => { advance(); setAnswer(""); setSubmitError(null); }}
-            className="w-full text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors py-1"
-          >
-            Skip this question →
-          </button>
 
         </div>
       </div>

@@ -109,7 +109,7 @@ export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const {
-    feedback, isQ2, isQ3, student_prediction, isReview,
+    feedback, answer, isQ2, isQ3, student_prediction, isReview,
     topicKey, questionId, nextFullRoute, nextRetryRoute, backRoute, paperRef
   } = state || {};
 
@@ -120,6 +120,9 @@ export default function Feedback() {
   const marksEarned = feedback?.marks_earned ?? 0;
   const fullMarks = marksEarned >= maxMarks;
   const subject = detectSubject(resolvedTopicKey);
+
+  // Question text for Socratic Panel
+  const questionText = metaEntry?.question_text ?? "";
 
   const recorded = useRef(false);
   useEffect(() => {
@@ -189,11 +192,14 @@ export default function Feedback() {
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* 3-Layer Pulse Feedback */}
+          {/* 3-Layer Pulse Feedback — now with Socratic context */}
           <PulseFeedback
             feedback={feedback}
             subject={subject}
             marksTotal={maxMarks}
+            questionId={questionId}
+            questionText={questionText}
+            studentAnswer={answer ?? ""}
           />
 
           {/* Prediction feedback (Q3 familiarity check) */}

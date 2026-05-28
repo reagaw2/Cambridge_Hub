@@ -7,6 +7,7 @@ export default function CSFeedback() {
   const navigate = useNavigate();
   const {
     feedback,
+    answer,
     totalMarks,
     backRoute,
     dashRoute,
@@ -15,6 +16,7 @@ export default function CSFeedback() {
     topicRoute,
     topicLabel,
     isLastQuestion,
+    questionId,
   } = state || {};
 
   if (!feedback) { navigate("/cs"); return null; }
@@ -61,11 +63,14 @@ export default function CSFeedback() {
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* Unified 3-Layer Pulse Engine — subject="cs" gives violet accent */}
+          {/* Unified 3-Layer Pulse Engine with Socratic context */}
           <PulseFeedback
             feedback={feedback}
             subject="cs"
             marksTotal={maxMarks}
+            questionId={questionId}
+            questionText={feedback?.question_text ?? ""}
+            studentAnswer={answer ?? ""}
           />
 
           {/* Primary action */}

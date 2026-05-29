@@ -518,6 +518,84 @@ function TeacherQuestionInline({ questionId, existing, onSave, onSkip }) {
   );
 }
 
+// ── Option with cross-out support ─────────────────────────────────────────────
+function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOption, onSelect, onToggleCrossOut }) {
+  const isCorrectOption = optKey === correctOption;
+  const isWrongChosen = submitted && optKey === selected && !isCorrectOption;
+
+  let containerCls = "group relative w-full flex items-start gap-3 p-4 rounded-xl border text-left transition-all select-none ";
+
+  if (submitted) {
+    if (isCorrectOption) containerCls += "border-l-4 border-green-500 bg-green-500/10";
+    else if (isWrongChosen) containerCls += "border-l-4 border-red-400 bg-red-500/10";
+    else containerCls += "border-border/40 bg-secondary/30 opacity-40";
+  } else if (crossedOut) {
+    containerCls += "border-border/30 bg-secondary/20 opacity-50";
+  } else {
+    containerCls += selected === optKey
+      ? "border-l-4 border-primary bg-primary/10 cursor-pointer"
+      : "border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer";
+  }
+
+  return (
+    <div className={containerCls}>
+      {/* Click area for selecting */}
+      <button
+        type="button"
+        disabled={submitted}
+        onClick={() => !submitted && !crossedOut && onSelect(optKey)}
+        className="flex items-start gap-3 flex-1 min-w-0 text-left"
+        style={{ background: "none", border: "none", padding: 0 }}
+      >
+        <span className={`font-mono text-xs font-black shrink-0 mt-0.5 w-4 transition-colors ${
+          submitted && isCorrectOption ? "text-green-400"
+          : submitted && isWrongChosen ? "text-red-400"
+          : selected === optKey ? "text-primary"
+          : crossedOut ? "text-muted-foreground/30"
+          : "text-muted-foreground"
+        }`}>{optKey}</span>
+        <span className={`text-sm leading-relaxed flex-1 min-w-0 transition-all ${
+          crossedOut ? "line-through text-muted-foreground/30" : "text-foreground/90"
+        }`}>{text}</span>
+      </button>
+
+      {/* Cross-out indicator / button — only shown before submission */}
+      {!submitted && (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
+          title={crossedOut ? "Restore option" : "Cross out this option"}
+          className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ml-1 mt-0.5 ${
+            crossedOut
+              ? "bg-red-500/25 border border-red-500/50 text-red-400 opacity-100"
+              : "opacity-0 group-hover:opacity-100 bg-secondary border border-border text-muted-foreground/50 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
+          }`}
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+
+      {/* Submitted state icons */}
+      {submitted && isCorrectOption && (
+        <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+      )}
+      {submitted && isWrongChosen && (
+        <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+      )}
+
+      {/* Cross-out line overlay */}
+      {crossedOut && !submitted && (
+        <div
+          className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden"
+          aria-hidden="true"
+        >
+          <div className="absolute top-1/2 left-3 right-3 h-px bg-muted-foreground/30" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main session ──────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
@@ -534,6 +612,7 @@ export default function P1Session() {
 
   const [selected, setSelected] = useState(null);
   const [isGuess, setIsGuess] = useState(false);
+  const [crossedOut, setCrossedOut] = useState(new Set()); // per-question crossed-out options
   const [loading, setLoading] = useState(false);
   const [loadingL2, setLoadingL2] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
@@ -574,16 +653,17 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, currentIdx, sessionLoading]);
 
-  // Clear auto-advance timer on unmount
   useEffect(() => {
     return () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); };
   }, []);
 
+  // Reset per-question state when moving to a new question
   useEffect(() => {
     if (sessionLoading) return;
     if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     setSelected(existingAnswer?.chosen ?? null);
     setIsGuess(existingAnswer?.flagged_as_guess ?? false);
+    setCrossedOut(new Set()); // always reset cross-outs per question
     setSubmitted(!!existingAnswer);
     setShowCorrectBanner(false);
     setLayer1(existingAnswer?.layer1 ?? null);
@@ -598,6 +678,20 @@ export default function P1Session() {
   const starredIds = new Set(Object.keys(starredQuestions));
   const notedIds = new Set(Object.keys(notes));
   const isCurrentStarred = question ? starredIds.has(question.id) : false;
+
+  function handleToggleCrossOut(key) {
+    setCrossedOut(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+        // If the crossed-out option was selected, deselect it
+        if (selected === key) setSelected(null);
+      }
+      return next;
+    });
+  }
 
   function getMergedFeedback() {
     if (!layer1) return null;
@@ -637,6 +731,7 @@ export default function P1Session() {
     setCurrentIdx(0);
     setSelected(null);
     setIsGuess(false);
+    setCrossedOut(new Set());
     setSubmitted(false);
     setShowCorrectBanner(false);
     setLayer1(null);
@@ -669,7 +764,7 @@ export default function P1Session() {
       reasoning: isGuess ? null : selected,
     });
 
-    // ── Correct and NOT a guess → no AI call, instant banner + auto-advance ──
+    // Correct and NOT a guess → no AI call, instant banner + auto-advance
     if (isCorrect && !isGuess) {
       const record = { chosen: selected, correct: true, flagged_as_guess: false, layer1: null, layer2: null };
       setAnswers(prev => ({ ...prev, [question.id]: record }));
@@ -683,7 +778,7 @@ export default function P1Session() {
       return;
     }
 
-    // ── Wrong answer or guess → fetch AI feedback ──────────────────────────
+    // Wrong answer or guess → fetch AI feedback
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
     const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}
 Options: ${optionsList}
@@ -775,14 +870,6 @@ Respond ONLY in JSON:
     setLoadingL2(false);
   }
 
-  function handleNext() {
-    advanceQuestion();
-  }
-
-  function handlePrev() {
-    if (currentIdx > 0) setCurrentIdx(i => i - 1);
-  }
-
   if (sessionLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3">
@@ -796,10 +883,8 @@ Respond ONLY in JSON:
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === questions.length - 1;
   const totalStarredAndNoted = starredIds.size + notedIds.size;
-
-  // Determine what to show post-submission
-  const needsFeedback = submitted && (layer1 !== null || showCorrectBanner);
   const showFeedbackPanel = submitted && layer1 !== null;
+  const crossedCount = crossedOut.size;
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -927,37 +1012,29 @@ Respond ONLY in JSON:
             <p className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-line">{question.text}</p>
           </div>
 
+          {/* Elimination hint */}
+          {!submitted && (
+            <p className="text-[11px] text-muted-foreground/50 text-center -mt-1">
+              Hover an option and tap <span className="font-mono bg-secondary px-1 rounded">✕</span> to cross it out by elimination
+              {crossedCount > 0 && <span className="text-red-400/70 ml-1">· {crossedCount} crossed out</span>}
+            </p>
+          )}
+
           {/* Options */}
           <div className="flex flex-col gap-2.5">
-            {OPTION_KEYS.map(key => {
-              const isSelected = selected === key;
-              const isCorrectOption = key === question.correct;
-              const isWrongChosen = submitted && key === selected && !isCorrectOption;
-
-              let cls = "w-full flex items-start gap-3 p-4 rounded-xl border text-left transition-all ";
-              if (submitted) {
-                if (isCorrectOption) cls += "border-l-4 border-green-500 bg-green-500/10";
-                else if (isWrongChosen) cls += "border-l-4 border-red-400 bg-red-500/10";
-                else cls += "border-border/40 bg-secondary/30 opacity-40";
-              } else {
-                cls += isSelected
-                  ? "border-l-4 border-primary bg-primary/10 cursor-pointer"
-                  : "border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer";
-              }
-
-              return (
-                <button key={key} onClick={() => !submitted && setSelected(key)} disabled={submitted} className={cls}>
-                  <span className={`font-mono text-xs font-black shrink-0 mt-0.5 w-4 ${
-                    submitted && isCorrectOption ? "text-green-400"
-                    : submitted && isWrongChosen ? "text-red-400"
-                    : isSelected ? "text-primary" : "text-muted-foreground"
-                  }`}>{key}</span>
-                  <span className="text-sm leading-relaxed flex-1">{question.options[key]}</span>
-                  {submitted && isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />}
-                  {submitted && isWrongChosen && <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />}
-                </button>
-              );
-            })}
+            {OPTION_KEYS.map(key => (
+              <OptionRow
+                key={key}
+                optKey={key}
+                text={question.options[key]}
+                selected={selected}
+                crossedOut={crossedOut.has(key)}
+                submitted={submitted}
+                correctOption={question.correct}
+                onSelect={setSelected}
+                onToggleCrossOut={handleToggleCrossOut}
+              />
+            ))}
           </div>
 
           {/* Guess + Submit */}
@@ -984,10 +1061,10 @@ Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Correct banner — no AI, auto-advances */}
+          {/* Correct banner */}
           {showCorrectBanner && <CorrectBanner />}
 
-          {/* AI feedback — only shown for wrong answers or guesses */}
+          {/* AI feedback */}
           {showFeedbackPanel && (
             <Layer1Feedback
               feedback={layer1}
@@ -996,7 +1073,7 @@ Respond ONLY in JSON:
             />
           )}
 
-          {/* Note widget — shown after submission for wrong/guess answers */}
+          {/* Note widget */}
           {submitted && !showCorrectBanner && (
             <MiniNoteWidget
               questionId={question.id}
@@ -1006,7 +1083,7 @@ Respond ONLY in JSON:
             />
           )}
 
-          {/* Star prompt — only for wrong/guess answers */}
+          {/* Star prompt */}
           {showFeedbackPanel && !isCurrentStarred && (
             <button
               onClick={handleToggleStar}
@@ -1017,7 +1094,7 @@ Respond ONLY in JSON:
             </button>
           )}
 
-          {/* Starred confirmation + teacher question prompt */}
+          {/* Starred confirmation */}
           {showFeedbackPanel && isCurrentStarred && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-4 py-2.5">
@@ -1058,7 +1135,7 @@ Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Show breakdown button — only for wrong/guess */}
+          {/* Show breakdown button */}
           {showFeedbackPanel && !layer2 && (
             <button
               onClick={handleRequestLayer2}
@@ -1081,14 +1158,14 @@ Respond ONLY in JSON:
 
           {layer2 && <Layer2Feedback feedback={layer2} />}
 
-          {/* Prev / Next — only shown when not auto-advancing */}
+          {/* Prev / Next */}
           {!showCorrectBanner && (
             <div className="grid grid-cols-2 gap-3 pt-2">
-              <button onClick={handlePrev} disabled={isFirst}
+              <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={isFirst}
                 className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30">
                 <ChevronLeft className="w-4 h-4" /> Previous
               </button>
-              <button onClick={handleNext}
+              <button onClick={() => currentIdx < questions.length - 1 ? setCurrentIdx(i => i + 1) : navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } })}
                 className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
                 {isLast ? "Finish" : "Next"} <ChevronRight className="w-4 h-4" />
               </button>

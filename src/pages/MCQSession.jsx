@@ -1,28 +1,62 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { getQuestionsForTopic, getQuestionsByIds } from "@/lib/mcqBank";
 import { recordAttempt } from "@/lib/topicStore";
 import { base44 } from "@/api/base44Client";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
-function OptionButton({ letter, text, selected, onSelect }) {
-  const isSelected = selected === letter;
+// ── Option row with cross-out ─────────────────────────────────────────────────
+function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCrossOut }) {
+  const isSelected = selected === optKey;
+
   return (
-    <button
-      onClick={() => onSelect(letter)}
-      className={`w-full flex items-start gap-3 p-4 rounded-xl border transition-all text-left min-h-[56px] ${
-        isSelected
+    <div className={`group relative w-full flex items-start gap-3 p-4 rounded-xl border text-left transition-all ${
+      crossedOut
+        ? "border-border/30 bg-secondary/20 opacity-50"
+        : isSelected
           ? "border-l-4 border-amber-400 bg-amber-400/8"
           : "border-border hover:border-border/80"
-      }`}
-    >
-      <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${
-        isSelected ? "text-amber-400" : "text-muted-foreground"
-      }`}>{letter}</span>
-      <span className="text-sm text-foreground/90 leading-relaxed flex-1">{text}</span>
-    </button>
+    }`}>
+      {/* Select area */}
+      <button
+        type="button"
+        onClick={() => !crossedOut && onSelect(optKey)}
+        className="flex items-start gap-3 flex-1 min-w-0 text-left"
+        style={{ background: "none", border: "none", padding: 0 }}
+      >
+        <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${
+          isSelected ? "text-amber-400"
+          : crossedOut ? "text-muted-foreground/30"
+          : "text-muted-foreground"
+        }`}>{optKey}</span>
+        <span className={`text-sm leading-relaxed flex-1 min-w-0 transition-all ${
+          crossedOut ? "line-through text-muted-foreground/30" : "text-foreground/90"
+        }`}>{text}</span>
+      </button>
+
+      {/* Cross-out toggle button */}
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
+        title={crossedOut ? "Restore option" : "Cross out this option"}
+        className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ml-1 mt-0.5 ${
+          crossedOut
+            ? "bg-red-500/25 border border-red-500/50 text-red-400 opacity-100"
+            : "opacity-0 group-hover:opacity-100 bg-secondary border border-border text-muted-foreground/50 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
+        }`}
+      >
+        <X className="w-3 h-3" />
+      </button>
+
+      {/* Cross-out line overlay */}
+      {crossedOut && (
+        <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" aria-hidden="true">
+          <div className="absolute top-1/2 left-3 right-3 h-px bg-muted-foreground/30" />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -36,6 +70,7 @@ export default function MCQSession() {
 
   const [questions, setQuestions] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [crossedOut, setCrossedOut] = useState(new Set());
   const [reasoning, setReasoning] = useState("");
   const [isGuess, setIsGuess] = useState(false);
   const [noSelectionError, setNoSelectionError] = useState(false);
@@ -63,7 +98,22 @@ export default function MCQSession() {
     if (noSelectionError) setNoSelectionError(false);
   }
 
+  function handleToggleCrossOut(key) {
+    setCrossedOut(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+        // Deselect if this option was selected
+        if (selected === key) setSelected(null);
+      }
+      return next;
+    });
+  }
+
   const reasoningValid = isGuess || reasoning.trim().length > 0;
+  const crossedCount = crossedOut.size;
 
   async function handleSubmit() {
     if (!selected) { setNoSelectionError(true); return; }
@@ -182,9 +232,23 @@ JSON response (be concise, 1-2 sentences per field):
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
           </div>
 
+          {/* Elimination hint */}
+          <p className="text-[11px] text-muted-foreground/50 text-center -mt-1">
+            Hover an option and tap <span className="font-mono bg-secondary px-1 rounded">✕</span> to cross it out
+            {crossedCount > 0 && <span className="text-red-400/70 ml-1">· {crossedCount} crossed out</span>}
+          </p>
+
           <div className="flex flex-col gap-2.5">
             {OPTION_KEYS.map(key => (
-              <OptionButton key={key} letter={key} text={question.options[key]} selected={selected} onSelect={handleSelect} />
+              <OptionRow
+                key={key}
+                optKey={key}
+                text={question.options[key]}
+                selected={selected}
+                crossedOut={crossedOut.has(key)}
+                onSelect={handleSelect}
+                onToggleCrossOut={handleToggleCrossOut}
+              />
             ))}
           </div>
 

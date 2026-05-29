@@ -15,29 +15,35 @@ import { useAuth } from "@/lib/AuthContext";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
+function CorrectBanner() {
+  return (
+    <div className="rounded-xl border border-green-500/40 bg-green-500/10 px-5 py-5 flex flex-col items-center gap-2 text-center">
+      <CheckCircle2 className="w-8 h-8 text-green-400" />
+      <p className="text-lg font-bold text-green-400">Correct! Well done.</p>
+      <p className="text-[11px] text-green-400/60">Moving to next question…</p>
+    </div>
+  );
+}
+
 function Layer1Feedback({ feedback, isCorrect, isGuess }) {
-  const accentBg = isCorrect && !isGuess
-    ? "bg-green-500/10 border-green-500/25"
-    : isGuess
-      ? "bg-amber-500/10 border-amber-500/25"
-      : "bg-red-500/10 border-red-500/25";
-  const accent = isCorrect && !isGuess ? "text-green-400" : isGuess ? "text-amber-400" : "text-red-400";
+  const accentBg = isGuess
+    ? "bg-amber-500/10 border-amber-500/25"
+    : "bg-red-500/10 border-red-500/25";
+  const accent = isGuess ? "text-amber-400" : "text-red-400";
 
   return (
     <div className="space-y-3">
       <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${accentBg}`}>
         <span className="text-2xl shrink-0">
-          {isCorrect && !isGuess ? "✅" : isGuess ? "🎲" : "❌"}
+          {isGuess && isCorrect ? "🎲" : isGuess ? "🎲" : "❌"}
         </span>
         <div>
           <p className={`text-sm font-bold ${accent}`}>
-            {isCorrect && !isGuess
-              ? "Correct!"
-              : isGuess && isCorrect
-                ? "Correct — but flagged as a guess"
-                : isGuess
-                  ? "Incorrect — flagged as a guess"
-                  : "Incorrect"}
+            {isGuess && isCorrect
+              ? "Correct — but flagged as a guess"
+              : isGuess
+                ? "Incorrect — flagged as a guess"
+                : "Incorrect"}
           </p>
           {(isGuess || !isCorrect) && (
             <p className="text-[11px] text-muted-foreground mt-0.5">Added to your review bank</p>
@@ -211,7 +217,6 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
   );
 }
 
-// ── Starred + Notes panel ─────────────────────────────────────────────────────
 function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onClose, onJump, questions, userEmail, onTeacherQuestionSave }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadingNotes, setDownloadingNotes] = useState(false);
@@ -234,14 +239,10 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
   async function handleDownloadNotes() {
     setDownloadingNotes(true);
     await generateNotesPdf({
-      paperId,
-      paperLabel,
+      paperId, paperLabel,
       session: paper.session,
       variant: paper.id?.split("/")?.[1] ?? "",
-      notes,
-      starredQuestions,
-      questions,
-      userEmail,
+      notes, starredQuestions, questions, userEmail,
     });
     setDownloadingNotes(false);
   }
@@ -257,8 +258,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
       <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl max-h-[88vh] flex flex-col">
-
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
           <div>
             <div className="flex items-center gap-2">
@@ -274,9 +273,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
           {starred.length === 0 && noteCount === 0 && (
             <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
               <Star className="w-8 h-8 text-muted-foreground/30" />
@@ -289,8 +286,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
 
           {starred.map(([questionId, entry]) => (
             <div key={questionId} className="bg-secondary/40 border border-border rounded-xl overflow-hidden">
-
-              {/* Question header */}
               <div className="flex items-start justify-between gap-2 p-4 pb-2">
                 <div className="space-y-0.5 flex-1">
                   <div className="flex items-center gap-2">
@@ -311,7 +306,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                 </button>
               </div>
 
-              {/* AI feedback preview */}
               {entry.feedback?.pulse_layer_1 && (
                 <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
@@ -319,7 +313,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                 </div>
               )}
 
-              {/* Student's note for this question */}
               {notes[questionId]?.text && (
                 <div className="mx-4 mb-2 bg-green-500/8 border border-green-500/20 rounded-lg px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 mb-0.5">📝 My Note</p>
@@ -327,7 +320,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                 </div>
               )}
 
-              {/* Teacher question section */}
               <div className="px-4 pb-4 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
                   <MessageCircleQuestion className="w-3 h-3" />
@@ -341,7 +333,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                     <button
                       onClick={() => {
                         handleTeacherInputChange(questionId, entry.teacherQuestion);
-                        // Trigger edit by clearing existing
                         onTeacherQuestionSave(questionId, "");
                       }}
                       className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors"
@@ -372,9 +363,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           ))}
         </div>
 
-        {/* Download buttons */}
         <div className="shrink-0 px-4 py-4 border-t border-border/50 space-y-2">
-          {/* My Notes PDF */}
           <button
             onClick={handleDownloadNotes}
             disabled={(starred.length === 0 && noteCount === 0) || downloadingNotes}
@@ -387,7 +376,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
             )}
           </button>
 
-          {/* Teacher review PDF (starred only) */}
           <button
             onClick={handleDownloadStarred}
             disabled={starred.length === 0 || downloading}
@@ -409,7 +397,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
   );
 }
 
-// ── Mini note widget ──────────────────────────────────────────────────────────
 function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   const existing = notes[questionId];
   const [open, setOpen] = useState(false);
@@ -489,11 +476,44 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
               </button>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground/30">⌘ + Enter to save · Saved to My Notes for offline review</p>
+          <p className="text-[10px] text-muted-foreground/30">⌘ + Enter to save</p>
         </>
       ) : (
         <p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">{existing?.text}</p>
       )}
+    </div>
+  );
+}
+
+function TeacherQuestionInline({ questionId, existing, onSave, onSkip }) {
+  const [text, setText] = useState(existing ?? "");
+
+  return (
+    <div className="px-4 pb-4 space-y-2 border-t border-amber-500/20 pt-3">
+      <div className="flex items-center gap-1.5">
+        <MessageCircleQuestion className="w-3.5 h-3.5 text-amber-400/70" />
+        <p className="text-[11px] font-bold text-amber-400/80">Want to ask your teacher something?</p>
+      </div>
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="e.g. Why does the wave function collapse? How do we know which equation to use here?"
+        rows={2}
+        autoFocus
+        className="w-full bg-card border border-amber-500/25 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
+      />
+      <div className="flex items-center justify-between">
+        <button onClick={onSkip} className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+          Skip for now
+        </button>
+        <button
+          onClick={() => onSave(text)}
+          disabled={!text.trim()}
+          className="text-xs font-bold text-amber-400 hover:brightness-110 transition-all bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Save question →
+        </button>
+      </div>
     </div>
   );
 }
@@ -521,13 +541,15 @@ export default function P1Session() {
   const [showCalc, setShowCalc] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [showCorrectBanner, setShowCorrectBanner] = useState(false);
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
 
   const [starredQuestions, setStarredQuestions] = useState(() => getStarredQuestions(paperId));
   const [notes, setNotes] = useState(() => getNotes(paperId));
-  // Show teacher question prompt after starring (per question, just in this session)
   const [showTeacherPrompt, setShowTeacherPrompt] = useState(false);
+
+  const autoAdvanceTimer = useRef(null);
 
   useEffect(() => {
     setSessionLoading(true);
@@ -552,11 +574,18 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, currentIdx, sessionLoading]);
 
+  // Clear auto-advance timer on unmount
+  useEffect(() => {
+    return () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); };
+  }, []);
+
   useEffect(() => {
     if (sessionLoading) return;
+    if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     setSelected(existingAnswer?.chosen ?? null);
     setIsGuess(existingAnswer?.flagged_as_guess ?? false);
     setSubmitted(!!existingAnswer);
+    setShowCorrectBanner(false);
     setLayer1(existingAnswer?.layer1 ?? null);
     setLayer2(existingAnswer?.layer2 ?? null);
     setShowCalc(false);
@@ -585,11 +614,10 @@ export default function P1Session() {
       const merged = getMergedFeedback();
       const updated = starQuestion(paperId, question, merged);
       setStarredQuestions({ ...updated });
-      setShowTeacherPrompt(true); // prompt for teacher question after starring
+      setShowTeacherPrompt(true);
     }
   }
 
-  // Update starred feedback when layer2 loads
   useEffect(() => {
     if (!question || !layer1 || !layer2 || !isCurrentStarred) return;
     const merged = getMergedFeedback();
@@ -610,9 +638,18 @@ export default function P1Session() {
     setSelected(null);
     setIsGuess(false);
     setSubmitted(false);
+    setShowCorrectBanner(false);
     setLayer1(null);
     setLayer2(null);
     setShowOverview(false);
+  }
+
+  function advanceQuestion() {
+    if (currentIdx < questions.length - 1) {
+      setCurrentIdx(i => i + 1);
+    } else {
+      navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } });
+    }
   }
 
   async function handleSubmit() {
@@ -632,6 +669,21 @@ export default function P1Session() {
       reasoning: isGuess ? null : selected,
     });
 
+    // ── Correct and NOT a guess → no AI call, instant banner + auto-advance ──
+    if (isCorrect && !isGuess) {
+      const record = { chosen: selected, correct: true, flagged_as_guess: false, layer1: null, layer2: null };
+      setAnswers(prev => ({ ...prev, [question.id]: record }));
+      setSubmitted(true);
+      setShowCorrectBanner(true);
+      setLoading(false);
+
+      autoAdvanceTimer.current = setTimeout(() => {
+        advanceQuestion();
+      }, 1500);
+      return;
+    }
+
+    // ── Wrong answer or guess → fetch AI feedback ──────────────────────────
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
     const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}
 Options: ${optionsList}
@@ -724,8 +776,7 @@ Respond ONLY in JSON:
   }
 
   function handleNext() {
-    if (currentIdx < questions.length - 1) setCurrentIdx(i => i + 1);
-    else navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } });
+    advanceQuestion();
   }
 
   function handlePrev() {
@@ -745,6 +796,10 @@ Respond ONLY in JSON:
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === questions.length - 1;
   const totalStarredAndNoted = starredIds.size + notedIds.size;
+
+  // Determine what to show post-submission
+  const needsFeedback = submitted && (layer1 !== null || showCorrectBanner);
+  const showFeedbackPanel = submitted && layer1 !== null;
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -773,7 +828,6 @@ Respond ONLY in JSON:
                 <BookOpen className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Data</span>
               </button>
-              {/* Notes & Stars button */}
               <button onClick={() => setShowStarred(true)}
                 className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                   totalStarredAndNoted > 0
@@ -844,18 +898,20 @@ Respond ONLY in JSON:
                 <span className="text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
                   {question.topic}
                 </span>
-                <button
-                  onClick={handleToggleStar}
-                  title={isCurrentStarred ? "Remove star" : "Star for teacher review"}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
-                    isCurrentStarred
-                      ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
-                      : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"
-                  }`}
-                >
-                  <Star className={`w-3.5 h-3.5 ${isCurrentStarred ? "fill-amber-400" : ""}`} />
-                  <span>{isCurrentStarred ? "Starred" : "Star"}</span>
-                </button>
+                {submitted && (
+                  <button
+                    onClick={handleToggleStar}
+                    title={isCurrentStarred ? "Remove star" : "Star for teacher review"}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
+                      isCurrentStarred
+                        ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+                        : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"
+                    }`}
+                  >
+                    <Star className={`w-3.5 h-3.5 ${isCurrentStarred ? "fill-amber-400" : ""}`} />
+                    <span>{isCurrentStarred ? "Starred" : "Star"}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -928,8 +984,11 @@ Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Layer 1 */}
-          {submitted && layer1 && (
+          {/* Correct banner — no AI, auto-advances */}
+          {showCorrectBanner && <CorrectBanner />}
+
+          {/* AI feedback — only shown for wrong answers or guesses */}
+          {showFeedbackPanel && (
             <Layer1Feedback
               feedback={layer1}
               isCorrect={existingAnswer?.correct ?? false}
@@ -937,8 +996,8 @@ Respond ONLY in JSON:
             />
           )}
 
-          {/* Mini note widget — always shown after submitting */}
-          {submitted && (
+          {/* Note widget — shown after submission for wrong/guess answers */}
+          {submitted && !showCorrectBanner && (
             <MiniNoteWidget
               questionId={question.id}
               paperId={paperId}
@@ -947,8 +1006,8 @@ Respond ONLY in JSON:
             />
           )}
 
-          {/* Star prompt — shown after feedback */}
-          {submitted && layer1 && !isCurrentStarred && (
+          {/* Star prompt — only for wrong/guess answers */}
+          {showFeedbackPanel && !isCurrentStarred && (
             <button
               onClick={handleToggleStar}
               className="w-full flex items-center justify-center gap-2 border border-amber-500/25 bg-amber-500/5 text-amber-400/80 text-sm font-semibold py-2.5 rounded-xl hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/50 active:scale-[0.98] transition-all"
@@ -958,8 +1017,8 @@ Respond ONLY in JSON:
             </button>
           )}
 
-          {/* Starred confirmation + inline teacher question prompt */}
-          {submitted && layer1 && isCurrentStarred && (
+          {/* Starred confirmation + teacher question prompt */}
+          {showFeedbackPanel && isCurrentStarred && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <div className="flex items-center gap-2">
@@ -971,7 +1030,6 @@ Respond ONLY in JSON:
                 </button>
               </div>
 
-              {/* Teacher question prompt — shown when just starred OR if teacher question not yet saved */}
               {(showTeacherPrompt || !starredQuestions[question.id]?.teacherQuestion) && (
                 <TeacherQuestionInline
                   questionId={question.id}
@@ -984,7 +1042,6 @@ Respond ONLY in JSON:
                 />
               )}
 
-              {/* Show saved teacher question */}
               {!showTeacherPrompt && starredQuestions[question.id]?.teacherQuestion && (
                 <div className="px-4 pb-3 space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/60 flex items-center gap-1">
@@ -993,10 +1050,7 @@ Respond ONLY in JSON:
                   <p className="text-xs text-foreground/70 leading-relaxed italic">
                     "{starredQuestions[question.id].teacherQuestion}"
                   </p>
-                  <button
-                    onClick={() => setShowTeacherPrompt(true)}
-                    className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors"
-                  >
+                  <button onClick={() => setShowTeacherPrompt(true)} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">
                     Edit
                   </button>
                 </div>
@@ -1004,8 +1058,8 @@ Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Show breakdown button */}
-          {submitted && layer1 && !layer2 && (
+          {/* Show breakdown button — only for wrong/guess */}
+          {showFeedbackPanel && !layer2 && (
             <button
               onClick={handleRequestLayer2}
               disabled={loadingL2}
@@ -1025,25 +1079,20 @@ Respond ONLY in JSON:
             </button>
           )}
 
-          {/* Layer 2 */}
           {layer2 && <Layer2Feedback feedback={layer2} />}
 
-          {/* Prev / Next */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button onClick={handlePrev} disabled={isFirst}
-              className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30">
-              <ChevronLeft className="w-4 h-4" /> Previous
-            </button>
-            <button onClick={handleNext}
-              className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
-              {isLast ? "Finish" : "Next"} <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {!submitted && (
-            <p className="text-[11px] text-muted-foreground/40 text-center -mt-1">
-              Progress syncs across all your devices automatically
-            </p>
+          {/* Prev / Next — only shown when not auto-advancing */}
+          {!showCorrectBanner && (
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button onClick={handlePrev} disabled={isFirst}
+                className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30">
+                <ChevronLeft className="w-4 h-4" /> Previous
+              </button>
+              <button onClick={handleNext}
+                className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
+                {isLast ? "Finish" : "Next"} <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           )}
 
         </div>
@@ -1076,43 +1125,6 @@ Respond ONLY in JSON:
           onTeacherQuestionSave={handleTeacherQuestionSave}
         />
       )}
-    </div>
-  );
-}
-
-// ── Inline teacher question widget ────────────────────────────────────────────
-function TeacherQuestionInline({ questionId, existing, onSave, onSkip }) {
-  const [text, setText] = useState(existing ?? "");
-
-  return (
-    <div className="px-4 pb-4 space-y-2 border-t border-amber-500/20 pt-3">
-      <div className="flex items-center gap-1.5">
-        <MessageCircleQuestion className="w-3.5 h-3.5 text-amber-400/70" />
-        <p className="text-[11px] font-bold text-amber-400/80">Want to ask your teacher something?</p>
-      </div>
-      <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        placeholder="e.g. Why does the wave function collapse? How do we know which equation to use here?"
-        rows={2}
-        autoFocus
-        className="w-full bg-card border border-amber-500/25 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
-      />
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onSkip}
-          className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-        >
-          Skip for now
-        </button>
-        <button
-          onClick={() => onSave(text)}
-          disabled={!text.trim()}
-          className="text-xs font-bold text-amber-400 hover:brightness-110 transition-all bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Save question →
-        </button>
-      </div>
     </div>
   );
 }

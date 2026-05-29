@@ -8,10 +8,37 @@ import { saveMCQAttempt } from "@/lib/topicStore";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
-// ── Layer 1 feedback — fast, minimal ─────────────────────────────────────────
+// ── Persistence helpers ───────────────────────────────────────────────────────
+const SESSION_KEY = "p1_session_9702_12_FM25";
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return { answers: {}, currentIdx: 0 };
+    return JSON.parse(raw);
+  } catch {
+    return { answers: {}, currentIdx: 0 };
+  }
+}
+
+function saveSession(answers, currentIdx) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ answers, currentIdx }));
+  } catch {}
+}
+
+export function clearP1Session() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+// ── Layer 1 feedback ──────────────────────────────────────────────────────────
 function Layer1Feedback({ feedback, isCorrect, isGuess }) {
+  const accentBg = isCorrect && !isGuess
+    ? "bg-green-500/10 border-green-500/25"
+    : isGuess
+      ? "bg-amber-500/10 border-amber-500/25"
+      : "bg-red-500/10 border-red-500/25";
   const accent = isCorrect && !isGuess ? "text-green-400" : isGuess ? "text-amber-400" : "text-red-400";
-  const accentBg = isCorrect && !isGuess ? "bg-green-500/10 border-green-500/25" : isGuess ? "bg-amber-500/10 border-amber-500/25" : "bg-red-500/10 border-red-500/25";
 
   return (
     <div className="space-y-3">
@@ -22,7 +49,13 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
         </span>
         <div>
           <p className={`text-sm font-bold ${accent}`}>
-            {isCorrect && !isGuess ? "Correct!" : isGuess && isCorrect ? "Correct — but flagged as a guess" : isGuess ? "Incorrect — flagged as a guess" : "Incorrect"}
+            {isCorrect && !isGuess
+              ? "Correct!"
+              : isGuess && isCorrect
+                ? "Correct — but flagged as a guess"
+                : isGuess
+                  ? "Incorrect — flagged as a guess"
+                  : "Incorrect"}
           </p>
           {(isGuess || !isCorrect) && (
             <p className="text-[11px] text-muted-foreground mt-0.5">Added to your review bank</p>
@@ -30,7 +63,7 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
         </div>
       </div>
 
-      {/* Takeaway (Layer 1) */}
+      {/* Takeaway */}
       {feedback.pulse_layer_1 && (
         <div className="relative rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-transparent p-4 overflow-hidden">
           <div className="pointer-events-none absolute -top-4 -right-4 w-20 h-20 rounded-full bg-emerald-400/10 blur-xl" />
@@ -74,7 +107,6 @@ function Layer2Feedback({ feedback }) {
           <p className="text-xs font-bold text-white">System · Breakdown · Tipping Point</p>
         </div>
       </div>
-
       <div className="px-4 pb-4 pt-3 space-y-4">
         {steps.map(s => s.content ? (
           <div key={s.number} className="space-y-1.5">
@@ -92,7 +124,7 @@ function Layer2Feedback({ feedback }) {
   );
 }
 
-// ── Formula sheet modal ──────────────────────────────────────────────────────
+// ── Formula sheet modal ───────────────────────────────────────────────────────
 function FormulaSheet({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
@@ -111,10 +143,9 @@ function FormulaSheet({ onClose }) {
   );
 }
 
-// ── Overview panel ───────────────────────────────────────────────────────────
+// ── Overview panel ────────────────────────────────────────────────────────────
 function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
   const topics = [...new Set(questions.map(q => q.topic))];
-
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
       <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl p-5 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -143,15 +174,13 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
             const isAnswered = !!a?.chosen;
-            const isCorrect = a?.correct;
-            const isGuess = a?.flagged_as_guess;
             return (
               <button key={q.id} onClick={() => { onJump(i); onClose(); }} title={`Q${q.number}: ${q.topic}`}
                 className={`w-9 h-9 rounded-lg text-xs font-bold border transition-all ${
                   isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
-                  : isGuess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                  : isAnswered && isCorrect ? "bg-green-500/20 border-green-500/40 text-green-400"
-                  : isAnswered && !isCorrect ? "bg-red-500/20 border-red-500/40 text-red-400"
+                  : a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                  : isAnswered && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
+                  : isAnswered && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400"
                   : "bg-secondary border-border text-muted-foreground hover:border-primary/30"
                 }`}>
                 {q.number}
@@ -181,18 +210,32 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
             );
           })}
         </div>
+
+        {/* Clear progress button */}
+        <button
+          onClick={() => {
+            clearP1Session();
+            onClose();
+            window.location.reload();
+          }}
+          className="w-full py-2.5 rounded-xl border border-red-500/25 text-red-400/70 text-xs font-semibold hover:bg-red-500/10 hover:text-red-400 transition-all"
+        >
+          Clear progress & restart
+        </button>
       </div>
     </div>
   );
 }
 
-// ── Main session ─────────────────────────────────────────────────────────────
+// ── Main session ──────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
   const questions = PHYSICS_P1_QUESTIONS;
 
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [answers, setAnswers] = useState({});
+  // Initialise from localStorage
+  const [answers, setAnswers] = useState(() => loadSession().answers);
+  const [currentIdx, setCurrentIdx] = useState(() => loadSession().currentIdx);
+
   const [selected, setSelected] = useState(null);
   const [isGuess, setIsGuess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -201,12 +244,18 @@ export default function P1Session() {
   const [showOverview, setShowOverview] = useState(false);
   const [showCalc, setShowCalc] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [layer1, setLayer1] = useState(null);  // fast feedback
-  const [layer2, setLayer2] = useState(null);  // on-demand breakdown
+  const [layer1, setLayer1] = useState(null);
+  const [layer2, setLayer2] = useState(null);
 
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
 
+  // Persist whenever answers or currentIdx change
+  useEffect(() => {
+    saveSession(answers, currentIdx);
+  }, [answers, currentIdx]);
+
+  // Restore per-question state when navigating
   useEffect(() => {
     setSelected(existingAnswer?.chosen ?? null);
     setIsGuess(existingAnswer?.flagged_as_guess ?? false);
@@ -219,13 +268,19 @@ export default function P1Session() {
   const answeredCount = Object.keys(answers).length;
   const progress = answeredCount / questions.length;
 
+  function updateAnswers(id, record) {
+    setAnswers(prev => {
+      const next = { ...prev, [id]: record };
+      return next;
+    });
+  }
+
   async function handleSubmit() {
     if (!selected || loading || submitted) return;
     setLoading(true);
 
     const isCorrect = selected === question.correct;
 
-    // Save to review bank
     await saveMCQAttempt({
       question_id: question.id,
       topic: question.topic,
@@ -237,7 +292,6 @@ export default function P1Session() {
       reasoning: isGuess ? null : selected,
     });
 
-    // ── Layer 1 only — fast, minimal prompt ──────────────────────────────
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
     const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}
 Options: ${optionsList}
@@ -276,8 +330,8 @@ Respond ONLY in JSON:
       };
     }
 
-    const answerRecord = { chosen: selected, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
-    setAnswers(prev => ({ ...prev, [question.id]: answerRecord }));
+    const record = { chosen: selected, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
+    updateAnswers(question.id, record);
     setLayer1(fb1);
     setLayer2(null);
     setSubmitted(true);
@@ -318,14 +372,11 @@ Give a deeper breakdown. Respond ONLY in JSON:
       });
       fb2 = r?.response ?? r;
     } catch {
-      fb2 = {
-        step1_system: "Could not load breakdown.",
-        step2_phrase_breakdown: "",
-        step3_tipping_point: "",
-      };
+      fb2 = { step1_system: "Could not load breakdown.", step2_phrase_breakdown: "", step3_tipping_point: "" };
     }
 
     setLayer2(fb2);
+    // Persist Layer 2 into stored answer too
     setAnswers(prev => ({
       ...prev,
       [question.id]: { ...prev[question.id], layer2: fb2 },
@@ -350,18 +401,16 @@ Give a deeper breakdown. Respond ONLY in JSON:
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* ── Sticky top bar ── */}
+        {/* Sticky top bar */}
         <div className="sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border/50">
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
             <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
               <ArrowLeft className="w-4 h-4 text-foreground" />
             </button>
-
             <div className="flex flex-col items-center">
               <p className="text-xs font-bold text-foreground">9702/12 · F/M/25</p>
               <p className="text-[10px] text-muted-foreground">Q{currentIdx + 1} of {questions.length}</p>
             </div>
-
             <div className="flex items-center gap-1.5">
               <button onClick={() => setShowCalc(c => !c)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
@@ -382,13 +431,12 @@ Give a deeper breakdown. Respond ONLY in JSON:
               </button>
             </div>
           </div>
-
           <div className="w-full h-0.5 bg-secondary">
             <div className="h-0.5 bg-primary transition-all duration-500" style={{ width: `${progress * 100}%` }} />
           </div>
         </div>
 
-        {/* ── Compact overview strip ── */}
+        {/* Compact overview strip */}
         <div className="flex gap-1 px-4 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-card/40">
           {questions.map((q, i) => {
             const a = answers[q.id];
@@ -464,7 +512,7 @@ Give a deeper breakdown. Respond ONLY in JSON:
             })}
           </div>
 
-          {/* Guess + Submit (pre-submission) */}
+          {/* Guess + Submit */}
           {!submitted && (
             <div className="flex gap-2">
               <button
@@ -488,7 +536,7 @@ Give a deeper breakdown. Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Layer 1 feedback (appears immediately after submit) */}
+          {/* Layer 1 feedback */}
           {submitted && layer1 && (
             <Layer1Feedback
               feedback={layer1}
@@ -497,7 +545,7 @@ Give a deeper breakdown. Respond ONLY in JSON:
             />
           )}
 
-          {/* "Show breakdown" button — only shown after Layer 1 loads and Layer 2 not yet fetched */}
+          {/* Show breakdown button */}
           {submitted && layer1 && !layer2 && (
             <button
               onClick={handleRequestLayer2}
@@ -518,10 +566,10 @@ Give a deeper breakdown. Respond ONLY in JSON:
             </button>
           )}
 
-          {/* Layer 2 — on demand, no mark scheme verdict, no Layer 3 */}
+          {/* Layer 2 */}
           {layer2 && <Layer2Feedback feedback={layer2} />}
 
-          {/* Prev / Next — always visible */}
+          {/* Prev / Next */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button onClick={handlePrev} disabled={isFirst}
               className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30">
@@ -535,7 +583,7 @@ Give a deeper breakdown. Respond ONLY in JSON:
 
           {!submitted && (
             <p className="text-[11px] text-muted-foreground/40 text-center -mt-1">
-              You can skip and return later using the overview strip above
+              Progress is saved automatically — you can exit and return any time
             </p>
           )}
 

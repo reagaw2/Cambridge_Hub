@@ -1,12 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2 } from "lucide-react";
+import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download } from "lucide-react";
 import { getP1Paper } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { saveMCQAttempt } from "@/lib/topicStore";
 import { loadP1Session, saveP1Session, clearP1Session } from "@/lib/p1SessionStore";
+import { getStarredQuestions, starQuestion, unstarQuestion, isQuestionStarred } from "@/lib/p1StarStore";
+import { generateStarredPdf } from "@/lib/p1StarPdf";
 import PaperPdfButton from "@/components/PaperPdfButton";
+import { useAuth } from "@/lib/AuthContext";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
@@ -122,7 +125,7 @@ function FormulaSheet({ onClose, imageUrl }) {
   );
 }
 
-function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClear }) {
+function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClear, starredIds }) {
   const topics = [...new Set(questions.map(q => q.topic))];
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
@@ -132,6 +135,7 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
             <p className="font-bold text-foreground">Question Overview</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {Object.keys(answers).length} of {questions.length} answered
+              {starredIds.size > 0 && <span className="ml-2 text-amber-400">· {starredIds.size} ⭐ starred</span>}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary">
@@ -145,6 +149,7 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-500/60 inline-block border border-amber-500/40" />Guessed</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-secondary inline-block border border-border" />Not answered</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded ring-2 ring-primary bg-primary/20 inline-block" />Current</span>
+          <span className="flex items-center gap-1">⭐ Starred</span>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -152,9 +157,10 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
             const isAnswered = !!a?.chosen;
+            const isStarred = starredIds.has(q.id);
             return (
-              <button key={q.id} onClick={() => { onJump(i); onClose(); }} title={`Q${q.number}: ${q.topic}`}
-                className={`w-9 h-9 rounded-lg text-xs font-bold border transition-all ${
+              <button key={q.id} onClick={() => { onJump(i); onClose(); }} title={`Q${q.number}: ${q.topic}${isStarred ? " ⭐" : ""}`}
+                className={`relative w-9 h-9 rounded-lg text-xs font-bold border transition-all ${
                   isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
                   : a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
                   : isAnswered && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
@@ -162,6 +168,9 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
                   : "bg-secondary border-border text-muted-foreground hover:border-primary/30"
                 }`}>
                 {q.number}
+                {isStarred && (
+                  <span className="absolute -top-1 -right-1 text-[8px] leading-none">⭐</span>
+                )}
               </button>
             );
           })}
@@ -200,9 +209,120 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
   );
 }
 
+// ── Starred Questions Panel ───────────────────────────────────────────────────
+function StarredPanel({ paperId, paperLabel, starredQuestions, onClose, onJump, questions, userEmail }) {
+  const [downloading, setDownloading] = useState(false);
+  const starred = Object.values(starredQuestions).sort((a, b) => a.questionNumber - b.questionNumber);
+
+  async function handleDownload() {
+    setDownloading(true);
+    await generateStarredPdf({ paperId, paperLabel, starredQuestions, userEmail });
+    setDownloading(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
+      <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl max-h-[80vh] flex flex-col">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+              <p className="font-bold text-foreground">Starred Questions</p>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {starred.length} question{starred.length !== 1 ? "s" : ""} starred for teacher review
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {starred.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+              <Star className="w-8 h-8 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No starred questions yet.</p>
+              <p className="text-[11px] text-muted-foreground/60 max-w-[240px] leading-relaxed">
+                After submitting an answer, tap the ⭐ button to star a question for teacher review.
+              </p>
+            </div>
+          ) : (
+            starred.map(entry => {
+              const qIdx = questions.findIndex(q => q.id === Object.keys(starredQuestions).find(id => starredQuestions[id] === entry));
+              return (
+                <div key={entry.questionNumber} className="bg-secondary/40 border border-border rounded-xl p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                        <span className="font-mono text-xs font-bold text-primary">Q{entry.questionNumber}</span>
+                        <span className="text-[11px] text-muted-foreground">{entry.topic}</span>
+                      </div>
+                      <p className="text-xs text-foreground/70 leading-relaxed line-clamp-2">
+                        {entry.questionText}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const idx = questions.findIndex(q => q.id === Object.keys(starredQuestions).find(id => starredQuestions[id] === entry));
+                        if (idx >= 0) { onJump(idx); onClose(); }
+                      }}
+                      className="text-[11px] font-semibold text-primary hover:brightness-110 transition-all shrink-0 px-2 py-1 rounded-lg bg-primary/10"
+                    >
+                      Go to →
+                    </button>
+                  </div>
+
+                  {/* AI feedback summary */}
+                  {entry.feedback?.pulse_layer_1 && (
+                    <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
+                      <p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.pulse_layer_1}</p>
+                    </div>
+                  )}
+                  {entry.feedback?.cambridge_insight && (
+                    <div className="bg-card border border-border/60 rounded-lg px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Cambridge Insight</p>
+                      <p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.cambridge_insight}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Download button */}
+        <div className="shrink-0 px-4 py-4 border-t border-border/50 space-y-2">
+          <button
+            onClick={handleDownload}
+            disabled={starred.length === 0 || downloading}
+            className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {downloading ? (
+              <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Generating PDF…</>
+            ) : (
+              <><Download className="w-4 h-4" /> Download for Teacher (PDF)</>
+            )}
+          </button>
+          <p className="text-[10px] text-muted-foreground/50 text-center leading-relaxed">
+            Downloads all starred questions with full AI feedback — ready to show your teacher
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main session ──────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   const paperId = location.state?.paperId ?? "9702/12/F/M/25";
   const paper = getP1Paper(paperId);
@@ -219,26 +339,27 @@ export default function P1Session() {
   const [showFormulas, setShowFormulas] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showCalc, setShowCalc] = useState(false);
+  const [showStarred, setShowStarred] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
+  const [starredQuestions, setStarredQuestions] = useState(() => getStarredQuestions(paperId));
 
   // Load session for THIS specific paper on mount
   useEffect(() => {
     setSessionLoading(true);
+    setStarredQuestions(getStarredQuestions(paperId));
     loadP1Session(paperId).then(session => {
       setAnswers(session.answers ?? {});
       setCurrentIdx(session.currentIdx ?? 0);
       setSessionLoading(false);
     });
-  // paperId is stable for the lifetime of this component mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
 
-  // Persist whenever answers or currentIdx change (skip initial load)
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return; }
@@ -247,7 +368,6 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, currentIdx, sessionLoading]);
 
-  // Restore per-question state when navigating between questions
   useEffect(() => {
     if (sessionLoading) return;
     setSelected(existingAnswer?.chosen ?? null);
@@ -261,6 +381,35 @@ export default function P1Session() {
 
   const answeredCount = Object.keys(answers).length;
   const progress = answeredCount / questions.length;
+  const starredIds = new Set(Object.keys(starredQuestions));
+  const isCurrentStarred = question ? starredIds.has(question.id) : false;
+
+  // Merge all feedback layers for starring
+  function getMergedFeedback() {
+    if (!layer1) return null;
+    return { ...layer1, ...(layer2 ?? {}) };
+  }
+
+  function handleToggleStar() {
+    if (!question) return;
+    if (isCurrentStarred) {
+      const updated = unstarQuestion(paperId, question.id);
+      setStarredQuestions({ ...updated });
+    } else {
+      const merged = getMergedFeedback();
+      const updated = starQuestion(paperId, question, merged);
+      setStarredQuestions({ ...updated });
+    }
+  }
+
+  // Update starred feedback when layer2 loads (so the PDF gets the full data)
+  useEffect(() => {
+    if (!question || !layer1 || !layer2 || !isCurrentStarred) return;
+    const merged = getMergedFeedback();
+    const updated = starQuestion(paperId, question, merged);
+    setStarredQuestions({ ...updated });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layer2]);
 
   async function handleClear() {
     await clearP1Session(paperId);
@@ -431,6 +580,18 @@ Respond ONLY in JSON:
                 <BookOpen className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Data</span>
               </button>
+              {/* Stars button — shows count badge */}
+              <button onClick={() => setShowStarred(true)}
+                className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                  starredIds.size > 0
+                    ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
+                    : "bg-secondary border-border text-muted-foreground hover:brightness-110"
+                }`}>
+                <Star className={`w-3.5 h-3.5 ${starredIds.size > 0 ? "fill-amber-400" : ""}`} />
+                {starredIds.size > 0 && (
+                  <span className="font-mono text-[10px]">{starredIds.size}</span>
+                )}
+              </button>
               <button onClick={() => setShowOverview(true)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-all">
                 <Grid3X3 className="w-3.5 h-3.5" />
@@ -443,7 +604,7 @@ Respond ONLY in JSON:
           </div>
         </div>
 
-        {/* PDF access banner — paperId ensures the correct PDF loads */}
+        {/* PDF access banner */}
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
           <PaperPdfButton label="Open Question Paper" paperId={paperId} />
           <p className="text-[11px] text-muted-foreground/60 leading-snug">
@@ -457,9 +618,10 @@ Respond ONLY in JSON:
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
             const isAnswered = !!a?.chosen;
+            const isStarred = starredIds.has(q.id);
             return (
               <button key={q.id} onClick={() => setCurrentIdx(i)}
-                className={`shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${
+                className={`relative shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${
                   isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
                   : a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
                   : isAnswered && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
@@ -467,6 +629,9 @@ Respond ONLY in JSON:
                   : "bg-secondary/60 border-border/40 text-muted-foreground/50"
                 }`}>
                 {q.number}
+                {isStarred && (
+                  <span className="absolute -top-1 -right-1 text-[7px] leading-none">⭐</span>
+                )}
               </button>
             );
           })}
@@ -482,9 +647,24 @@ Respond ONLY in JSON:
               <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
                 Question {question.number}
               </span>
-              <span className="text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
-                {question.topic}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
+                  {question.topic}
+                </span>
+                {/* Star button — always visible */}
+                <button
+                  onClick={handleToggleStar}
+                  title={isCurrentStarred ? "Remove star" : "Star for teacher review"}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
+                    isCurrentStarred
+                      ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+                      : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"
+                  }`}
+                >
+                  <Star className={`w-3.5 h-3.5 ${isCurrentStarred ? "fill-amber-400" : ""}`} />
+                  <span>{isCurrentStarred ? "Starred" : "Star"}</span>
+                </button>
+              </div>
             </div>
 
             {/* Diagram notice */}
@@ -566,6 +746,30 @@ Respond ONLY in JSON:
             />
           )}
 
+          {/* Star prompt — shown after feedback if not yet starred */}
+          {submitted && layer1 && !isCurrentStarred && (
+            <button
+              onClick={handleToggleStar}
+              className="w-full flex items-center justify-center gap-2 border border-amber-500/25 bg-amber-500/5 text-amber-400/80 text-sm font-semibold py-2.5 rounded-xl hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/50 active:scale-[0.98] transition-all"
+            >
+              <Star className="w-4 h-4" />
+              Star this question for teacher review
+            </button>
+          )}
+
+          {/* Starred confirmation */}
+          {submitted && layer1 && isCurrentStarred && (
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/8">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
+                <p className="text-xs text-amber-400 font-semibold">Starred — included in your teacher review PDF</p>
+              </div>
+              <button onClick={handleToggleStar} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">
+                Remove
+              </button>
+            </div>
+          )}
+
           {/* Show breakdown button */}
           {submitted && layer1 && !layer2 && (
             <button
@@ -620,6 +824,18 @@ Respond ONLY in JSON:
           onJump={setCurrentIdx}
           onClose={() => setShowOverview(false)}
           onClear={handleClear}
+          starredIds={starredIds}
+        />
+      )}
+      {showStarred && (
+        <StarredPanel
+          paperId={paperId}
+          paperLabel={paper.label}
+          starredQuestions={starredQuestions}
+          onClose={() => setShowStarred(false)}
+          onJump={setCurrentIdx}
+          questions={questions}
+          userEmail={user?.email}
         />
       )}
     </div>

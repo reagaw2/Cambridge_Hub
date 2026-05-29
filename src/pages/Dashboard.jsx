@@ -57,7 +57,7 @@ const MCQ_ONLY_TOPICS = [
 ];
 
 const COMING_SOON = [
-  "Medical Physics", "Telecommunications",
+  "Medical Physics",
   "Ideal Gases", "Superposition", "Mechanics",
 ];
 
@@ -99,6 +99,20 @@ function TrendBadge({ trend }) {
       <ArrowDown className="w-3 h-3" /> Needs work
     </span>);
   return null;
+}
+
+// ── Section Divider ───────────────────────────────────────────────────────────
+function SectionDivider({ label, sublabel }) {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <div className="flex-1 h-px bg-white/8" />
+      <div className="text-center">
+        <p className="text-[11px] font-black uppercase tracking-widest text-white/40">{label}</p>
+        {sublabel && <p className="text-[9px] text-white/20 mt-0.5">{sublabel}</p>}
+      </div>
+      <div className="flex-1 h-px bg-white/8" />
+    </div>
+  );
 }
 
 const PTR_THRESHOLD = 72;
@@ -210,6 +224,8 @@ export default function Dashboard() {
     await loadDashboardData();
   }
 
+  const hasReviewBank = reviewBank.length > 0 || guessReviewBank.length > 0;
+
   return (
     <div className="min-h-screen bg-[#0d0d1a] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -277,9 +293,10 @@ export default function Dashboard() {
             </span>
           </div>
 
-          {/* ── Past Papers Section ─────────────────────────────────────── */}
+          {/* ── PAST PAPERS ──────────────────────────────────────────────── */}
+          <SectionDivider label="Past Papers" sublabel="Timed paper practice" />
+
           <div className="space-y-2">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Past Papers — Paper 1 MCQ</p>
             {P1_PAPERS.map(paper => (
               <button
                 key={paper.id}
@@ -302,39 +319,47 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Review Banks */}
-          {reviewBank.length > 0 && (
-            <div onClick={() => navigate("/review-bank")}
-              className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Bookmark className="w-4 h-4 text-amber-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">{reviewBank.length} question{reviewBank.length !== 1 ? "s" : ""} in review bank</p>
-                  <p className="text-[11px] text-white/40 mt-0.5 truncate">{reviewBankSubtitle(reviewBank)}</p>
+          {/* ── REVIEW BANKS ─────────────────────────────────────────────── */}
+          {hasReviewBank && (
+            <>
+              <SectionDivider label="Review Banks" sublabel="Spaced repetition · questions you missed" />
+
+              {reviewBank.length > 0 && (
+                <div onClick={() => navigate("/review-bank")}
+                  className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Bookmark className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">
+                        {reviewBank.length} written question{reviewBank.length !== 1 ? "s" : ""} in review bank
+                      </p>
+                      <p className="text-[11px] text-white/40 mt-0.5 truncate">{reviewBankSubtitle(reviewBank)}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
                 </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
-            </div>
+              )}
+
+              {guessReviewBank.length > 0 && (
+                <div onClick={() => navigate("/guess-review-bank")}
+                  className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="text-base shrink-0">🎲</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">
+                        {guessReviewBank.length} MCQ flagged as guesses
+                      </p>
+                      <p className="text-[11px] text-white/40 mt-0.5">{guessBankSubtitle(guessReviewBank)}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
+                </div>
+              )}
+            </>
           )}
 
-          {guessReviewBank.length > 0 && (
-            <div onClick={() => navigate("/guess-review-bank")}
-              className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <span className="text-base shrink-0">🎲</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">{guessReviewBank.length} MCQ flagged as guesses</p>
-                  <p className="text-[11px] text-white/40 mt-0.5">{guessBankSubtitle(guessReviewBank)}</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
-            </div>
-          )}
-
-          {/* A Level Topics */}
-          <div className="space-y-1 pt-2">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">A Level Topics · Paper 4</p>
-          </div>
+          {/* ── A LEVEL WRITTEN TOPICS ───────────────────────────────────── */}
+          <SectionDivider label="A Level Topics" sublabel="Paper 4 written practice" />
 
           <div className="space-y-2">
             {PAPER4_TOPICS.map(({ label, key, route }) => {
@@ -381,9 +406,7 @@ export default function Dashboard() {
           {/* MCQ progress topics */}
           {mcqOnlyTopics.length > 0 && (
             <>
-              <div className="space-y-1 pt-2">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Multiple Choice Progress</p>
-              </div>
+              <SectionDivider label="Multiple Choice Progress" sublabel="Topics you've attempted" />
               <div className="space-y-2">
                 {mcqOnlyTopics.map(({ label, key }) => {
                   const data = topicData[key];
@@ -405,9 +428,7 @@ export default function Dashboard() {
           )}
 
           {/* MCQ-only topics */}
-          <div className="space-y-1 pt-2">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Multiple Choice Topics</p>
-          </div>
+          <SectionDivider label="Multiple Choice Topics" sublabel="Paper 1 topic practice" />
           <div className="space-y-2">
             {MCQ_ONLY_TOPICS.map((label) => (
               <div key={label} onClick={() => navigate("/mcq", { state: { topic: label } })}

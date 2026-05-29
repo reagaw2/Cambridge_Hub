@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Lock } from "lucide-react";
 import { getGuessReviewBank } from "@/lib/topicStore";
-import { getQuestionsByIds } from "@/lib/mcqBank";
+import { getQuestionsByIds, MCQ_QUESTIONS } from "@/lib/mcqBank";
 
 function getLockStatus(locked_until) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -24,7 +24,11 @@ function GuessCard({ entry, mcqData, now, navigate, onStartSession }) {
   const q = mcqData[questionId];
   const [lockedMsg, setLockedMsg] = useState(false);
 
-  const preview = q?.text?.slice(0, 80) + (q?.text?.length > 80 ? "…" : "");
+  // Guard against question not found in bank
+  const questionText = q?.text ?? "";
+  const preview = questionText
+    ? (questionText.slice(0, 80) + (questionText.length > 80 ? "…" : ""))
+    : `Question ID: ${questionId}`;
   const topic = q?.topic ?? "MCQ";
 
   if (!locked) {
@@ -35,7 +39,7 @@ function GuessCard({ entry, mcqData, now, navigate, onStartSession }) {
             {topic}
           </span>
         </div>
-        <p className="text-sm text-foreground/80 leading-relaxed">{preview ?? questionId}</p>
+        <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
         <div className="flex items-center justify-end">
           <button
             onClick={() => onStartSession(questionId)}
@@ -58,7 +62,7 @@ function GuessCard({ entry, mcqData, now, navigate, onStartSession }) {
           {topic}
         </span>
       </div>
-      <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview ?? questionId}</p>
+      <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview}</p>
       <div className="flex items-center justify-end gap-1.5 text-amber-400/80">
         <Lock className="w-3 h-3" />
         <span className="text-[11px] font-medium">Unlocks in {formatCountdown(msRemaining)}</span>
@@ -81,15 +85,18 @@ export default function GuessReviewBankScreen() {
 
   useEffect(() => {
     getGuessReviewBank().then(bank => {
-      // bank is now array of objects { question_id, locked_until }
-      // but may still have legacy string entries — normalise
+      // Normalise legacy string entries
       const normalised = bank.map(e => typeof e === "string" ? { question_id: e, locked_until: null } : e);
       setEntries(normalised);
 
       const ids = normalised.map(e => e.question_id);
-      const questions = getQuestionsByIds(ids);
+
+      // Build lookup from ALL MCQ questions (not just filtered result)
+      // This ensures we find questions even if getQuestionsByIds doesn't cover them
       const map = {};
-      questions.forEach(q => { map[q.id] = q; });
+      MCQ_QUESTIONS.forEach(q => { map[q.id] = q; });
+      // Also overlay any matches from getQuestionsByIds for completeness
+      getQuestionsByIds(ids).forEach(q => { map[q.id] = q; });
       setMcqData(map);
       setLoading(false);
     });

@@ -1,8 +1,28 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { getGuessReviewBank } from "@/lib/topicStore";
 import { getQuestionsByIds, MCQ_QUESTIONS } from "@/lib/mcqBank";
+import PaperPdfButton from "@/components/PaperPdfButton";
+
+const OPTION_KEYS = ["A", "B", "C", "D"];
+
+// Map question source strings → paperId used by PaperPdfButton / p1PaperStore
+const SOURCE_TO_PAPER_ID = {
+  "9702/12/F/M/25": "9702/12/F/M/25",
+  "9702/12/M/J/22": "9702/12/M/J/22",
+};
+
+function getPaperIdFromSource(source) {
+  if (!source) return null;
+  // Direct match first
+  if (SOURCE_TO_PAPER_ID[source]) return SOURCE_TO_PAPER_ID[source];
+  // Scan for any known key appearing inside the source string
+  for (const [key, val] of Object.entries(SOURCE_TO_PAPER_ID)) {
+    if (source.includes(key)) return val;
+  }
+  return null;
+}
 
 function getLockStatus(locked_until) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -18,59 +38,118 @@ function formatCountdown(ms) {
   return `${minutes}m`;
 }
 
-function GuessCard({ entry, mcqData, now, navigate, onStartSession }) {
+function GuessCard({ entry, mcqData, navigate, onStartSession }) {
   const questionId = entry.question_id;
   const { locked, msRemaining } = getLockStatus(entry.locked_until);
   const q = mcqData[questionId];
   const [lockedMsg, setLockedMsg] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  // Guard against question not found in bank
-  const questionText = q?.text ?? "";
-  const preview = questionText
-    ? (questionText.slice(0, 80) + (questionText.length > 80 ? "…" : ""))
-    : `Question ID: ${questionId}`;
+  const questionText = q?.text ?? null;
   const topic = q?.topic ?? "MCQ";
+  const source = q?.source ?? entry.source ?? null;
+  const paperId = getPaperIdFromSource(source);
+  const hasOptions = q?.options && Object.keys(q.options).length > 0;
 
-  if (!locked) {
-    return (
-      <div className="bg-card border border-l-4 border-border border-l-green-500/70 rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-green-400/80 bg-green-500/10 px-2 py-0.5 rounded-full">
-            {topic}
-          </span>
-        </div>
-        <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
-        <div className="flex items-center justify-end">
-          <button
-            onClick={() => onStartSession(questionId)}
-            className="text-xs font-semibold text-green-400 hover:brightness-110 transition-all"
-          >
-            Attempt now →
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const borderColor = locked ? "border-l-amber-500/60" : "border-l-green-500/70";
+  const containerCls = `bg-card border border-l-4 border-border ${borderColor} rounded-xl overflow-hidden${locked ? " opacity-60" : ""}`;
 
   return (
-    <div
-      className="bg-card border border-l-4 border-border border-l-amber-500/60 rounded-xl p-4 space-y-3 opacity-50 cursor-pointer"
-      onClick={() => { setLockedMsg(true); setTimeout(() => setLockedMsg(false), 3000); }}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-full">
-          {topic}
-        </span>
+    <div className={containerCls}>
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+            locked ? "text-amber-400/80 bg-amber-500/10" : "text-green-400/80 bg-green-500/10"
+          }`}>
+            {topic}
+          </span>
+          {source && (
+            <span className="text-[10px] text-muted-foreground/50 font-mono">{source}</span>
+          )}
+        </div>
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-secondary"
+        >
+          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          {expanded ? "Less" : "Full question"}
+        </button>
       </div>
-      <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview}</p>
-      <div className="flex items-center justify-end gap-1.5 text-amber-400/80">
-        <Lock className="w-3 h-3" />
-        <span className="text-[11px] font-medium">Unlocks in {formatCountdown(msRemaining)}</span>
+
+      {/* Question text — always show a preview, expand to full */}
+      <div className="px-4 pb-3">
+        {questionText ? (
+          <p className={`text-sm text-foreground/85 leading-relaxed ${!expanded ? "line-clamp-3" : ""}`}>
+            {questionText}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground/40 italic">Question ID: {questionId}</p>
+        )}
       </div>
+
+      {/* Options — only shown when expanded */}
+      {expanded && hasOptions && (
+        <div className="px-4 pb-3 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Options</p>
+          {OPTION_KEYS.map(key => {
+            const text = q.options[key];
+            if (!text) return null;
+            return (
+              <div
+                key={key}
+                className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-border/50 bg-secondary/30"
+              >
+                <span className="font-mono text-xs font-black text-muted-foreground shrink-0 mt-0.5 w-4">{key}</span>
+                <span className="text-sm text-foreground/80 leading-relaxed">{text}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* PDF button — shown when expanded and paper is known */}
+      {expanded && paperId && (
+        <div className="px-4 pb-3 flex items-center gap-3">
+          <PaperPdfButton label="Open Past Paper" paperId={paperId} />
+          <p className="text-[11px] text-muted-foreground/50 leading-snug">
+            Open the PDF to see diagrams
+          </p>
+        </div>
+      )}
+
+      {/* Footer action row */}
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border/30">
+        {locked ? (
+          <>
+            <div
+              className="flex items-center gap-1.5 text-amber-400/80 cursor-pointer"
+              onClick={() => { setLockedMsg(l => !l); }}
+            >
+              <Lock className="w-3 h-3" />
+              <span className="text-[11px] font-medium">Unlocks in {formatCountdown(msRemaining)}</span>
+            </div>
+            <span className="text-[11px] text-muted-foreground/40">Guessed · needs review</span>
+          </>
+        ) : (
+          <>
+            <span className="text-[11px] text-muted-foreground/50">You guessed this — prove you know it</span>
+            <button
+              onClick={() => onStartSession(questionId)}
+              className="text-xs font-semibold text-green-400 hover:brightness-110 transition-all px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/25"
+            >
+              Attempt now →
+            </button>
+          </>
+        )}
+      </div>
+
       {lockedMsg && (
-        <p className="text-[11px] text-amber-400/70 italic">
-          This question unlocks in {formatCountdown(msRemaining)}. A correct guess is not mastered knowledge.
-        </p>
+        <div className="px-4 pb-3">
+          <p className="text-[11px] text-amber-400/70 italic">
+            A correct guess doesn't mean mastery. This unlocks in {formatCountdown(msRemaining)}.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -81,30 +160,23 @@ export default function GuessReviewBankScreen() {
   const [entries, setEntries] = useState([]);
   const [mcqData, setMcqData] = useState({});
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     getGuessReviewBank().then(bank => {
-      // Normalise legacy string entries
-      const normalised = bank.map(e => typeof e === "string" ? { question_id: e, locked_until: null } : e);
+      const normalised = bank.map(e =>
+        typeof e === "string" ? { question_id: e, locked_until: null } : e
+      );
       setEntries(normalised);
 
       const ids = normalised.map(e => e.question_id);
 
-      // Build lookup from ALL MCQ questions (not just filtered result)
-      // This ensures we find questions even if getQuestionsByIds doesn't cover them
+      // Build full lookup from all MCQ questions
       const map = {};
       MCQ_QUESTIONS.forEach(q => { map[q.id] = q; });
-      // Also overlay any matches from getQuestionsByIds for completeness
       getQuestionsByIds(ids).forEach(q => { map[q.id] = q; });
       setMcqData(map);
       setLoading(false);
     });
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(interval);
   }, []);
 
   function handleStartSession(questionId) {
@@ -133,7 +205,6 @@ export default function GuessReviewBankScreen() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -157,39 +228,37 @@ export default function GuessReviewBankScreen() {
             </div>
           )}
 
-          {entries.length > 0 && unlocked.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-4">
+          {entries.length > 0 && unlocked.length === 0 && locked.length > 0 && (
+            <div className="flex flex-col items-center justify-center text-center px-8 gap-4 py-8">
               <Lock className="w-8 h-8 text-amber-400/60" />
               <p className="text-base font-semibold text-foreground leading-relaxed max-w-xs">
-                All questions are waiting. Come back when they unlock — your brain is consolidating the material.
+                All questions are waiting. Come back when they unlock.
               </p>
               {nextUnlock && (
                 <p className="text-sm text-amber-400 font-medium">
-                  Next question unlocks in {formatCountdown(getLockStatus(nextUnlock.locked_until).msRemaining)}
+                  Next unlocks in {formatCountdown(getLockStatus(nextUnlock.locked_until).msRemaining)}
                 </p>
               )}
             </div>
           )}
 
-          {/* Ready to attempt */}
           {unlocked.length > 0 && (
             <div className="space-y-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-green-400">Ready to attempt</p>
               {unlocked.map(e => (
-                <GuessCard key={e.question_id} entry={e} mcqData={mcqData} now={now} navigate={navigate} onStartSession={handleStartSession} />
+                <GuessCard key={e.question_id} entry={e} mcqData={mcqData} navigate={navigate} onStartSession={handleStartSession} />
               ))}
             </div>
           )}
 
-          {/* Waiting */}
           {sortedLocked.length > 0 && (
             <div className="space-y-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-400">Waiting — Spaced Repetition Active</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">These questions are locked for 12 hours. A correct guess is not mastered knowledge.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Locked for 12 hours. A correct guess is not mastered knowledge.</p>
               </div>
               {sortedLocked.map(e => (
-                <GuessCard key={e.question_id} entry={e} mcqData={mcqData} now={now} navigate={navigate} onStartSession={handleStartSession} />
+                <GuessCard key={e.question_id} entry={e} mcqData={mcqData} navigate={navigate} onStartSession={handleStartSession} />
               ))}
             </div>
           )}

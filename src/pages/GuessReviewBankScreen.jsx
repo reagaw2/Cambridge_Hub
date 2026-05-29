@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { ArrowLeft, Lock, ChevronDown, ChevronUp } from "lucide-react";
 import { getGuessReviewBank } from "@/lib/topicStore";
 import { getQuestionsByIds, MCQ_QUESTIONS } from "@/lib/mcqBank";
 import PaperPdfButton from "@/components/PaperPdfButton";
@@ -11,13 +11,12 @@ const OPTION_KEYS = ["A", "B", "C", "D"];
 const SOURCE_TO_PAPER_ID = {
   "9702/12/F/M/25": "9702/12/F/M/25",
   "9702/12/M/J/22": "9702/12/M/J/22",
+  "9702/11/M/J/22": "9702/11/M/J/22",
 };
 
 function getPaperIdFromSource(source) {
   if (!source) return null;
-  // Direct match first
   if (SOURCE_TO_PAPER_ID[source]) return SOURCE_TO_PAPER_ID[source];
-  // Scan for any known key appearing inside the source string
   for (const [key, val] of Object.entries(SOURCE_TO_PAPER_ID)) {
     if (source.includes(key)) return val;
   }
@@ -52,10 +51,10 @@ function GuessCard({ entry, mcqData, navigate, onStartSession }) {
   const hasOptions = q?.options && Object.keys(q.options).length > 0;
 
   const borderColor = locked ? "border-l-amber-500/60" : "border-l-green-500/70";
-  const containerCls = `bg-card border border-l-4 border-border ${borderColor} rounded-xl overflow-hidden${locked ? " opacity-60" : ""}`;
 
   return (
-    <div className={containerCls}>
+    <div className={`bg-card border border-l-4 border-border ${borderColor} rounded-xl overflow-hidden${locked ? " opacity-60" : ""}`}>
+
       {/* Header row */}
       <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -77,7 +76,7 @@ function GuessCard({ entry, mcqData, navigate, onStartSession }) {
         </button>
       </div>
 
-      {/* Question text — always show a preview, expand to full */}
+      {/* Question text — preview or full */}
       <div className="px-4 pb-3">
         {questionText ? (
           <p className={`text-sm text-foreground/85 leading-relaxed ${!expanded ? "line-clamp-3" : ""}`}>
@@ -88,7 +87,7 @@ function GuessCard({ entry, mcqData, navigate, onStartSession }) {
         )}
       </div>
 
-      {/* Options — only shown when expanded */}
+      {/* Options — only when expanded */}
       {expanded && hasOptions && (
         <div className="px-4 pb-3 space-y-1.5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Options</p>
@@ -96,10 +95,7 @@ function GuessCard({ entry, mcqData, navigate, onStartSession }) {
             const text = q.options[key];
             if (!text) return null;
             return (
-              <div
-                key={key}
-                className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-border/50 bg-secondary/30"
-              >
+              <div key={key} className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-border/50 bg-secondary/30">
                 <span className="font-mono text-xs font-black text-muted-foreground shrink-0 mt-0.5 w-4">{key}</span>
                 <span className="text-sm text-foreground/80 leading-relaxed">{text}</span>
               </div>
@@ -108,17 +104,17 @@ function GuessCard({ entry, mcqData, navigate, onStartSession }) {
         </div>
       )}
 
-      {/* PDF button — shown when expanded and paper is known */}
+      {/* PDF button — when expanded and paper known */}
       {expanded && paperId && (
         <div className="px-4 pb-3 flex items-center gap-3">
           <PaperPdfButton label="Open Past Paper" paperId={paperId} />
           <p className="text-[11px] text-muted-foreground/50 leading-snug">
-            Open the PDF to see diagrams
+            Open the PDF to see any diagrams for this question
           </p>
         </div>
       )}
 
-      {/* Footer action row */}
+      {/* Footer */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border/30">
         {locked ? (
           <>
@@ -169,8 +165,6 @@ export default function GuessReviewBankScreen() {
       setEntries(normalised);
 
       const ids = normalised.map(e => e.question_id);
-
-      // Build full lookup from all MCQ questions
       const map = {};
       MCQ_QUESTIONS.forEach(q => { map[q.id] = q; });
       getQuestionsByIds(ids).forEach(q => { map[q.id] = q; });

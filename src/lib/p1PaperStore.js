@@ -11,6 +11,7 @@ const BUCKET = "paper-assets";
 const PAPER_FILES = {
   "9702/12/F/M/25": "9702_m25_qp_12.pdf",
   "9702/12/M/J/22": "9702_s22_qp_12.pdf",
+  "9702/11/M/J/22": "9702_s22_qp_11.pdf",
 };
 
 function localCacheKey(paperId) {
@@ -19,8 +20,6 @@ function localCacheKey(paperId) {
 
 /**
  * Get the public URL for a specific paper PDF.
- * Checks localStorage cache first, then derives from Supabase config.
- * @param {string} paperId  e.g. "9702/12/F/M/25"
  */
 export async function getPaperPdfUrl(paperId) {
   const filename = PAPER_FILES[paperId];
@@ -38,7 +37,6 @@ export async function getPaperPdfUrl(paperId) {
       .getPublicUrl(filename);
 
     if (data?.publicUrl) {
-      // Verify the file actually exists with a HEAD request
       const check = await fetch(data.publicUrl, { method: "HEAD" }).catch(() => null);
       if (check?.ok) {
         localStorage.setItem(cacheKey, data.publicUrl);
@@ -54,9 +52,6 @@ export async function getPaperPdfUrl(paperId) {
 
 /**
  * Upload a PDF via the server-side route (bypasses RLS).
- * @param {File} file
- * @param {string} paperId  e.g. "9702/12/M/J/22"
- * @returns {{ url: string | null, error: string | null }}
  */
 export async function uploadPaperPdf(file, paperId) {
   const filename = PAPER_FILES[paperId] ?? file.name;

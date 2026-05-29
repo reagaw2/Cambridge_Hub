@@ -6,6 +6,7 @@ import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyT
 import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles, FileText } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import { getStreakData } from "@/lib/topicStore";
+import { P1_PAPERS } from "@/lib/physicsP1Bank";
 
 function getLockStatus(locked_until) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -156,18 +157,6 @@ const AS_WRITTEN_TOPICS = [
 
 const WRITTEN_TOPICS = [...AS_WRITTEN_TOPICS, ...PAPER4_TOPICS];
 
-// Past papers available
-const PAST_PAPERS = [
-  {
-    id: "9702/12/F/M/25",
-    label: "9702/12 · Feb/Mar 2025",
-    type: "Paper 1 — Multiple Choice",
-    questions: 40,
-    route: "/physics/p1",
-    available: true,
-  },
-];
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -223,7 +212,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0d0d1a] text-white">
-      {/* Ambient glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute top-[-5%] left-[-5%] w-[400px] h-[400px] rounded-full bg-emerald-600/10 blur-[120px]" />
         <div className="absolute bottom-[-5%] right-[-5%] w-[400px] h-[400px] rounded-full bg-purple-600/10 blur-[120px]" />
@@ -291,13 +279,12 @@ export default function Dashboard() {
 
           {/* ── Past Papers Section ─────────────────────────────────────── */}
           <div className="space-y-2">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Past Papers</p>
-            {PAST_PAPERS.map(paper => (
+            <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Past Papers — Paper 1 MCQ</p>
+            {P1_PAPERS.map(paper => (
               <button
                 key={paper.id}
-                onClick={() => paper.available && navigate(paper.route)}
-                disabled={!paper.available}
-                className="w-full text-left rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 p-4 transition-all active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => navigate("/physics/p1", { state: { paperId: paper.id } })}
+                className="w-full text-left rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 p-4 transition-all active:scale-[0.99]"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -306,7 +293,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-white">{paper.label}</p>
-                      <p className="text-[11px] text-white/40 mt-0.5">{paper.type} · {paper.questions} questions</p>
+                      <p className="text-[11px] text-white/40 mt-0.5">Paper 1 Multiple Choice · 40 questions</p>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-emerald-400/50 shrink-0" />

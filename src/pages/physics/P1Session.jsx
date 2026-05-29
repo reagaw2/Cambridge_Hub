@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2 } from "lucide-react";
-import { PHYSICS_P1_QUESTIONS, PAPER_META, FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
+import { getP1Paper, FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { saveMCQAttempt } from "@/lib/topicStore";
@@ -64,7 +64,7 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
   );
 }
 
-// ── Layer 2 feedback — on demand ─────────────────────────────────────────────
+// ── Layer 2 feedback ─────────────────────────────────────────────────────────
 function Layer2Feedback({ feedback }) {
   const steps = [
     { number: "1", color: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400" }, label: "The System & Objective", content: feedback.step1_system },
@@ -101,22 +101,22 @@ function Layer2Feedback({ feedback }) {
 }
 
 // ── Formula sheet modal ───────────────────────────────────────────────────────
-function FormulaSheet({ onClose }) {
+function FormulaSheet({ onClose, imageUrl }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
       <div className="w-full max-w-[700px] bg-card border border-border rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50 sticky top-0 bg-card z-10">
-          <p className="font-bold text-foreground">Formula Sheet — 9702/12/F/M/25</p>
+          <p className="font-bold text-foreground">Data / Formula Sheet</p>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
         <div className="p-2">
-          {FORMULA_SHEET_URL ? (
-            <img src={FORMULA_SHEET_URL} alt="Formula sheet" className="w-full rounded-lg" style={{ background: "#fff" }} />
+          {imageUrl ? (
+            <img src={imageUrl} alt="Formula sheet" className="w-full rounded-lg" style={{ background: "#fff" }} />
           ) : (
             <div className="p-8 text-center text-muted-foreground text-sm">
-              Formula sheet image not available. Please refer to your Cambridge data booklet.
+              Formula sheet not available for this paper. Please refer to your Cambridge data booklet.
             </div>
           )}
         </div>
@@ -207,7 +207,12 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
 // ── Main session ──────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
-  const questions = PHYSICS_P1_QUESTIONS;
+  const location = useLocation();
+
+  // Support paper selection via route state — fallback to F/M/25
+  const paperId = location.state?.paperId ?? "9702/12/F/M/25";
+  const paper = getP1Paper(paperId);
+  const questions = paper.questions;
 
   const [sessionLoading, setSessionLoading] = useState(true);
   const [answers, setAnswers] = useState({});
@@ -279,7 +284,7 @@ export default function P1Session() {
     await saveMCQAttempt({
       question_id: question.id,
       topic: question.topic,
-      source: "9702/12/F/M/25",
+      source: paper.id,
       chosen_option: selected,
       correct_option: question.correct,
       correct: isCorrect,
@@ -380,14 +385,13 @@ Respond ONLY in JSON:
 
   function handleNext() {
     if (currentIdx < questions.length - 1) setCurrentIdx(i => i + 1);
-    else navigate("/physics/p1-summary", { state: { answers, questions, paperId: PAPER_META.id } });
+    else navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } });
   }
 
   function handlePrev() {
     if (currentIdx > 0) setCurrentIdx(i => i - 1);
   }
 
-  // Loading screen while fetching saved session
   if (sessionLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3">
@@ -412,7 +416,7 @@ Respond ONLY in JSON:
               <ArrowLeft className="w-4 h-4 text-foreground" />
             </button>
             <div className="flex flex-col items-center">
-              <p className="text-xs font-bold text-foreground">9702/12 · F/M/25</p>
+              <p className="text-xs font-bold text-foreground">{paper.label}</p>
               <p className="text-[10px] text-muted-foreground">Q{currentIdx + 1} of {questions.length}</p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -440,11 +444,11 @@ Respond ONLY in JSON:
           </div>
         </div>
 
-        {/* PDF access banner — always visible below top bar */}
+        {/* PDF access banner */}
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
           <PaperPdfButton label="Open Question Paper" />
           <p className="text-[11px] text-muted-foreground/60 leading-snug">
-            Open the PDF to see diagrams for questions with images
+            Open the PDF to see diagrams for image questions
           </p>
         </div>
 
@@ -483,8 +487,7 @@ Respond ONLY in JSON:
                 {question.topic}
               </span>
             </div>
-            {/* Show diagram hint for questions that have images */}
-            {question.image_url && (
+            {question.image_required && (
               <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 flex items-center gap-2.5">
                 <span className="text-base shrink-0">📊</span>
                 <p className="text-[11px] text-primary/80 leading-snug">
@@ -606,7 +609,7 @@ Respond ONLY in JSON:
         </div>
       </div>
 
-      {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} />}
+      {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
       {showOverview && (
         <OverviewPanel
           questions={questions}

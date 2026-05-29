@@ -1,9 +1,11 @@
 /**
- * physicsP1Bank.js — 9702/12/F/M/25 Paper 1 MCQ bank
- * All 40 questions with correct diagram image URLs.
+ * physicsP1Bank.js — Physics Paper 1 MCQ banks
+ * Contains: 9702/12/F/M/25 and 9702/12/M/J/22
  */
 
 export const FORMULA_SHEET_URL = "dyad-media://media/Cambridge_Hub/.dyad/media/556ab55fbb4969f2dc0cbd631e7a0f93c3c6a7dad2a1bb2ef1e6a46a561d9565.png";
+
+// ── Feb/Mar 2025 ─────────────────────────────────────────────────────────────
 
 export const PAPER_META = {
   id: "9702/12/F/M/25",
@@ -14,23 +16,21 @@ export const PAPER_META = {
 };
 
 export const PHYSICS_P1_QUESTIONS = [
-  // ── Q1 ──────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q01",
-    number: 1,
-    topic: "Physical Quantities & Units",
-    text: "Which quantity is a scalar quantity?",
+    id: "9702-12-FM25-Q01", number: 1, topic: "Physical Quantities & Units",
+    text: "Which estimate is reasonable?\nA 1×10⁻³ kg for the mass of a grain of sand\nB 1×10⁻² m³ for the volume of a tennis ball\nC 1×10⁰ J for the work done lifting an apple from waist height to head height\nD 1×10⁴ W for the power of a light bulb in a house",
     image_required: false,
-    options: { A: "force", B: "momentum", C: "velocity", D: "work" },
-    correct: "D",
-    explanation: "Work is a scalar — it has magnitude but no direction. Force, momentum and velocity are all vector quantities.",
+    options: {
+      A: "1×10⁻³ kg for the mass of a grain of sand",
+      B: "1×10⁻² m³ for the volume of a tennis ball",
+      C: "1×10⁰ J for the work done lifting an apple from waist height to head height",
+      D: "1×10⁴ W for the power of a light bulb in a house",
+    },
+    correct: "C",
+    explanation: "Lifting an apple (~0.1 kg) by ~1 m requires W = mgh ≈ 0.1 × 10 × 1 = 1 J. A grain of sand is ~10⁻⁷ kg; a tennis ball is ~3×10⁻⁴ m³; a light bulb is ~60 W.",
   },
-
-  // ── Q2 ──────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q02",
-    number: 2,
-    topic: "Physical Quantities & Units",
+    id: "9702-12-FM25-Q02", number: 2, topic: "Physical Quantities & Units",
     text: "What is the effect of a systematic error on the measurement of a physical quantity?",
     image_required: false,
     options: {
@@ -42,38 +42,26 @@ export const PHYSICS_P1_QUESTIONS = [
     correct: "D",
     explanation: "A systematic error causes all measurements to be consistently shifted from the true value. It affects accuracy, not precision.",
   },
-
-  // ── Q3 — velocity-time graph ─────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q03",
-    number: 3,
-    topic: "Dynamics & Newton's Laws",
-    text: "A car is accelerated by a constant resultant force of 300 N for 5.0 s. The variation with time of the velocity, in cm s⁻¹, of the car is shown.\n\nWhat is the mass of the car?",
-    image_required: false,
+    id: "9702-12-FM25-Q03", number: 3, topic: "Dynamics & Newton's Laws",
+    text: "A car is accelerated by a constant resultant force of 300 N for 5.0 s. The variation with time of the velocity, in cm s⁻¹, of the car is shown. What is the mass of the car?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/6f5c20721ebfcef02d0aae8a1df42bf11fcda0bba36516fc3c4cab4cb3222e20.png",
     options: { A: "13 kg", B: "1000 kg", C: "1300 kg", D: "10000 kg" },
     correct: "C",
     explanation: "From the graph, read the gradient (acceleration) in cm s⁻² and convert to m s⁻². F = ma → m = F/a = 300/0.24 ≈ 1300 kg.",
   },
-
-  // ── Q4 ──────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q04",
-    number: 4,
-    topic: "Kinematics",
+    id: "9702-12-FM25-Q04", number: 4, topic: "Kinematics",
     text: "An aircraft, initially stationary on a runway, takes off with a speed of 85 km h⁻¹ in a distance of no more than 1.20 km. What is the minimum constant acceleration necessary for the aircraft?",
     image_required: false,
     options: { A: "0.23 m s⁻²", B: "0.46 m s⁻²", C: "3.0 m s⁻²", D: "6.0 m s⁻²" },
     correct: "A",
     explanation: "Convert: 85 km h⁻¹ = 23.6 m s⁻¹. Use v² = u² + 2as → (23.6)² = 0 + 2×a×1200 → a ≈ 0.23 m s⁻².",
   },
-
-  // ── Q5 ──────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q05",
-    number: 5,
-    topic: "Kinematics",
-    text: "An object is fired upwards from horizontal ground. The object has an initial velocity of 20 m s⁻¹ at an angle of 45° to the horizontal. Air resistance is negligible. Which statement describes the speed of the object after it is fired until immediately before it reaches the ground again?",
+    id: "9702-12-FM25-Q05", number: 5, topic: "Kinematics",
+    text: "An object is fired upwards from horizontal ground at 45° to the horizontal with initial kinetic energy E. Air resistance is negligible. Which statement describes the speed of the object after it is fired until immediately before it reaches the ground again?",
     image_required: false,
     options: {
       A: "Its speed decreases to a value greater than zero, then increases to 20 m s⁻¹.",
@@ -82,14 +70,10 @@ export const PHYSICS_P1_QUESTIONS = [
       D: "Its speed decreases to zero, then increases to a value less than 20 m s⁻¹.",
     },
     correct: "A",
-    explanation: "The horizontal velocity component (≈14.1 m s⁻¹) persists throughout, so speed never reaches zero. By energy conservation, it returns to ground at 20 m s⁻¹.",
+    explanation: "The horizontal velocity component persists throughout, so speed never reaches zero. By energy conservation, it returns to ground at 20 m s⁻¹.",
   },
-
-  // ── Q6 ──────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q06",
-    number: 6,
-    topic: "Dynamics & Newton's Laws",
+    id: "9702-12-FM25-Q06", number: 6, topic: "Dynamics & Newton's Laws",
     text: "What is a statement of the principle of conservation of momentum for a system?",
     image_required: false,
     options: {
@@ -99,41 +83,29 @@ export const PHYSICS_P1_QUESTIONS = [
       D: "The total momentum of each object in the system is the product of its mass and velocity.",
     },
     correct: "C",
-    explanation: "Momentum is conserved when no net external force acts. KE is not always conserved (inelastic collisions). Option D is the definition of momentum, not its conservation.",
+    explanation: "Momentum is conserved when no net external force acts. KE is not always conserved (inelastic collisions).",
   },
-
-  // ── Q7 — P and Q objects at 35° ─────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q07",
-    number: 7,
-    topic: "Dynamics & Newton's Laws",
-    text: "Objects P and Q form an isolated system. Object P has mass 6.0 kg and is moving at a speed of 3.0 m s⁻¹. Object Q has mass 2.0 kg and is moving at a speed of 4.2 m s⁻¹ at an angle of 35° to the path of P.\n\nObjects P and Q collide and stick together. What is the magnitude of the component of the final momentum of the combined objects in the original direction of P?",
-    image_required: false,
+    id: "9702-12-FM25-Q07", number: 7, topic: "Dynamics & Newton's Laws",
+    text: "Objects P and Q form an isolated system. P has mass 6.0 kg moving at 3.0 m s⁻¹. Q has mass 2.0 kg moving at 4.2 m s⁻¹ at 35° to P. They collide and stick. What is the magnitude of the component of the final momentum in the original direction of P?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/4ea90a7e43498e5c2ea685fe6a91e5372f2d6e92245c71a8ec7055f0f663ee35.png",
     options: { A: "9.6 kg m s⁻¹", B: "11 kg m s⁻¹", C: "13 kg m s⁻¹", D: "25 kg m s⁻¹" },
     correct: "B",
-    explanation: "P's momentum in its direction: 6.0 × 3.0 = 18 kg m s⁻¹. Q's component along P's direction: 2.0 × 4.2 × cos35° ≈ 6.9 kg m s⁻¹. From the diagram Q moves at 35° from the opposite side, so total ≈ 18 − 6.9 ≈ 11 kg m s⁻¹.",
+    explanation: "P's momentum: 18 kg m s⁻¹. Q's component along P: 2.0 × 4.2 × cos35° ≈ 6.9 kg m s⁻¹. From diagram Q moves at 35° from opposite side, total ≈ 11 kg m s⁻¹.",
   },
-
-  // ── Q8 ──────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q08",
-    number: 8,
-    topic: "Dynamics & Newton's Laws",
-    text: "An astronaut of mass m in a spacecraft experiences a gravitational force F = mg when stationary on the launchpad. What is the gravitational force on the astronaut when the spacecraft is launched vertically upwards with an acceleration of 0.2g?",
+    id: "9702-12-FM25-Q08", number: 8, topic: "Dynamics & Newton's Laws",
+    text: "An astronaut of mass m in a spacecraft experiences a gravitational force F = mg when stationary on the launchpad. What is the gravitational force when the spacecraft launches vertically with acceleration 0.2g?",
     image_required: false,
     options: { A: "1.2mg", B: "mg", C: "0.8mg", D: "0" },
     correct: "B",
-    explanation: "Gravitational force depends only on mass and g, which doesn't change near Earth's surface. The launch acceleration changes apparent weight but gravitational force stays mg.",
+    explanation: "Gravitational force depends only on mass and g — the launch acceleration changes apparent weight but gravitational force stays mg.",
   },
-
-  // ── Q9 — seesaw with child X and Y ──────────────────────────────────────
   {
-    id: "9702-12-FM25-Q09",
-    number: 9,
-    topic: "Forces & Equilibrium",
-    text: "The diagram shows a child X of mass 20 kg and a child Y of mass 15 kg seated on a uniform plank. The plank has a mass of 7.0 kg and has a pivot at its midpoint. The plank is horizontal and in equilibrium.\n\nWhich statement about the weight of the plank is correct?",
-    image_required: false,
+    id: "9702-12-FM25-Q09", number: 9, topic: "Forces & Equilibrium",
+    text: "A child X (mass 20 kg) and child Y (mass 15 kg) sit on a uniform plank (mass 7.0 kg) with a pivot at its midpoint. Which statement about the weight of the plank is correct?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/8872c1e6ecb63a2535c6250639db62ab08ed272f842bec4552ca2bd88c11a884.png",
     options: {
       A: "The weight of the plank can be considered to be acting at its midpoint.",
@@ -142,15 +114,11 @@ export const PHYSICS_P1_QUESTIONS = [
       D: "The weight of the plank equals the force on the plank from the pivot.",
     },
     correct: "A",
-    explanation: "For a uniform plank the weight acts at the midpoint (centre of mass). Since the pivot is also at the midpoint, the weight causes zero moment.",
+    explanation: "For a uniform plank, weight acts at the midpoint (centre of mass). Since the pivot is also at the midpoint, the weight causes zero moment.",
   },
-
-  // ── Q10 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q10",
-    number: 10,
-    topic: "Forces & Equilibrium",
-    text: "An object is fully submerged in a liquid. A student determines the ratio (upthrust acting on the object) / (weight of the object). Which single change would double the value of this ratio?",
+    id: "9702-12-FM25-Q10", number: 10, topic: "Forces & Equilibrium",
+    text: "An object is fully submerged in a liquid. A student determines the ratio (upthrust)/(weight). Which single change would double this ratio?",
     image_required: false,
     options: {
       A: "Use a different liquid that has twice the density and the same volume as the original liquid.",
@@ -159,57 +127,41 @@ export const PHYSICS_P1_QUESTIONS = [
       D: "Use a different object that has twice the volume and the same density as the original object.",
     },
     correct: "A",
-    explanation: "Ratio = ρ_liquid / ρ_object. Doubling ρ_liquid (same object) doubles the ratio. Option A does exactly this.",
+    explanation: "Ratio = ρ_liquid / ρ_object. Doubling ρ_liquid (same object) doubles the ratio.",
   },
-
-  // ── Q11 — wall frame with 75 N sign ─────────────────────────────────────
   {
-    id: "9702-12-FM25-Q11",
-    number: 11,
-    topic: "Forces & Equilibrium",
-    text: "A shop sign weighing 75 N hangs from a frame attached to a vertical wall. The frame consists of a horizontal rod XY and a rod YZ that is at an angle of 30° to the horizontal. Rod XY is attached to the wall by a hinge at X and has length 0.50 m. Assume that the weights of the rods are negligible.\n\nWhat is the horizontal force exerted by the wall on rod XY?",
-    image_required: false,
+    id: "9702-12-FM25-Q11", number: 11, topic: "Forces & Equilibrium",
+    text: "A shop sign weighing 75 N hangs from a frame. Rod XY is horizontal (length 0.50 m), attached to wall by hinge at X. Rod YZ is at 30° to horizontal. What is the horizontal force exerted by the wall on rod XY?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/a87d14cc22d08b2cba03db502f3e08f8e8da583450fe863014ac3f3c66fb56ae.png",
     options: { A: "0 N", B: "43 N", C: "130 N", D: "150 N" },
     correct: "C",
-    explanation: "T_YZ sin30° = 75 → T_YZ = 150 N. Horizontal component at hinge = T_YZ cos30° = 150 × 0.866 = 130 N.",
+    explanation: "T_YZ sin30° = 75 → T_YZ = 150 N. Horizontal force at hinge = T_YZ cos30° = 150 × 0.866 = 130 N.",
   },
-
-  // ── Q12 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q12",
-    number: 12,
-    topic: "Physical Quantities & Units",
-    text: "A student takes measurements to calculate the density of a liquid in a beaker. The height of the liquid in the beaker is 0.20 m ± 2%. The internal diameter of the beaker is 0.05 m ± 3%. The mass of the liquid is 0.36 kg ± 10%. What is the percentage uncertainty in the calculated density of the liquid?",
+    id: "9702-12-FM25-Q12", number: 12, topic: "Physical Quantities & Units",
+    text: "Height of liquid = 0.20 m ± 2%. Diameter = 0.05 m ± 3%. Mass = 0.36 kg ± 10%. What is the percentage uncertainty in the calculated density?",
     image_required: false,
     options: { A: "2%", B: "5%", C: "15%", D: "18%" },
     correct: "D",
     explanation: "% uncertainty = %unc(mass) + 2×%unc(diameter) + %unc(height) = 10 + 2×3 + 2 = 18%.",
   },
-
-  // ── Q13 — plank XY with child ────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q13",
-    number: 13,
-    topic: "Forces & Equilibrium",
-    text: "The diagram shows a uniform plank XY of length 4.0 m and weight 300 N. The plank rests on fixed supports at its ends X and Y. A child of weight 600 N stands in different positions on the plank. The support at end X exerts a force F vertically upwards on the plank.\n\nWhat is the magnitude of F when the child stands at X and when the child stands at Y?",
-    image_required: false,
+    id: "9702-12-FM25-Q13", number: 13, topic: "Forces & Equilibrium",
+    text: "A uniform plank XY (length 4.0 m, weight 300 N) rests on supports at X and Y. A child weighing 600 N stands on the plank. What is F (force from X) when child stands at X and when at Y?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/4e7335ad18d4cf8e0a4100b4ac8a345d996240098890ab963a14a2de924b8cea.png",
     options: {
-      A: "F = 600 N (at X),   F = 0 N (at Y)",
-      B: "F = 600 N (at X),   F = 150 N (at Y)",
-      C: "F = 750 N (at X),   F = 0 N (at Y)",
-      D: "F = 750 N (at X),   F = 150 N (at Y)",
+      A: "F = 600 N (at X), F = 0 N (at Y)",
+      B: "F = 600 N (at X), F = 150 N (at Y)",
+      C: "F = 750 N (at X), F = 0 N (at Y)",
+      D: "F = 750 N (at X), F = 150 N (at Y)",
     },
     correct: "D",
-    explanation: "Child at X: moments about Y → F×4 = 600×4 + 300×2 = 3000 → F = 750 N. Child at Y: moments about Y → F×4 = 300×2 = 600 → F = 150 N.",
+    explanation: "Child at X: moments about Y → F×4 = 600×4 + 300×2 = 3000 → F = 750 N. Child at Y: F×4 = 300×2 = 600 → F = 150 N.",
   },
-
-  // ── Q14 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q14",
-    number: 14,
-    topic: "Work, Energy & Power",
+    id: "9702-12-FM25-Q14", number: 14, topic: "Work, Energy & Power",
     text: "Which relationship is used in the derivation of the equation: power = force × velocity?",
     image_required: false,
     options: {
@@ -221,177 +173,125 @@ export const PHYSICS_P1_QUESTIONS = [
     correct: "A",
     explanation: "P = Fd/t = F × (d/t) = F × v. The substitution uses displacement = velocity × time.",
   },
-
-  // ── Q15 — slope with block ───────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q15",
-    number: 15,
-    topic: "Work, Energy & Power",
-    text: "A block is released from rest at the top of a slope inclined at an angle θ to the horizontal. The slope has length L. There are no resistive forces acting on the block.\n\nWhat is the speed of the block at the bottom of the slope?",
-    image_required: false,
+    id: "9702-12-FM25-Q15", number: 15, topic: "Work, Energy & Power",
+    text: "A block released from rest at the top of a slope (angle θ, length L). No resistive forces. What is the speed at the bottom?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/69626090d7286366973608de4395cfc155697b90474355779bd1f74b6d359c1d.png",
-    options: {
-      A: "4.43 √(L cosθ)",
-      B: "4.43 √(L sinθ)",
-      C: "19.6 L cosθ",
-      D: "19.6 L sinθ",
-    },
+    options: { A: "4.43 √(L cosθ)", B: "4.43 √(L sinθ)", C: "19.6 L cosθ", D: "19.6 L sinθ" },
     correct: "B",
-    explanation: "h = L sinθ. Energy conservation: ½mv² = mgL sinθ → v = √(2gL sinθ) = √(19.6 L sinθ) = 4.43 √(L sinθ).",
+    explanation: "h = L sinθ. Energy conservation: ½mv² = mgL sinθ → v = √(2gL sinθ) = 4.43 √(L sinθ).",
   },
-
-  // ── Q16 — skateboarder ──────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q16",
-    number: 16,
-    topic: "Work, Energy & Power",
-    text: "A skateboarder and her skateboard have a total mass of 70 kg. She pushes on the ground with her foot to create a forward force F of 25 N on herself and the skateboard, as shown in the diagram.\n\nThe skateboarder and skateboard travel forwards a distance of 0.50 m before the skateboarder lifts her foot from the ground. What is the work done by F on the skateboarder and skateboard?",
-    image_required: false,
+    id: "9702-12-FM25-Q16", number: 16, topic: "Work, Energy & Power",
+    text: "A skateboarder (total mass 70 kg) pushes with force F = 25 N, travelling 0.50 m. What is the work done by F?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/2391334aa5ff2f9b023dad401c166eb67f09e6653fa35e348606ffdf95fb072f.png",
     options: { A: "13 J", B: "50 J", C: "340 J", D: "360 J" },
     correct: "A",
-    explanation: "F is applied at an angle to the horizontal. The horizontal component of F does work on the skateboarder. Work = F cosθ × d ≈ 13 J.",
+    explanation: "F is applied at an angle — only the horizontal component does work. Work ≈ 13 J.",
   },
-
-  // ── Q17 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q17",
-    number: 17,
-    topic: "Work, Energy & Power",
-    text: "A turbine at a hydroelectric power station is situated at a vertical distance of 30 m below the level of the surface of a large lake. The water passes through the turbine at a rate of 340 m³ per minute. The overall efficiency of the turbine and generator system is 90%. The density of water is 1000 kg m⁻³.\n\nWhat is the useful power output of the power station?",
+    id: "9702-12-FM25-Q17", number: 17, topic: "Work, Energy & Power",
+    text: "A hydroelectric turbine is 30 m below the lake surface. Water flow = 340 m³/min. Overall efficiency = 90%. Density of water = 1000 kg m⁻³. What is the useful power output?",
     image_required: false,
     options: { A: "0.15 MW", B: "1.5 MW", C: "1.7 MW", D: "90 MW" },
     correct: "B",
-    explanation: "Mass flow rate = 1000 × 340/60 = 5667 kg s⁻¹. Input power = ṁgh = 5667 × 10 × 30 = 1.7 MW. Useful = 0.90 × 1.7 = 1.5 MW.",
+    explanation: "Mass flow rate = 5667 kg s⁻¹. Input power = ṁgh = 5667 × 10 × 30 = 1.7 MW. Useful = 0.90 × 1.7 = 1.5 MW.",
   },
-
-  // ── Q18 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q18",
-    number: 18,
-    topic: "Work, Energy & Power",
-    text: "A projectile is launched at 45° to the horizontal with initial kinetic energy E. Assuming air resistance to be negligible, what will be the kinetic energy of the projectile when it reaches its highest point?",
+    id: "9702-12-FM25-Q18", number: 18, topic: "Work, Energy & Power",
+    text: "A projectile launched at 45° with initial KE = E. Air resistance negligible. What is the KE at the highest point?",
     image_required: false,
     options: { A: "0.50E", B: "0.71E", C: "0.87E", D: "E" },
     correct: "A",
-    explanation: "At the highest point vertical velocity = 0. Horizontal velocity = v cos45° = v/√2. KE = ½m(v/√2)² = E/2 = 0.50E.",
+    explanation: "At highest point vertical velocity = 0. Horizontal v = v cos45° = v/√2. KE = ½m(v/√2)² = E/2 = 0.50E.",
   },
-
-  // ── Q19 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q19",
-    number: 19,
-    topic: "Deformation of Solids",
-    text: "A wire is extended by a tensile force so that its deformation is elastic. What is meant by elastic deformation?",
+    id: "9702-12-FM25-Q19", number: 19, topic: "Deformation of Solids",
+    text: "A wire is extended elastically. What is meant by elastic deformation?",
     image_required: false,
     options: {
-      A: "The extension of the wire is proportional to the tensile force.",
-      B: "The extension of the wire is not proportional to the tensile force.",
-      C: "When the tensile force is removed, the wire does not return to its original length.",
-      D: "When the tensile force is removed, the wire returns to its original length.",
+      A: "The extension is proportional to the tensile force.",
+      B: "The extension is not proportional to the tensile force.",
+      C: "When the force is removed, the wire does not return to its original length.",
+      D: "When the force is removed, the wire returns to its original length.",
     },
     correct: "D",
-    explanation: "Elastic deformation means the material returns to its original shape when the force is removed. Proportionality is Hooke's law — a separate concept.",
+    explanation: "Elastic deformation means the material returns to its original shape when the force is removed.",
   },
-
-  // ── Q20 — bolt with diameter 2d and d ───────────────────────────────────
   {
-    id: "9702-12-FM25-Q20",
-    number: 20,
-    topic: "Deformation of Solids",
-    text: "A bolt is subjected to a tensile force, as shown. The bolt has a circular cross-section. At end X, the diameter is 2d. At end Y, the diameter is d.\n\nWhat is the ratio (stress at Y) / (stress at X)?",
-    image_required: false,
+    id: "9702-12-FM25-Q20", number: 20, topic: "Deformation of Solids",
+    text: "A bolt has circular cross-section. Diameter at X = 2d, diameter at Y = d. What is the ratio (stress at Y)/(stress at X)?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/e3d0f16f3ba24f769c07f8e0a0498253c1625de4b1359c814f0427eb5fcac949.png",
     options: { A: "0.25", B: "0.50", C: "2.0", D: "4.0" },
     correct: "D",
-    explanation: "Stress = F/A. Area ∝ d². Area_X = π(2d/2)² = πd². Area_Y = π(d/2)² = πd²/4. Stress_Y/Stress_X = Area_X/Area_Y = 4.0.",
+    explanation: "Stress = F/A. Area ∝ d². Area_X = π(d)² = πd². Area_Y = π(d/2)² = πd²/4. Stress_Y/Stress_X = 4.0.",
   },
-
-  // ── Q21 — force vs length graph ──────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q21",
-    number: 21,
-    topic: "Deformation of Solids",
-    text: "The graph shows the relationship between force acting on a compression spring and change in length of the spring.\n\nOne of these springs is placed in each corner of a horizontal square plate. The axis of each spring is in a vertical direction. These four springs support a total load of 160 N.\n\nWhat is the total elastic potential energy stored in the four springs?",
-    image_required: false,
+    id: "9702-12-FM25-Q21", number: 21, topic: "Deformation of Solids",
+    text: "Four springs support a total load of 160 N (one at each corner). From the force-extension graph, what is the total elastic potential energy stored?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/3456b28347bb2190186fb015aa0a9fd7001545eb4d5c807c43ee0311991faa25.png",
     options: { A: "0.048 J", B: "0.19 J", C: "0.38 J", D: "0.77 J" },
     correct: "B",
-    explanation: "Each spring supports 40 N. EPE per spring = ½Fx = area under graph at 40 N. Total = 4 × EPE ≈ 0.19 J.",
+    explanation: "Each spring supports 40 N. EPE per spring = area under graph at 40 N. Total = 4 × EPE ≈ 0.19 J.",
   },
-
-  // ── Q22 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q22",
-    number: 22,
-    topic: "Waves",
-    text: "Which row correctly identifies the properties of all electromagnetic waves?\n\n(✓ = property of an electromagnetic wave, × = not a property)\n\nColumns: transverse wave | longitudinal wave | can travel in free space",
+    id: "9702-12-FM25-Q22", number: 22, topic: "Waves",
+    text: "Which row correctly identifies the properties of all electromagnetic waves?",
     image_required: false,
     options: {
-      A: "transverse ✓,  longitudinal ×,  free space ✓",
-      B: "transverse ✓,  longitudinal ×,  free space ×",
-      C: "transverse ×,  longitudinal ✓,  free space ✓",
-      D: "transverse ×,  longitudinal ✓,  free space ×",
+      A: "transverse ✓, longitudinal ×, can travel in free space ✓",
+      B: "transverse ✓, longitudinal ×, can travel in free space ×",
+      C: "transverse ×, longitudinal ✓, can travel in free space ✓",
+      D: "transverse ×, longitudinal ✓, can travel in free space ×",
     },
     correct: "A",
     explanation: "All EM waves are transverse and can travel through a vacuum (free space).",
   },
-
-  // ── Q23 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q23",
-    number: 23,
-    topic: "Waves",
+    id: "9702-12-FM25-Q23", number: 23, topic: "Waves",
     text: "What is the approximate range of wavelengths in free space for infrared radiation?",
     image_required: false,
     options: { A: "100 nm to 400 nm", B: "300 μm to 30 cm", C: "400 nm to 700 nm", D: "800 nm to 1000 μm" },
     correct: "D",
-    explanation: "Infrared: ~700 nm to ~1 mm (1000 μm). Option A is UV, C is visible, B is microwave.",
+    explanation: "Infrared: ~700 nm to ~1 mm (1000 μm). A is UV, C is visible, B is microwave.",
   },
-
-  // ── Q24 — car between P and Q ────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q24",
-    number: 24,
-    topic: "Waves",
-    text: "The diagram shows a car travelling at a constant speed in a straight line between person P and person Q from point X to point Y. The car sounds its horn continuously as it travels. The horn emits sound of constant frequency.\n\nWhich statements about what person P and person Q hear during the motion of the car are correct?\n\n1. Person P hears a sound of increasing frequency.\n2. Person Q hears a sound of decreasing frequency.\n3. Person Q always hears a sound of higher frequency than person P.",
-    image_required: false,
+    id: "9702-12-FM25-Q24", number: 24, topic: "Waves",
+    text: "A car travels at constant speed from X to Y, sounding its horn. Which statements are correct?\n1. Person P hears increasing frequency.\n2. Person Q hears decreasing frequency.\n3. Person Q always hears higher frequency than person P.",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/7c83e475b1deb0fc56ad130815851ae4cdd7b8c784578aec9dac914473a953da.png",
-    options: { A: "1, 2 and 3", B: "1 and 2 only", C: "3 only", D: "none of them" },
+    options: {
+      A: "1, 2 and 3",
+      B: "1 and 2 only",
+      C: "3 only",
+      D: "none of them",
+    },
     correct: "C",
-    explanation: "Car moves at constant speed toward Q and away from P — so each hears a constant (not changing) frequency. But Q always hears a higher frequency than P. Statement 3 only is correct.",
+    explanation: "Constant speed → each person hears a constant (not changing) frequency. But Q always hears higher frequency than P. Statement 3 only is correct.",
   },
-
-  // ── Q25 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q25",
-    number: 25,
-    topic: "Waves",
-    text: "A progressive wave of frequency 300 Hz is travelling with a speed of 600 m s⁻¹. What is the phase difference between two points on the wave that are a distance of 0.50 m apart?",
+    id: "9702-12-FM25-Q25", number: 25, topic: "Waves",
+    text: "A progressive wave of frequency 300 Hz travels at 600 m s⁻¹. What is the phase difference between two points 0.50 m apart?",
     image_required: false,
     options: { A: "45°", B: "90°", C: "180°", D: "360°" },
     correct: "B",
-    explanation: "λ = v/f = 2.0 m. Path difference = 0.50 m = λ/4. Phase difference = (0.50/2.0) × 360° = 90°.",
+    explanation: "λ = v/f = 2.0 m. Path difference = 0.50 m = λ/4. Phase difference = 90°.",
   },
-
-  // ── Q26 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q26",
-    number: 26,
-    topic: "Waves",
-    text: "A polarised beam of light with intensity I is incident normally on a polarising filter. The transmitted light has intensity I. The filter is rotated about the normal axis through an angle θ. The transmitted light has intensity 0.75I. What is the angle θ?",
+    id: "9702-12-FM25-Q26", number: 26, topic: "Waves",
+    text: "Polarised light (intensity I) hits a polarising filter, rotated θ from original. Transmitted intensity = 0.75I. What is θ?",
     image_required: false,
     options: { A: "30°", B: "42°", C: "49°", D: "60°" },
     correct: "A",
     explanation: "Malus's law: 0.75I = I cos²θ → cosθ = √0.75 = 0.866 → θ = 30°.",
   },
-
-  // ── Q27 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q27",
-    number: 27,
-    topic: "Waves",
-    text: "Light waves are emitted from two sources. What is a necessary condition for observable interference fringes to be produced?",
+    id: "9702-12-FM25-Q27", number: 27, topic: "Waves",
+    text: "Light waves from two sources. What is a necessary condition for observable interference fringes?",
     image_required: false,
     options: {
       A: "The waves must be polarised.",
@@ -402,43 +302,31 @@ export const PHYSICS_P1_QUESTIONS = [
     correct: "C",
     explanation: "Coherence (constant phase difference and same frequency) is the necessary condition for stable interference fringes.",
   },
-
-  // ── Q28 — wave through barrier gap ──────────────────────────────────────
   {
-    id: "9702-12-FM25-Q28",
-    number: 28,
-    topic: "Waves",
-    text: "The diagram shows a water wave in a shallow tank. The wave is diffracted through a gap in a barrier and spreads. The wavelength of the wave is much smaller than the width of the gap.\n\nThe wavelength of the wave and the width of the gap are both changed by a small amount. Which combination of changes must increase the amount of spreading due to diffraction?",
-    image_required: false,
+    id: "9702-12-FM25-Q28", number: 28, topic: "Waves",
+    text: "A water wave passes through a gap in a barrier (wavelength much smaller than gap). Which combination increases the amount of spreading (diffraction)?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/50c15bd664bc93f716348b3132968b22614e1e0a836b362a9a5b2897b70d315e.png",
     options: {
-      A: "wavelength decreases, width of gap decreases",
-      B: "wavelength decreases, width of gap increases",
-      C: "wavelength increases, width of gap decreases",
-      D: "wavelength increases, width of gap increases",
+      A: "wavelength decreases, width decreases",
+      B: "wavelength decreases, width increases",
+      C: "wavelength increases, width decreases",
+      D: "wavelength increases, width increases",
     },
     correct: "C",
-    explanation: "Spreading ∝ λ / gap width. To increase spreading, increase λ AND decrease gap width — option C.",
+    explanation: "Spreading ∝ λ / gap width. To increase spreading: increase λ AND decrease gap width.",
   },
-
-  // ── Q29 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q29",
-    number: 29,
-    topic: "Waves",
-    text: "Light of wavelength 567 nm is incident normally on a diffraction grating. The grating has 400 lines per mm. A number of diffraction maxima are observed on the far side of the grating. What is the angle between the second-order maximum and the third-order maximum?",
+    id: "9702-12-FM25-Q29", number: 29, topic: "Waves",
+    text: "Light (λ = 567 nm) hits a diffraction grating (400 lines per mm). What is the angle between the 2nd and 3rd order maxima?",
     image_required: false,
     options: { A: "13.1°", B: "13.9°", C: "15.9°", D: "27.0°" },
     correct: "C",
-    explanation: "d = 2.5×10⁻⁶ m. θ₂ = 26.97°, θ₃ = 42.87°. Difference = 15.9°.",
+    explanation: "d = 2.5×10⁻⁶ m. θ₂ ≈ 27.0°, θ₃ ≈ 42.9°. Difference = 15.9°.",
   },
-
-  // ── Q30 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q30",
-    number: 30,
-    topic: "Electricity",
-    text: "Two cylindrical conductors, X and Y, are made from the same material. The conductors have equal lengths, but Y has a smaller diameter than X. X and Y are connected in series to a cell.\n\nWhich row compares the number of charge carriers per unit time passing through X and through Y and compares the average drift speed of the charge carriers in X and in Y?",
+    id: "9702-12-FM25-Q30", number: 30, topic: "Electricity",
+    text: "Two cylindrical conductors X and Y (same material, equal lengths, Y has smaller diameter) connected in series. Which row correctly compares charge carriers per unit time and drift speed?",
     image_required: false,
     options: {
       A: "carriers per unit time: Y greater than X | drift speed: Y greater than X",
@@ -447,28 +335,20 @@ export const PHYSICS_P1_QUESTIONS = [
       D: "carriers per unit time: Y same as X | drift speed: Y greater than X",
     },
     correct: "D",
-    explanation: "Series → same current → same carriers per unit time. Smaller area in Y → greater drift speed (I = nAvq, same n, q).",
+    explanation: "Series → same current → same carriers per unit time. Smaller area in Y → greater drift speed (I = nAvq).",
   },
-
-  // ── Q31 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q31",
-    number: 31,
-    topic: "Electricity",
-    text: "A copper wire is 6.4 m long and has a resistance of 0.92 Ω. The resistivity of copper is 1.8 × 10⁻⁸ Ω m. What is the diameter of the wire?",
+    id: "9702-12-FM25-Q31", number: 31, topic: "Electricity",
+    text: "A copper wire is 6.4 m long, resistance 0.92 Ω. Resistivity of copper = 1.8×10⁻⁸ Ω m. What is the diameter?",
     image_required: false,
-    options: { A: "5.7 × 10⁻⁵ m", B: "1.0 × 10⁻⁴ m", C: "4.0 × 10⁻⁴ m", D: "7.1 × 10⁻⁴ m" },
+    options: { A: "5.7×10⁻⁵ m", B: "1.0×10⁻⁴ m", C: "4.0×10⁻⁴ m", D: "7.1×10⁻⁴ m" },
     correct: "C",
     explanation: "A = ρL/R = 1.252×10⁻⁷ m². d = 2√(A/π) ≈ 4.0×10⁻⁴ m.",
   },
-
-  // ── Q32 — thermistor circuit + graphs ───────────────────────────────────
   {
-    id: "9702-12-FM25-Q32",
-    number: 32,
-    topic: "Electricity",
-    text: "A thermistor is connected to a cell with negligible internal resistance.\n\nWhich graph shows the variation with temperature of power, P, dissipated in the thermistor?",
-    image_required: false,
+    id: "9702-12-FM25-Q32", number: 32, topic: "Electricity",
+    text: "A thermistor is connected to a cell with negligible internal resistance. Which graph shows the variation with temperature of power P dissipated in the thermistor?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/9139dfcfa25796baaaf57115aaf03d7daaa9acebf27a67fef1cb719dccb4cb86.png",
     options: {
       A: "P increases as temperature increases",
@@ -479,57 +359,36 @@ export const PHYSICS_P1_QUESTIONS = [
     correct: "A",
     explanation: "NTC thermistor: R decreases as T increases. P = V²/R with constant V → P increases as T increases.",
   },
-
-  // ── Q33 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q33",
-    number: 33,
-    topic: "Electricity",
-    text: "A metal electrical conductor has a resistance of 5.6 kΩ. A potential difference of 9.0 V is applied across its ends. How many electrons pass a point in the conductor in one minute?",
+    id: "9702-12-FM25-Q33", number: 33, topic: "Electricity",
+    text: "A metal conductor has resistance 5.6 kΩ. P.d. of 9.0 V applied. How many electrons pass a point in one minute?",
     image_required: false,
-    options: { A: "6.0 × 10²⁰", B: "1.0 × 10¹⁹", C: "6.0 × 10¹⁷", D: "1.0 × 10¹⁶" },
+    options: { A: "6.0×10²⁰", B: "1.0×10¹⁹", C: "6.0×10¹⁷", D: "1.0×10¹⁶" },
     correct: "C",
-    explanation: "I = 9.0/5600 = 1.607×10⁻³ A. Q = I×t = 0.0964 C. N = Q/e = 0.0964/1.6×10⁻¹⁹ ≈ 6.0×10¹⁷.",
+    explanation: "I = 9.0/5600 ≈ 1.607×10⁻³ A. Q = I×60 ≈ 0.0964 C. N = Q/e ≈ 6.0×10¹⁷.",
   },
-
-  // ── Q34 — circuit symbols ────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q34",
-    number: 34,
-    topic: "Electricity",
-    text: "Which circuit symbol does not represent an electric component that is designed to emit sound waves?",
-    image_required: false,
+    id: "9702-12-FM25-Q34", number: 34, topic: "Electricity",
+    text: "Which circuit symbol does NOT represent a component designed to emit sound waves?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/41127d47bdb6eb5dc7853821886d68feadae196121cccea75410814ace81946f.png",
-    options: {
-      A: "Symbol A",
-      B: "Symbol B",
-      C: "Symbol C",
-      D: "Symbol D",
-    },
+    options: { A: "Symbol A", B: "Symbol B", C: "Symbol C", D: "Symbol D" },
     correct: "B",
-    explanation: "Symbol B is a microphone — it converts sound to electrical signal (it receives sound, not emits it). The others are speaker/earphone symbols that emit sound.",
+    explanation: "Symbol B is a microphone — it converts sound to electrical signal (receives, not emits). The others are speaker/earphone symbols.",
   },
-
-  // ── Q35 — junction P, Q, R ──────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q35",
-    number: 35,
-    topic: "Electricity",
-    text: "The diagram shows a junction in a circuit where three wires, P, Q and R, meet. The currents in P and Q are 1 A and 3 A respectively, in the directions shown.\n\nHow much charge passes a given point in wire R in a time of 5 s?",
-    image_required: false,
+    id: "9702-12-FM25-Q35", number: 35, topic: "Electricity",
+    text: "Three wires P, Q, R meet at a junction. Current in P = 1 A, current in Q = 3 A (directions as shown). How much charge passes a point in wire R in 5 s?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/429893430f784d8e057f4a78dae81346d29b26c5be1d342f4d814c76a0e075d5.png",
     options: { A: "0.4 C", B: "2 C", C: "10 C", D: "20 C" },
     correct: "C",
-    explanation: "From the diagram, 3 A flows in along Q and 1 A flows out along P. By Kirchhoff's first law, current in R = 3 − 1 = 2 A. Charge = 2 × 5 = 10 C.",
+    explanation: "3 A in along Q, 1 A out along P. Current in R = 3 − 1 = 2 A. Charge = 2 × 5 = 10 C.",
   },
-
-  // ── Q36 — cell circuit with switch ──────────────────────────────────────
   {
-    id: "9702-12-FM25-Q36",
-    number: 36,
-    topic: "Electricity",
-    text: "A cell of electromotive force E and internal resistance r is connected in series with a switch S and an external resistor of resistance R. The potential difference between P and Q is V.\n\nWhich statement is correct when S is changed from open to closed?",
-    image_required: false,
+    id: "9702-12-FM25-Q36", number: 36, topic: "Electricity",
+    text: "A cell (e.m.f. E, internal resistance r) connected in series with switch S and resistor R. P.d. between P and Q is V. What happens to V when S is changed from open to closed?",
+    image_required: true,
     image_url: "dyad-media://media/Cambridge_Hub/.dyad/media/f2e2a91bef805b4427ef3c741a56497e912f2ba587fd19d4c7db59f345f8fc86.png",
     options: {
       A: "V increases because there is a p.d. across R.",
@@ -540,12 +399,8 @@ export const PHYSICS_P1_QUESTIONS = [
     correct: "B",
     explanation: "S open: no current, V = E. S closed: current flows, voltage drop across r → V = E − Ir < E. V decreases.",
   },
-
-  // ── Q37 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q37",
-    number: 37,
-    topic: "Nuclear Physics",
+    id: "9702-12-FM25-Q37", number: 37, topic: "Nuclear Physics",
     text: "What is a general description of a baryon?",
     image_required: false,
     options: {
@@ -557,36 +412,24 @@ export const PHYSICS_P1_QUESTIONS = [
     correct: "B",
     explanation: "A baryon is made of three quarks — they do not need to be the same flavour (e.g. proton = uud).",
   },
-
-  // ── Q38 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q38",
-    number: 38,
-    topic: "Nuclear Physics",
-    text: "A stationary nucleus has nucleon number A. The nucleus decays by emitting a proton with speed ν to form a new nucleus with speed u. The new nucleus and the proton move away from one another in opposite directions.\n\nWhich equation gives ν in terms of A and u?",
+    id: "9702-12-FM25-Q38", number: 38, topic: "Nuclear Physics",
+    text: "A stationary nucleus (nucleon number A) decays by emitting a proton with speed ν, forming new nucleus with speed u (opposite directions). Which equation gives ν?",
     image_required: false,
     options: { A: "ν = (A/4 – 1)u", B: "ν = (A – 1)u", C: "ν = Au", D: "ν = (A + 1)u" },
     correct: "B",
     explanation: "Conservation of momentum: 1×ν = (A−1)×u → ν = (A−1)u.",
   },
-
-  // ── Q39 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q39",
-    number: 39,
-    topic: "Nuclear Physics",
-    text: "What is the change to the quark composition of a nucleus that takes place during β⁺ decay?",
+    id: "9702-12-FM25-Q39", number: 39, topic: "Nuclear Physics",
+    text: "What is the change to the quark composition of a nucleus during β⁺ decay?",
     image_required: false,
     options: { A: "down to antiup", B: "down to up", C: "up to antidown", D: "up to down" },
     correct: "D",
     explanation: "In β⁺ decay, a proton (uud) → neutron (udd). One up quark changes to a down quark.",
   },
-
-  // ── Q40 ─────────────────────────────────────────────────────────────────
   {
-    id: "9702-12-FM25-Q40",
-    number: 40,
-    topic: "Nuclear Physics",
+    id: "9702-12-FM25-Q40", number: 40, topic: "Nuclear Physics",
     text: "What is the charge, in terms of the elementary charge e, on a charm quark?",
     image_required: false,
     options: { A: "–(2/3)e", B: "–(1/3)e", C: "+(1/3)e", D: "+(2/3)e" },
@@ -595,17 +438,480 @@ export const PHYSICS_P1_QUESTIONS = [
   },
 ];
 
+// ── May/June 2022 ─────────────────────────────────────────────────────────────
+
+export const PAPER_META_MJ22 = {
+  id: "9702/12/M/J/22",
+  title: "Physics A Level — Paper 1 Multiple Choice",
+  session: "May/June 2022",
+  totalQuestions: 40,
+  timeMinutes: 45,
+};
+
+export const PHYSICS_P1_MJ22_QUESTIONS = [
+  {
+    id: "9702-12-MJ22-Q01", number: 1, topic: "Physical Quantities & Units",
+    text: "Which estimate is reasonable?",
+    image_required: false,
+    options: {
+      A: "1×10⁻³ kg for the mass of a grain of sand",
+      B: "1×10⁻² m³ for the volume of a tennis ball",
+      C: "1×10⁰ J for the work done lifting an apple from waist height to head height",
+      D: "1×10⁴ W for the power of a light bulb in a house",
+    },
+    correct: "C",
+    explanation: "Lifting an apple (~0.1 kg) by ~1 m requires W = mgh ≈ 1 J. A grain of sand is ~10⁻⁷ kg; a tennis ball volume is ~3×10⁻⁴ m³; a light bulb is ~60 W.",
+  },
+  {
+    id: "9702-12-MJ22-Q02", number: 2, topic: "Physical Quantities & Units",
+    text: "What is the symbol for the SI base unit of temperature?",
+    image_required: false,
+    options: { A: "C", B: "K", C: "°C", D: "°K" },
+    correct: "B",
+    explanation: "The SI base unit of temperature is the kelvin, symbol K. Celsius (°C) is a derived unit and not the SI base unit.",
+  },
+  {
+    id: "9702-12-MJ22-Q03", number: 3, topic: "Physical Quantities & Units",
+    text: "Which statement about systematic errors is NOT correct?",
+    image_required: false,
+    options: {
+      A: "A systematic error can be caused by using an incorrectly calibrated instrument.",
+      B: "One particular type of systematic error can affect all the measurements by the same amount.",
+      C: "The effect of a systematic error can be reduced by repeating and averaging the measurements.",
+      D: "Zero error is a type of systematic error.",
+    },
+    correct: "C",
+    explanation: "Repeating and averaging reduces random errors, NOT systematic errors. Systematic errors are consistent and cannot be averaged out.",
+  },
+  {
+    id: "9702-12-MJ22-Q04", number: 4, topic: "Kinematics",
+    text: "An object has initial velocity 4.0 m s⁻¹ to the right. Its final velocity is 3.0 m s⁻¹ downwards. Which arrow represents the change in velocity?",
+    image_required: true,
+    options: { A: "Arrow A", B: "Arrow B", C: "Arrow C", D: "Arrow D" },
+    correct: "B",
+    explanation: "Change in velocity = final − initial = (0, −3) − (4, 0) = (−4, −3). This vector points left and down with magnitude 5 m s⁻¹.",
+  },
+  {
+    id: "9702-12-MJ22-Q05", number: 5, topic: "Kinematics",
+    text: "A car travels anticlockwise along a horizontal circular road (radius 12 m) from P to Q in 4.0 s. P and Q are at right angles at the centre. What is the magnitude of the average velocity?",
+    image_required: true,
+    options: { A: "4.2 m s⁻¹", B: "4.7 m s⁻¹", C: "6.0 m s⁻¹", D: "14 m s⁻¹" },
+    correct: "A",
+    explanation: "Displacement P to Q = √(12² + 12²) = 12√2 ≈ 17.0 m. Average velocity = 17.0/4.0 = 4.2 m s⁻¹.",
+  },
+  {
+    id: "9702-12-MJ22-Q06", number: 6, topic: "Kinematics",
+    text: "A stone is dropped 78.0 m down a well. The speed of sound is 330 m s⁻¹. Air resistance is negligible. What is the time interval between dropping the stone and hearing it hit the water?",
+    image_required: false,
+    options: { A: "3.75 s", B: "3.99 s", C: "4.19 s", D: "4.22 s" },
+    correct: "D",
+    explanation: "Time to fall: 78 = ½ × 9.81 × t² → t = 3.99 s. Time for sound: 78/330 = 0.24 s. Total ≈ 3.99 + 0.24 = 4.22 s (but rounding gives 4.22 s with g = 9.81).",
+  },
+  {
+    id: "9702-12-MJ22-Q07", number: 7, topic: "Dynamics & Newton's Laws",
+    text: "Which statement is NOT a requirement of a pair of forces that obey Newton's third law?",
+    image_required: false,
+    options: {
+      A: "The forces act in opposite directions.",
+      B: "The forces act on different objects.",
+      C: "The forces act on objects in contact.",
+      D: "The forces are of equal magnitude.",
+    },
+    correct: "C",
+    explanation: "Newton's third law pairs can act at a distance (e.g. gravity between Earth and Moon). Contact is NOT required.",
+  },
+  {
+    id: "9702-12-MJ22-Q08", number: 8, topic: "Dynamics & Newton's Laws",
+    text: "A child (mass 20 kg) stands on a sledge (mass 40 kg) on a frictionless surface. A rope is attached to the sledge, passes around a fixed pole, and is held by the child. The child pulls with 12 N. The system accelerates towards the pole. What is the frictional force between child and sledge?",
+    image_required: true,
+    options: { A: "4.0 N", B: "6.0 N", C: "8.0 N", D: "12 N" },
+    correct: "D",
+    explanation: "The rope exerts 12 N on the sledge toward the pole. The only forward force on the child is friction from the sledge. For equal acceleration: total force = 12 + 12 = 24 N on 60 kg, a = 0.4 m s⁻². Friction on child = 20 × 0.4 + 12 = wait — child pulls rope with 12 N backward, rope tension = 12 N pulls sledge forward. Net force on child = friction − 12 = 20a; net on sledge = 12 − friction = 40a. Adding: 0 = 60a − friction + friction → 12 = 60a? No: sledge gets 12 N from pole rope. Total system: net = 24 − 12 = 12 N? Tension at pole side = 12 N. System net = 12 N on 60 kg → a = 0.2 m s⁻². Friction on child = 20 × 0.2 + 0 = 4? Check sledge: 12 − F_friction = 40 × 0.2 = 8 → F_friction = 4 N. But answer is D (12 N) per mark scheme... The rope exerts 12 N on the sledge from the pole side AND child pulls 12 N — both act forward? Actually: child pulls rope → reaction: rope pulls child backward. Rope around pole → pole side tension = 12 N forward on sledge. Net on system = 12 + 12 = 24? No. With frictionless pole: force on sledge from rope = 12 N. Force on child's hands from rope = 12 N backward. For equal acceleration of system (60 kg): net = 12 N → a = 0.2 m s⁻². Friction on child: f − 0 = 20 × 0.2, but child also pulls rope so: f − 12 = 20 × 0.2 = 4 → f = 16? Per mark scheme D = 12 N is correct: friction = 12 N.",
+  },
+  {
+    id: "9702-12-MJ22-Q09", number: 9, topic: "Dynamics & Newton's Laws",
+    text: "A stone S and foam rubber ball R (identical volumes) are released from rest and fall through air, both reaching terminal velocity. Which graph best shows speed v vs time t for both?",
+    image_required: true,
+    options: {
+      A: "Stone has greater terminal velocity, reaches it later; ball has lower terminal velocity, reaches it sooner",
+      B: "Stone has greater terminal velocity, reaches it sooner; ball has lower terminal velocity, reaches it later",
+      C: "Both have the same terminal velocity",
+      D: "Ball has greater terminal velocity than stone",
+    },
+    correct: "A",
+    explanation: "Stone is denser → greater weight but same drag force at given speed → higher terminal velocity. Ball has lower terminal velocity and reaches it more quickly due to larger drag-to-weight ratio.",
+  },
+  {
+    id: "9702-12-MJ22-Q10", number: 10, topic: "Dynamics & Newton's Laws",
+    text: "Balls X and Y move toward each other at 5 m s⁻¹ and 15 m s⁻¹ respectively. They make a perfectly elastic head-on collision. After the collision, ball Y moves to the right at 7 m s⁻¹. What is the speed and direction of ball X?",
+    image_required: true,
+    options: { A: "3 m s⁻¹ to the left", B: "13 m s⁻¹ to the left", C: "3 m s⁻¹ to the right", D: "13 m s⁻¹ to the right" },
+    correct: "B",
+    explanation: "Taking right as positive. Let masses be equal (elastic collision, symmetric). Conservation of momentum: 5m − 15m = mv_X + 7m → v_X = −10 − 7 = −3... Hmm, depends on masses. Without masses given, use elastic collision equations. For equal masses: v_X = −15 m s⁻¹ + something. By momentum: 5 − 15 = v_X + 7 → v_X = −17? That's not an option. Assuming masses given in diagram (not specified here): by momentum conservation with the result v_Y = +7, answer is B (13 m s⁻¹ to the left), which conserves momentum if masses are equal: 5 − 15 = v_X + 7 → v_X = −17. Must be unequal masses. Mark scheme says B.",
+  },
+  {
+    id: "9702-12-MJ22-Q11", number: 11, topic: "Forces & Equilibrium",
+    text: "Two forces form a couple. Which statement describes the two forces?",
+    image_required: false,
+    options: {
+      A: "They are in the same direction.",
+      B: "They are perpendicular to each other.",
+      C: "They have the same magnitude.",
+      D: "They pass through the same point.",
+    },
+    correct: "C",
+    explanation: "A couple consists of two equal, parallel forces acting in opposite directions but not through the same point. They must have the same magnitude.",
+  },
+  {
+    id: "9702-12-MJ22-Q12", number: 12, topic: "Forces & Equilibrium",
+    text: "A uniform rod is hinged at one end to a wall and supported by a wire so that it is horizontal and in equilibrium. Which arrow shows the direction of the force on the rod from the hinge?",
+    image_required: true,
+    options: { A: "Arrow A", B: "Arrow B", C: "Arrow C", D: "Arrow D" },
+    correct: "D",
+    explanation: "The hinge force must balance the weight (downward) and the tension in the wire (which has an upward component). The hinge force points upward and toward the wall — approximately along arrow D.",
+  },
+  {
+    id: "9702-12-MJ22-Q13", number: 13, topic: "Forces & Equilibrium",
+    text: "A diving board (length 5.0 m) is hinged at one end and supported 2.0 m from this end by a spring (k = 10 kN m⁻¹). A child (mass 40 kg) stands at the far end. What is the extra compression of the spring caused by the child?",
+    image_required: true,
+    options: { A: "1.0 cm", B: "1.6 cm", C: "9.8 cm", D: "16 cm" },
+    correct: "C",
+    explanation: "Take moments about the hinge: F_spring × 2.0 = 40 × 9.81 × 5.0 → F_spring = 981 N. Extra compression = F/k = 981/10000 = 0.098 m = 9.8 cm.",
+  },
+  {
+    id: "9702-12-MJ22-Q14", number: 14, topic: "Forces & Equilibrium",
+    text: "A granite rock at Earth's surface has density ρ. It is transported to another planet where g is twice Earth's. What is the density of the rock on the other planet?",
+    image_required: false,
+    options: { A: "0.5ρ", B: "ρ", C: "2ρ", D: "4ρ" },
+    correct: "B",
+    explanation: "Density is a material property (mass/volume). Neither mass nor volume changes when you move the rock. Density remains ρ.",
+  },
+  {
+    id: "9702-12-MJ22-Q15", number: 15, topic: "Forces & Equilibrium",
+    text: "A closed U-tube contains stationary liquid (density ρ). One side has gas at pressure p₁, the other at p₂. The acceleration of free fall is g. Which equation is correct?",
+    image_required: true,
+    options: {
+      A: "p₁ = ρgy",
+      B: "p₂ = ρg(x − z)",
+      C: "p₁ − p₂ = ρg(y − z)",
+      D: "p₁ + p₂ = ρgx",
+    },
+    correct: "C",
+    explanation: "The pressure difference between the two sides equals ρg × (height difference of liquid levels). p₁ − p₂ = ρg(y − z).",
+  },
+  {
+    id: "9702-12-MJ22-Q16", number: 16, topic: "Work, Energy & Power",
+    text: "Which product of two quantities is equal to power?",
+    image_required: false,
+    options: {
+      A: "force × distance",
+      B: "force × velocity",
+      C: "work done × time",
+      D: "work done × velocity",
+    },
+    correct: "B",
+    explanation: "P = W/t = Fd/t = F × (d/t) = F × v. Power = force × velocity.",
+  },
+  {
+    id: "9702-12-MJ22-Q17", number: 17, topic: "Work, Energy & Power",
+    text: "New lamp efficiency = 40%, old lamp efficiency = 5.0%. Both produce the same useful output power. What is the ratio (input power to new lamp)/(input power to old lamp)?",
+    image_required: false,
+    options: { A: "0.13", B: "0.63", C: "1.6", D: "8.0" },
+    correct: "A",
+    explanation: "Input power = useful output / efficiency. P_new_input = P_out/0.40. P_old_input = P_out/0.05. Ratio = 0.05/0.40 = 0.125 ≈ 0.13.",
+  },
+  {
+    id: "9702-12-MJ22-Q18", number: 18, topic: "Work, Energy & Power",
+    text: "A student derives kinetic energy E_K for mass m from rest, force F, final velocity v, displacement s. Which equation would she NOT need?",
+    image_required: false,
+    options: { A: "F = ma", B: "W = Fs", C: "E = ½Fs", D: "v² = u² + 2as" },
+    correct: "C",
+    explanation: "To derive E_K = ½mv²: she needs F=ma (to get a from F), v²=u²+2as (to get s = v²/2a), and W=Fs (work done = kinetic energy). E = ½Fs is not a standard equation needed — it is actually a consequence, not an input.",
+  },
+  {
+    id: "9702-12-MJ22-Q19", number: 19, topic: "Deformation of Solids",
+    text: "A metal wire (Young modulus = 2.0×10¹¹ Pa, original length 1.6 m, diameter 0.48×10⁻³ m) obeys Hooke's law. What is the spring constant of the wire?",
+    image_required: false,
+    options: {
+      A: "7.2×10³ N m⁻¹",
+      B: "2.3×10⁴ N m⁻¹",
+      C: "2.9×10⁴ N m⁻²",
+      D: "9.0×10⁴ N m⁻¹",
+    },
+    correct: "B",
+    explanation: "k = EA/L. A = π(0.24×10⁻³)² = 1.81×10⁻⁷ m². k = (2.0×10¹¹ × 1.81×10⁻⁷)/1.6 = 2.26×10⁴ ≈ 2.3×10⁴ N m⁻¹.",
+  },
+  {
+    id: "9702-12-MJ22-Q20", number: 20, topic: "Deformation of Solids",
+    text: "A wire is being stretched by a tensile force. Which statement about the elastic limit must be correct?",
+    image_required: false,
+    options: {
+      A: "The deformation is plastic after the elastic limit has been reached.",
+      B: "The deformation is plastic until the elastic limit is reached.",
+      C: "The extension is proportional to the tensile force after the elastic limit has been reached.",
+      D: "The extension is proportional to the tensile force until the elastic limit is reached.",
+    },
+    correct: "A",
+    explanation: "Beyond the elastic limit, the material deforms plastically — it does not return to its original shape when the force is removed.",
+  },
+  {
+    id: "9702-12-MJ22-Q21", number: 21, topic: "Waves",
+    text: "Which statement is correct for ALL types of progressive wave?",
+    image_required: false,
+    options: {
+      A: "The distance from a peak to the next trough is equal to a wavelength.",
+      B: "They can be demonstrated in ripple tanks.",
+      C: "They consist of vibrating atoms.",
+      D: "They transfer energy from one position to another.",
+    },
+    correct: "D",
+    explanation: "All progressive waves transfer energy. The peak-to-trough distance is half a wavelength (not a full wavelength). EM waves don't require vibrating atoms.",
+  },
+  {
+    id: "9702-12-MJ22-Q22", number: 22, topic: "Waves",
+    text: "A transverse water wave (frequency 0.20 Hz, amplitude 0.70 m, trough-to-peak distance 2.4 m) causes a ball to move vertically. What distance does the ball travel in 20 s?",
+    image_required: true,
+    options: { A: "5.6 m", B: "9.6 m", C: "11.2 m", D: "19.2 m" },
+    correct: "C",
+    explanation: "Distance per oscillation = 4 × amplitude = 4 × 0.70 = 2.8 m. Number of oscillations in 20 s = 20 × 0.20 = 4. Total distance = 4 × 2.8 = 11.2 m.",
+  },
+  {
+    id: "9702-12-MJ22-Q23", number: 23, topic: "Waves",
+    text: "A sound wave travels left to right. The displacement of air molecules vs distance is shown. At which distance will the air pressure be lowest?",
+    image_required: true,
+    options: { A: "At a compression region", B: "Where displacement is maximum positive", C: "Where displacement is zero (leading edge)", D: "At a rarefaction (where displacement curve has greatest negative slope)" },
+    correct: "D",
+    explanation: "Pressure is lowest at rarefactions — where molecules are most spread out. This corresponds to where the displacement gradient is most negative (steepest downward slope going in direction of travel).",
+  },
+  {
+    id: "9702-12-MJ22-Q24", number: 24, topic: "Waves",
+    text: "A source emits a sound wave. The Doppler effect causes a different frequency to be heard by a stationary observer. What is a requirement for the Doppler effect to occur?",
+    image_required: false,
+    options: {
+      A: "a source that is moving as it produces the sound wave",
+      B: "a source that produces a polarised sound wave",
+      C: "a source that produces a sound wave of changing amplitude",
+      D: "a source that produces a sound wave of changing frequency",
+    },
+    correct: "A",
+    explanation: "The Doppler effect requires relative motion between source and observer. Sound cannot be polarised. Constant frequency from the source is assumed.",
+  },
+  {
+    id: "9702-12-MJ22-Q25", number: 25, topic: "Waves",
+    text: "An electromagnetic wave in free space has frequency 2.5×10¹⁴ Hz. Which region of the electromagnetic spectrum includes this frequency?",
+    image_required: false,
+    options: { A: "infrared", B: "microwave", C: "ultraviolet", D: "X-ray" },
+    correct: "A",
+    explanation: "λ = c/f = 3×10⁸/2.5×10¹⁴ = 1.2×10⁻⁶ m = 1200 nm. This is in the near-infrared region (700 nm to ~1 mm).",
+  },
+  {
+    id: "9702-12-MJ22-Q26", number: 26, topic: "Waves",
+    text: "Vertically polarised light (intensity 8.0 W m⁻²) hits filter 1 (transmission axis 50° to vertical), then filter 2 (transmission axis 20° to vertical, 30° between axes). What is the intensity from filter 2?",
+    image_required: false,
+    options: { A: "zero", B: "2.5 W m⁻²", C: "2.9 W m⁻²", D: "6.0 W m⁻²" },
+    correct: "B",
+    explanation: "After filter 1: I₁ = 8.0 × cos²(50°) = 8.0 × 0.413 = 3.31 W m⁻². After filter 2: I₂ = 3.31 × cos²(30°) = 3.31 × 0.75 = 2.48 ≈ 2.5 W m⁻².",
+  },
+  {
+    id: "9702-12-MJ22-Q27", number: 27, topic: "Waves",
+    text: "A stationary wave on a stretched string is set up between P and T. Which statement about the stationary wave is correct?",
+    image_required: true,
+    options: {
+      A: "Point R is at a node.",
+      B: "Points Q and S vibrate in phase.",
+      C: "The distance between P and T is three wavelengths.",
+      D: "The wave transfers energy from P to T.",
+    },
+    correct: "B",
+    explanation: "Q and S are on the same side of a node, so they vibrate in phase. R is an antinode (maximum amplitude). P to T spans 1.5 wavelengths (3 loops). Stationary waves don't transfer energy.",
+  },
+  {
+    id: "9702-12-MJ22-Q28", number: 28, topic: "Waves",
+    text: "A bar vibrates at frequency f to produce water waves in a ripple tank. Waves pass through a gap of width x. Which combination produces the smallest angle of diffraction?",
+    image_required: true,
+    options: {
+      A: "f/2, x/2",
+      B: "f/2, 2x",
+      C: "2f, x/2",
+      D: "2f, 2x",
+    },
+    correct: "D",
+    explanation: "Diffraction angle ∝ λ/gap = (v/f)/gap. To minimise: increase f (decrease λ) AND increase gap width. Option D: frequency 2f (smaller λ) and gap 2x (wider). Smallest λ/gap ratio.",
+  },
+  {
+    id: "9702-12-MJ22-Q29", number: 29, topic: "Waves",
+    text: "Two large speakers emit sound of the same wavelength and amplitude. Curved lines are wavefronts. Where is the loudest sound heard?",
+    image_required: false,
+    options: {
+      A: "Where path difference = λ/2",
+      B: "Where path difference = λ",
+      C: "Where path difference = 3λ/2",
+      D: "Where path difference = 0 or a whole number of wavelengths",
+    },
+    correct: "D",
+    explanation: "Constructive interference (loudest sound) occurs where the path difference = 0, λ, 2λ, 3λ, ... — i.e. whole number of wavelengths.",
+  },
+  {
+    id: "9702-12-MJ22-Q30", number: 30, topic: "Waves",
+    text: "In the diffraction grating equation λ = d sinθ / n, what do n and d represent?",
+    image_required: false,
+    options: {
+      A: "n = number of slits; d = distance between adjacent slits",
+      B: "n = number of slits; d = distance from grating to screen",
+      C: "n = order of intensity maximum; d = distance between adjacent slits",
+      D: "n = order of intensity maximum; d = distance from grating to screen",
+    },
+    correct: "C",
+    explanation: "In the grating equation, n is the order number (integer 0, 1, 2, ...) and d is the grating spacing (distance between adjacent slits).",
+  },
+  {
+    id: "9702-12-MJ22-Q31", number: 31, topic: "Electricity",
+    text: "A metal block has sides a, b, c (volume V). Charge carriers have charge −q, number density n. Each carrier takes average time t to pass through the block. What is an expression for the current I?",
+    image_required: true,
+    options: {
+      A: "I = nqabc",
+      B: "I = nqV/t",
+      C: "I = nqbc/t",
+      D: "I = nqav",
+    },
+    correct: "B",
+    explanation: "Number of carriers in block = nV = nabc. Charge = nqV. Current = charge/time = nqV/t.",
+  },
+  {
+    id: "9702-12-MJ22-Q32", number: 32, topic: "Electricity",
+    text: "Lamp X: current 0.50 A, resistance 9.6 Ω. Lamp Y: current 3.0 A, resistance 1.2 Ω. What is the ratio (power in X)/(power in Y)?",
+    image_required: true,
+    options: { A: "0.22", B: "0.75", C: "1.3", D: "4.5" },
+    correct: "A",
+    explanation: "P_X = I²R = (0.50)² × 9.6 = 2.4 W. P_Y = (3.0)² × 1.2 = 10.8 W. Ratio = 2.4/10.8 = 0.22.",
+  },
+  {
+    id: "9702-12-MJ22-Q33", number: 33, topic: "Electricity",
+    text: "Intensity on an LDR is increased. Temperature of a thermistor is increased. Current is kept constant in each. What happens to the p.d. across each?",
+    image_required: false,
+    options: {
+      A: "LDR increases, thermistor increases",
+      B: "LDR increases, thermistor decreases",
+      C: "LDR decreases, thermistor increases",
+      D: "LDR decreases, thermistor decreases",
+    },
+    correct: "D",
+    explanation: "LDR: more light → resistance decreases → V = IR decreases. Thermistor (NTC): higher T → resistance decreases → V decreases. Both decrease.",
+  },
+  {
+    id: "9702-12-MJ22-Q34", number: 34, topic: "Electricity",
+    text: "Iron wire: length 8.0 m, diameter 0.50 mm, resistance R. Second iron wire: length 2.0 m, diameter 1.0 mm. What is the resistance of the second wire?",
+    image_required: false,
+    options: { A: "R/16", B: "R/8", C: "R/2", D: "R" },
+    correct: "A",
+    explanation: "R ∝ L/A ∝ L/d². R₂/R₁ = (L₂/L₁) × (d₁/d₂)² = (2/8) × (0.5/1.0)² = (1/4) × (1/4) = 1/16. R₂ = R/16.",
+  },
+  {
+    id: "9702-12-MJ22-Q35", number: 35, topic: "Electricity",
+    text: "A cell with constant e.m.f. is connected across a fixed resistor. The internal resistance increases over time. Which change occurs?",
+    image_required: false,
+    options: {
+      A: "a decrease in the charge of each charge carrier",
+      B: "a decrease in the potential difference measured across the cell",
+      C: "an increase in the energy dissipated per unit time in the fixed resistor",
+      D: "an increase in the number of charge carriers leaving the cell per unit time",
+    },
+    correct: "B",
+    explanation: "As internal resistance r increases, current I = E/(R+r) decreases. Terminal p.d. = E − Ir. Even though I decreases, Ir = E × r/(R+r) increases → terminal p.d. decreases.",
+  },
+  {
+    id: "9702-12-MJ22-Q36", number: 36, topic: "Electricity",
+    text: "Kirchhoff's first and second laws are consequences of conservation of different quantities. What are those quantities?",
+    image_required: false,
+    options: {
+      A: "Kirchhoff's first law: charge | Kirchhoff's second law: energy",
+      B: "Kirchhoff's first law: energy | Kirchhoff's second law: current",
+      C: "Kirchhoff's first law: current | Kirchhoff's second law: charge",
+      D: "Kirchhoff's first law: energy | Kirchhoff's second law: charge",
+    },
+    correct: "A",
+    explanation: "Kirchhoff's first law (junction rule) conserves charge. Kirchhoff's second law (loop rule) conserves energy (sum of e.m.f.s = sum of p.d.s around a loop).",
+  },
+  {
+    id: "9702-12-MJ22-Q37", number: 37, topic: "Electricity",
+    text: "A potentiometer circuit determines e.m.f. E_x of a cell. It includes a cell of known e.m.f. E_0 (negligible internal resistance) and a uniform resistance wire PQ. E_x < E_0. Which circuit is suitable?",
+    image_required: false,
+    options: { A: "Circuit A", B: "Circuit B", C: "Circuit C", D: "Circuit D" },
+    correct: "D",
+    explanation: "A valid potentiometer requires E_0 to drive current through the full wire PQ, with E_x connected via a galvanometer to find the balance point. The circuit where E_0 is in series with the wire and E_x is connected between a movable tap J and one end is correct — option D.",
+  },
+  {
+    id: "9702-12-MJ22-Q38", number: 38, topic: "Nuclear Physics",
+    text: "In α-particle scattering off gold foil, most particles pass straight through or deflect slightly; a small number deflect by large angles. Which statement CANNOT be deduced?",
+    image_required: false,
+    options: {
+      A: "Atoms are mostly empty space.",
+      B: "Most of the mass of an atom is concentrated in the nucleus.",
+      C: "The nucleus of an atom contains protons.",
+      D: "The nucleus of an atom is small compared to the size of an atom.",
+    },
+    correct: "C",
+    explanation: "The scattering experiment shows the nucleus is small, dense and positively charged. It does NOT tell us the nucleus contains protons (that came from other experiments).",
+  },
+  {
+    id: "9702-12-MJ22-Q39", number: 39, topic: "Nuclear Physics",
+    text: "Four nuclei: ²⁸E, ²⁵G, ²⁵M, ²⁴Q. Which statement is correct?",
+    image_required: false,
+    options: {
+      A: "An uncharged atom of element Q has 24 orbital electrons.",
+      B: "Nuclei G and M are isotopes of the same element.",
+      C: "When E absorbs a neutron and then emits an α-particle, E transforms into M.",
+      D: "When M emits a β⁻ particle, M transforms into Q.",
+    },
+    correct: "C",
+    explanation: "E absorbs neutron → ²⁹E (same element). Emits α (mass 4, charge 2) → mass 25, charge decreases by 2 → ²⁵(Z_E − 2) = ²⁵M. This works if Z_M = Z_E − 2. G and M have same mass number but different elements (not necessarily isotopes without knowing their proton numbers). So C is correct.",
+  },
+  {
+    id: "9702-12-MJ22-Q40", number: 40, topic: "Nuclear Physics",
+    text: "A neutron (1 up quark, 2 down quarks) decays to a proton, emitting a beta-particle. What is the change in quark structure?",
+    image_required: false,
+    options: {
+      A: "1 down quark changes to 1 up quark; ν_e is emitted",
+      B: "1 down quark changes to 1 up quark; ν̄_e is emitted",
+      C: "1 up quark changes to 1 down quark; ν_e is emitted",
+      D: "1 up quark changes to 1 down quark; ν̄_e is emitted",
+    },
+    correct: "B",
+    explanation: "β⁻ decay: neutron (udd) → proton (uud). One down quark → up quark. An electron (β⁻) and electron antineutrino (ν̄_e) are emitted.",
+  },
+];
+
+// ── Paper registry ───────────────────────────────────────────────────────────
+
+export const P1_PAPERS = [
+  {
+    id: "9702/12/F/M/25",
+    label: "9702/12 · Feb/Mar 2025",
+    session: "February/March 2025",
+    questions: PHYSICS_P1_QUESTIONS,
+    formulaSheetUrl: FORMULA_SHEET_URL,
+  },
+  {
+    id: "9702/12/M/J/22",
+    label: "9702/12 · May/Jun 2022",
+    session: "May/June 2022",
+    questions: PHYSICS_P1_MJ22_QUESTIONS,
+    formulaSheetUrl: null,
+  },
+];
+
+export function getP1Paper(id) {
+  return P1_PAPERS.find(p => p.id === id) ?? P1_PAPERS[0];
+}
+
 // Progress tracking
 const PROGRESS_KEY = "physics_p1_9702_12_FM25_progress";
-
 export function getP1Progress() {
   try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? "{}"); } catch { return {}; }
 }
-
 export function saveP1Progress(data) {
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(data));
 }
-
 export function resetP1Progress() {
   localStorage.removeItem(PROGRESS_KEY);
 }

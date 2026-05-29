@@ -1,34 +1,47 @@
 /**
- * p1PaperStore.js — manages the past paper PDF in Supabase Storage.
- * Upload goes through a server-side Nitro route to bypass RLS.
- * All devices fetch the same public URL — fully cross-device.
+ * p1PaperStore.js — manages past paper PDFs in Supabase Storage.
+ * Supports multiple papers, each stored at its own path in the bucket.
  */
 
 import { supabaseClient } from "@/api/base44Client";
 
 const BUCKET = "paper-assets";
-const FILE_PATH = "9702_m25_qp_12.pdf";
-const LOCAL_URL_KEY = "p1_paper_url_9702_m25_qp_12";
+
+// Registry of known papers — add new entries here as PDFs are uploaded
+const PAPER_FILES = {
+  "9702/12/F/M/25": "9702_m25_qp_12.pdf",
+  "9702/12/M/J/22": "9702_12_M_J_22.pdf",
+};
+
+function localCacheKey(paperId) {
+  return `p1_paper_url_${(paperId ?? "").replace(/\//g, "_")}`;
+}
 
 /**
- * Get the public URL for the paper PDF.
+ * Get the public URL for a specific paper PDF.
  * Checks localStorage cache first, then derives from Supabase config.
+ * @param {string} paperId  e.g. "9702/12/F/M/25"
  */
-export async function getPaperPdfUrl() {
+export async function getPaperPdfUrl(paperId) {
+  const filename = PAPER_FILES[paperId];
+  if (!filename) return null;
+
+  const cacheKey = localCacheKey(paperId);
+
   // Check local cache first
-  const cached = localStorage.getItem(LOCAL_URL_KEY);
+  const cached = localStorage.getItem(cacheKey);
   if (cached) return cached;
 
   try {
     const { data } = supabaseClient.storage
       .from(BUCKET)
-      .getPublicUrl(FILE_PATH);
+      .getPublicUrl(filename);
 
     if (data?.publicUrl) {
       // Verify the file actually exists with a HEAD request
       const check = await fetch(data.publicUrl, { method: "HEAD" }).catch(() => null);
       if (check?.ok) {
-        localStorage.setItem(LOCAL_URL_KEY, data.publicUrl);
+        localStorage.setItem(cacheKey, data.publicUrl);
         return data.publicUrl;
       }
     }
@@ -40,20 +53,21 @@ export async function getPaperPdfUrl() {
 }
 
 /**
- * Upload the PDF via the server-side route (bypasses RLS).
+ * Upload a PDF via the server-side route (bypasses RLS).
  * @param {File} file
+ * @param {string} paperId  e.g. "9702/12/M/J/22"
  * @returns {{ url: string | null, error: string | null }}
  */
-export async function uploadPaperPdf(file) {
+export async function uploadPaperPdf(file, paperId) {
+  const filename = PAPER_FILES[paperId] ?? file.name;
+  const cacheKey = localCacheKey(paperId);
+
   try {
-    // Read file as base64
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result;
-        const base64Str = typeof result === "string"
-          ? result.split(",")[1]
-          : null;
+        const base64Str = typeof result === "string" ? result.split(",")[1] : null;
         if (base64Str) resolve(base64Str);
         else reject(new Error("Failed to read file as base64"));
       };
@@ -66,7 +80,7 @@ export async function uploadPaperPdf(file) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         base64,
-        filename: FILE_PATH,
+        filename,
         contentType: "application/pdf",
       }),
     });
@@ -78,7 +92,7 @@ export async function uploadPaperPdf(file) {
 
     const data = await res.json();
     const url = data.url ?? null;
-    if (url) localStorage.setItem(LOCAL_URL_KEY, url);
+    if (url) localStorage.setItem(cacheKey, url);
     return { url, error: null };
   } catch (e) {
     return { url: null, error: e.message };
@@ -86,8 +100,8 @@ export async function uploadPaperPdf(file) {
 }
 
 /**
- * Clear the local URL cache (forces a fresh check from Supabase).
+ * Clear the local URL cache for a paper (forces a fresh check from Supabase).
  */
-export function clearPaperUrlCache() {
-  localStorage.removeItem(LOCAL_URL_KEY);
+export function clearPaperUrlCache(paperId) {
+  localStorage.removeItem(localCacheKey(paperId));
 }

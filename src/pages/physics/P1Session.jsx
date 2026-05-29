@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2 } from "lucide-react";
-import { getP1Paper, FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
+import { getP1Paper } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { saveMCQAttempt } from "@/lib/topicStore";
@@ -10,7 +10,6 @@ import PaperPdfButton from "@/components/PaperPdfButton";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
-// ── Layer 1 feedback ──────────────────────────────────────────────────────────
 function Layer1Feedback({ feedback, isCorrect, isGuess }) {
   const accentBg = isCorrect && !isGuess
     ? "bg-green-500/10 border-green-500/25"
@@ -64,7 +63,6 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
   );
 }
 
-// ── Layer 2 feedback ─────────────────────────────────────────────────────────
 function Layer2Feedback({ feedback }) {
   const steps = [
     { number: "1", color: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400" }, label: "The System & Objective", content: feedback.step1_system },
@@ -100,7 +98,6 @@ function Layer2Feedback({ feedback }) {
   );
 }
 
-// ── Formula sheet modal ───────────────────────────────────────────────────────
 function FormulaSheet({ onClose, imageUrl }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
@@ -125,7 +122,6 @@ function FormulaSheet({ onClose, imageUrl }) {
   );
 }
 
-// ── Overview panel ────────────────────────────────────────────────────────────
 function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClear }) {
   const topics = [...new Set(questions.map(q => q.topic))];
   return (
@@ -204,12 +200,10 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
   );
 }
 
-// ── Main session ──────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Support paper selection via route state — fallback to F/M/25
   const paperId = location.state?.paperId ?? "9702/12/F/M/25";
   const paper = getP1Paper(paperId);
   const questions = paper.questions;
@@ -229,7 +223,6 @@ export default function P1Session() {
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
 
-  // Load from Supabase on mount
   useEffect(() => {
     loadP1Session().then(session => {
       setAnswers(session.answers ?? {});
@@ -241,7 +234,6 @@ export default function P1Session() {
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
 
-  // Persist whenever answers or currentIdx change (skip initial load)
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return; }
@@ -249,7 +241,6 @@ export default function P1Session() {
     saveP1Session(answers, currentIdx);
   }, [answers, currentIdx, sessionLoading]);
 
-  // Restore per-question state when navigating
   useEffect(() => {
     if (sessionLoading) return;
     setSelected(existingAnswer?.chosen ?? null);
@@ -444,9 +435,9 @@ Respond ONLY in JSON:
           </div>
         </div>
 
-        {/* PDF access banner */}
+        {/* PDF access banner — passes paperId so correct PDF loads */}
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
-          <PaperPdfButton label="Open Question Paper" />
+          <PaperPdfButton label="Open Question Paper" paperId={paperId} />
           <p className="text-[11px] text-muted-foreground/60 leading-snug">
             Open the PDF to see diagrams for image questions
           </p>
@@ -487,6 +478,8 @@ Respond ONLY in JSON:
                 {question.topic}
               </span>
             </div>
+
+            {/* Diagram notice — shown for all image_required questions */}
             {question.image_required && (
               <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 flex items-center gap-2.5">
                 <span className="text-base shrink-0">📊</span>
@@ -495,6 +488,7 @@ Respond ONLY in JSON:
                 </p>
               </div>
             )}
+
             <p className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-line">{question.text}</p>
           </div>
 

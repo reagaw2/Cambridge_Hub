@@ -1,35 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope } from "lucide-react";
+import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2 } from "lucide-react";
 import { PHYSICS_P1_QUESTIONS, PAPER_META, FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { saveMCQAttempt } from "@/lib/topicStore";
+import { loadP1Session, saveP1Session, clearP1Session } from "@/lib/p1SessionStore";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
-
-// ── Persistence helpers ───────────────────────────────────────────────────────
-const SESSION_KEY = "p1_session_9702_12_FM25";
-
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return { answers: {}, currentIdx: 0 };
-    return JSON.parse(raw);
-  } catch {
-    return { answers: {}, currentIdx: 0 };
-  }
-}
-
-function saveSession(answers, currentIdx) {
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ answers, currentIdx }));
-  } catch {}
-}
-
-export function clearP1Session() {
-  localStorage.removeItem(SESSION_KEY);
-}
 
 // ── Layer 1 feedback ──────────────────────────────────────────────────────────
 function Layer1Feedback({ feedback, isCorrect, isGuess }) {
@@ -42,7 +20,6 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
 
   return (
     <div className="space-y-3">
-      {/* Score banner */}
       <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${accentBg}`}>
         <span className="text-2xl shrink-0">
           {isCorrect && !isGuess ? "✅" : isGuess ? "🎲" : "❌"}
@@ -63,7 +40,6 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
         </div>
       </div>
 
-      {/* Takeaway */}
       {feedback.pulse_layer_1 && (
         <div className="relative rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-transparent p-4 overflow-hidden">
           <div className="pointer-events-none absolute -top-4 -right-4 w-20 h-20 rounded-full bg-emerald-400/10 blur-xl" />
@@ -77,7 +53,6 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
         </div>
       )}
 
-      {/* Cambridge insight */}
       {feedback.cambridge_insight && (
         <div className="bg-card border border-border rounded-xl px-4 py-3 space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cambridge Insight</p>
@@ -136,7 +111,13 @@ function FormulaSheet({ onClose }) {
           </button>
         </div>
         <div className="p-2">
-          <img src={FORMULA_SHEET_URL} alt="Formula sheet" className="w-full rounded-lg" style={{ background: "#fff" }} />
+          {FORMULA_SHEET_URL ? (
+            <img src={FORMULA_SHEET_URL} alt="Formula sheet" className="w-full rounded-lg" style={{ background: "#fff" }} />
+          ) : (
+            <div className="p-8 text-center text-muted-foreground text-sm">
+              Formula sheet image not available. Please refer to your Cambridge data booklet.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -144,7 +125,7 @@ function FormulaSheet({ onClose }) {
 }
 
 // ── Overview panel ────────────────────────────────────────────────────────────
-function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
+function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClear }) {
   const topics = [...new Set(questions.map(q => q.topic))];
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
@@ -211,13 +192,8 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
           })}
         </div>
 
-        {/* Clear progress button */}
         <button
-          onClick={() => {
-            clearP1Session();
-            onClose();
-            window.location.reload();
-          }}
+          onClick={onClear}
           className="w-full py-2.5 rounded-xl border border-red-500/25 text-red-400/70 text-xs font-semibold hover:bg-red-500/10 hover:text-red-400 transition-all"
         >
           Clear progress & restart
@@ -232,9 +208,9 @@ export default function P1Session() {
   const navigate = useNavigate();
   const questions = PHYSICS_P1_QUESTIONS;
 
-  // Initialise from localStorage
-  const [answers, setAnswers] = useState(() => loadSession().answers);
-  const [currentIdx, setCurrentIdx] = useState(() => loadSession().currentIdx);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [answers, setAnswers] = useState({});
+  const [currentIdx, setCurrentIdx] = useState(0);
 
   const [selected, setSelected] = useState(null);
   const [isGuess, setIsGuess] = useState(false);
@@ -247,32 +223,50 @@ export default function P1Session() {
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
 
+  // Load from Supabase on mount
+  useEffect(() => {
+    loadP1Session().then(session => {
+      setAnswers(session.answers ?? {});
+      setCurrentIdx(session.currentIdx ?? 0);
+      setSessionLoading(false);
+    });
+  }, []);
+
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
 
-  // Persist whenever answers or currentIdx change
+  // Persist whenever answers or currentIdx change (skip initial load)
+  const firstRender = useRef(true);
   useEffect(() => {
-    saveSession(answers, currentIdx);
-  }, [answers, currentIdx]);
+    if (firstRender.current) { firstRender.current = false; return; }
+    if (sessionLoading) return;
+    saveP1Session(answers, currentIdx);
+  }, [answers, currentIdx, sessionLoading]);
 
   // Restore per-question state when navigating
   useEffect(() => {
+    if (sessionLoading) return;
     setSelected(existingAnswer?.chosen ?? null);
     setIsGuess(existingAnswer?.flagged_as_guess ?? false);
     setSubmitted(!!existingAnswer);
     setLayer1(existingAnswer?.layer1 ?? null);
     setLayer2(existingAnswer?.layer2 ?? null);
     setShowCalc(false);
-  }, [currentIdx]);
+  }, [currentIdx, sessionLoading]);
 
   const answeredCount = Object.keys(answers).length;
   const progress = answeredCount / questions.length;
 
-  function updateAnswers(id, record) {
-    setAnswers(prev => {
-      const next = { ...prev, [id]: record };
-      return next;
-    });
+  async function handleClear() {
+    await clearP1Session();
+    setAnswers({});
+    setCurrentIdx(0);
+    setSelected(null);
+    setIsGuess(false);
+    setSubmitted(false);
+    setLayer1(null);
+    setLayer2(null);
+    setShowOverview(false);
   }
 
   async function handleSubmit() {
@@ -331,7 +325,7 @@ Respond ONLY in JSON:
     }
 
     const record = { chosen: selected, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
-    updateAnswers(question.id, record);
+    setAnswers(prev => ({ ...prev, [question.id]: record }));
     setLayer1(fb1);
     setLayer2(null);
     setSubmitted(true);
@@ -348,10 +342,10 @@ Options: ${optionsList}
 Correct: ${question.correct} (${question.options[question.correct]})
 Student chose: ${selected} — ${existingAnswer?.correct ? "CORRECT" : "WRONG"}
 
-Give a deeper breakdown. Respond ONLY in JSON:
+Respond ONLY in JSON:
 {
   "step1_system": "One sentence: what fundamental concept or law this question tests.",
-  "step2_phrase_breakdown": "One to two sentences: which specific words or quantities in the question determine the answer.",
+  "step2_phrase_breakdown": "One to two sentences: which specific words or quantities determine the answer.",
   "step3_tipping_point": "One sentence: the exact logical step that separates ${question.correct} from the most tempting wrong option."
 }`;
 
@@ -376,7 +370,6 @@ Give a deeper breakdown. Respond ONLY in JSON:
     }
 
     setLayer2(fb2);
-    // Persist Layer 2 into stored answer too
     setAnswers(prev => ({
       ...prev,
       [question.id]: { ...prev[question.id], layer2: fb2 },
@@ -391,6 +384,16 @@ Give a deeper breakdown. Respond ONLY in JSON:
 
   function handlePrev() {
     if (currentIdx > 0) setCurrentIdx(i => i - 1);
+  }
+
+  // Loading screen while fetching saved session
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading your progress…</p>
+      </div>
+    );
   }
 
   if (!question) return null;
@@ -471,9 +474,16 @@ Give a deeper breakdown. Respond ONLY in JSON:
                 {question.topic}
               </span>
             </div>
-            {question.image_url && (
+            {question.image_url && !question.image_url.startsWith("dyad-media://") && (
               <div className="rounded-xl overflow-hidden border border-border/40" style={{ background: "#fff" }}>
                 <img src={question.image_url} alt={`Diagram for Q${question.number}`} className="w-full object-contain" loading="lazy" />
+              </div>
+            )}
+            {question.image_url && question.image_url.startsWith("dyad-media://") && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                <p className="text-[11px] text-amber-400/80 text-center">
+                  📊 Diagram for Q{question.number} — refer to your physical paper or Cambridge past paper PDF
+                </p>
               </div>
             )}
             <p className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-line">{question.text}</p>
@@ -536,7 +546,7 @@ Give a deeper breakdown. Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Layer 1 feedback */}
+          {/* Layer 1 */}
           {submitted && layer1 && (
             <Layer1Feedback
               feedback={layer1}
@@ -583,7 +593,7 @@ Give a deeper breakdown. Respond ONLY in JSON:
 
           {!submitted && (
             <p className="text-[11px] text-muted-foreground/40 text-center -mt-1">
-              Progress is saved automatically — you can exit and return any time
+              Progress syncs across all your devices automatically
             </p>
           )}
 
@@ -598,6 +608,7 @@ Give a deeper breakdown. Respond ONLY in JSON:
           currentIdx={currentIdx}
           onJump={setCurrentIdx}
           onClose={() => setShowOverview(false)}
+          onClear={handleClear}
         />
       )}
     </div>

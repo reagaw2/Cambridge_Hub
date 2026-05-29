@@ -223,24 +223,31 @@ export default function P1Session() {
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
 
+  // Load session for THIS specific paper on mount
   useEffect(() => {
-    loadP1Session().then(session => {
+    setSessionLoading(true);
+    loadP1Session(paperId).then(session => {
       setAnswers(session.answers ?? {});
       setCurrentIdx(session.currentIdx ?? 0);
       setSessionLoading(false);
     });
-  }, []);
+  // paperId is stable for the lifetime of this component mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paperId]);
 
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
 
+  // Persist whenever answers or currentIdx change (skip initial load)
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return; }
     if (sessionLoading) return;
-    saveP1Session(answers, currentIdx);
+    saveP1Session(paperId, answers, currentIdx);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, currentIdx, sessionLoading]);
 
+  // Restore per-question state when navigating between questions
   useEffect(() => {
     if (sessionLoading) return;
     setSelected(existingAnswer?.chosen ?? null);
@@ -249,13 +256,14 @@ export default function P1Session() {
     setLayer1(existingAnswer?.layer1 ?? null);
     setLayer2(existingAnswer?.layer2 ?? null);
     setShowCalc(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIdx, sessionLoading]);
 
   const answeredCount = Object.keys(answers).length;
   const progress = answeredCount / questions.length;
 
   async function handleClear() {
-    await clearP1Session();
+    await clearP1Session(paperId);
     setAnswers({});
     setCurrentIdx(0);
     setSelected(null);
@@ -435,7 +443,7 @@ Respond ONLY in JSON:
           </div>
         </div>
 
-        {/* PDF access banner — passes paperId so correct PDF loads */}
+        {/* PDF access banner — paperId ensures the correct PDF loads */}
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
           <PaperPdfButton label="Open Question Paper" paperId={paperId} />
           <p className="text-[11px] text-muted-foreground/60 leading-snug">
@@ -479,7 +487,7 @@ Respond ONLY in JSON:
               </span>
             </div>
 
-            {/* Diagram notice — shown for all image_required questions */}
+            {/* Diagram notice */}
             {question.image_required && (
               <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 flex items-center gap-2.5">
                 <span className="text-base shrink-0">📊</span>

@@ -1,27 +1,14 @@
 /**
- * p1SessionStore.js — cross-device persistence for the 9702/12/F/M/25 P1 session.
+ * p1SessionStore.js — cross-device persistence for P1 sessions.
+ * Each paper has its own session slot, keyed by paperId.
  * Saves/loads to the `p1_sessions` JSONB column on the StudentData row.
  * Falls back gracefully to localStorage when offline or unauthenticated.
  */
 
 import { supabaseClient } from "@/api/base44Client";
 
-const LOCAL_KEY = "p1_session_9702_12_FM25";
-const PAPER_KEY = "9702_12_FM25"; // key inside p1_sessions object
-
-// ── Local helpers ─────────────────────────────────────────────────────────────
-
-function readLocal() {
-  try {
-    const raw = localStorage.getItem(LOCAL_KEY);
-    return raw ? JSON.parse(raw) : { answers: {}, currentIdx: 0 };
-  } catch {
-    return { answers: {}, currentIdx: 0 };
-  }
-}
-
-function writeLocal(data) {
-  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch {}
+function localKey(paperId) {
+  return `p1_session_${(paperId ?? "default").replace(/\//g, "_")}`;
 }
 
 // ── Supabase helpers ──────────────────────────────────────────────────────────
@@ -42,25 +29,34 @@ async function getStudentRow() {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Load session — tries Supabase first, merges with local cache.
- * Returns { answers, currentIdx }.
+ * Load session for a specific paper.
+ * Tries Supabase first, falls back to localStorage.
+ * @param {string} paperId  e.g. "9702/12/F/M/25"
  */
-export async function loadP1Session() {
-  const local = readLocal();
+export async function loadP1Session(paperId) {
+  const key = localKey(paperId);
+  const empty = { answers: {}, currentIdx: 0 };
+
+  // Read local first for instant render
+  let local = empty;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) local = JSON.parse(raw);
+  } catch {}
 
   try {
     const row = await getStudentRow();
     if (!row) return local;
 
-    const remote = row.p1_sessions?.[PAPER_KEY];
+    const paperKey = (paperId ?? "default").replace(/\//g, "_");
+    const remote = row.p1_sessions?.[paperKey];
     if (!remote) return local;
 
-    // Merge: remote is source of truth for answers; keep local currentIdx if more recent
     const merged = {
       answers: { ...local.answers, ...remote.answers },
       currentIdx: remote.currentIdx ?? local.currentIdx ?? 0,
     };
-    writeLocal(merged);
+    localStorage.setItem(key, JSON.stringify(merged));
     return merged;
   } catch {
     return local;
@@ -68,21 +64,24 @@ export async function loadP1Session() {
 }
 
 /**
- * Save session — writes to localStorage immediately (sync) and
- * pushes to Supabase in the background (async, fire-and-forget).
+ * Save session for a specific paper.
+ * Writes to localStorage immediately and pushes to Supabase in background.
+ * @param {string} paperId
  */
-export function saveP1Session(answers, currentIdx) {
+export function saveP1Session(paperId, answers, currentIdx) {
   const data = { answers, currentIdx, updatedAt: new Date().toISOString() };
-  writeLocal(data);
-  pushToSupabase(data).catch(e => console.warn("[p1SessionStore] bg sync failed:", e));
+  const key = localKey(paperId);
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+  pushToSupabase(paperId, data).catch(e => console.warn("[p1SessionStore] bg sync failed:", e));
 }
 
-async function pushToSupabase(data) {
+async function pushToSupabase(paperId, data) {
   const row = await getStudentRow();
   if (!row) return;
 
+  const paperKey = (paperId ?? "default").replace(/\//g, "_");
   const existing = row.p1_sessions ?? {};
-  const updated = { ...existing, [PAPER_KEY]: data };
+  const updated = { ...existing, [paperKey]: data };
 
   const { error } = await supabaseClient
     .from("StudentData")
@@ -93,15 +92,17 @@ async function pushToSupabase(data) {
 }
 
 /**
- * Clear session — wipes localStorage and Supabase entry.
+ * Clear session for a specific paper.
  */
-export async function clearP1Session() {
-  localStorage.removeItem(LOCAL_KEY);
+export async function clearP1Session(paperId) {
+  const key = localKey(paperId);
+  localStorage.removeItem(key);
   try {
     const row = await getStudentRow();
     if (!row) return;
+    const paperKey = (paperId ?? "default").replace(/\//g, "_");
     const existing = row.p1_sessions ?? {};
-    const { [PAPER_KEY]: _, ...rest } = existing;
+    const { [paperKey]: _, ...rest } = existing;
     await supabaseClient
       .from("StudentData")
       .update({ p1_sessions: rest })

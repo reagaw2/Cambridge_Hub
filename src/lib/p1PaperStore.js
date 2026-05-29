@@ -10,7 +10,7 @@ const BUCKET = "paper-assets";
 // Registry of known papers — add new entries here as PDFs are uploaded
 const PAPER_FILES = {
   "9702/12/F/M/25": "9702_m25_qp_12.pdf",
-  "9702/12/M/J/22": "9702_12_M_J_22.pdf",
+  "9702/12/M/J/22": "9702_s22_qp_12.pdf",
 };
 
 function localCacheKey(paperId) {

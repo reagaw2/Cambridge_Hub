@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles, FileText } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import { getStreakData } from "@/lib/topicStore";
 
@@ -156,6 +156,18 @@ const AS_WRITTEN_TOPICS = [
 
 const WRITTEN_TOPICS = [...AS_WRITTEN_TOPICS, ...PAPER4_TOPICS];
 
+// Past papers available
+const PAST_PAPERS = [
+  {
+    id: "9702/12/F/M/25",
+    label: "9702/12 · Feb/Mar 2025",
+    type: "Paper 1 — Multiple Choice",
+    questions: 40,
+    route: "/physics/p1",
+    available: true,
+  },
+];
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -275,6 +287,32 @@ export default function Dashboard() {
             <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-400/60 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
               Coming Soon
             </span>
+          </div>
+
+          {/* ── Past Papers Section ─────────────────────────────────────── */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-white/30">Past Papers</p>
+            {PAST_PAPERS.map(paper => (
+              <button
+                key={paper.id}
+                onClick={() => paper.available && navigate(paper.route)}
+                disabled={!paper.available}
+                className="w-full text-left rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 p-4 transition-all active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
+                      <FileText className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{paper.label}</p>
+                      <p className="text-[11px] text-white/40 mt-0.5">{paper.type} · {paper.questions} questions</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-emerald-400/50 shrink-0" />
+                </div>
+              </button>
+            ))}
           </div>
 
           {/* Review Banks */}

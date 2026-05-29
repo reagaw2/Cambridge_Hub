@@ -88,6 +88,8 @@ import NuclearQuestion9a from './pages/nuclear/Question9a';
 import NuclearQuestion9cii from './pages/nuclear/Question9cii';
 import SchemeWhispererAdmin from './pages/admin/SchemeWhispererAdmin';
 import BulkPaperIngestor from './pages/admin/BulkPaperIngestor';
+import P1Session from './pages/physics/P1Session';
+import P1Summary from './pages/physics/P1Summary';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, isLoadingProgress, authError, navigateToLogin, isAuthenticated, user } = useAuth();
@@ -139,6 +141,8 @@ const AuthenticatedApp = () => {
       <Route element={<AppLayout />}>
         <Route path="/" element={<SubjectSelection />} />
         <Route path="/physics" element={<Dashboard />} />
+        <Route path="/physics/p1" element={<P1Session />} />
+        <Route path="/physics/p1-summary" element={<P1Summary />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/question" element={<QuestionAttempt />} />
         <Route path="/feedback" element={<Feedback />} />

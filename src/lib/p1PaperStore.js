@@ -1,8 +1,7 @@
 /**
  * p1PaperStore.js — manages the past paper PDF in Supabase Storage.
- * 
- * The PDF is uploaded once to a public Supabase Storage bucket.
- * All devices then fetch the same public URL — fully cross-device.
+ * Upload goes through a server-side Nitro route to bypass RLS.
+ * All devices fetch the same public URL — fully cross-device.
  */
 
 import { supabaseClient } from "@/api/base44Client";
@@ -13,11 +12,10 @@ const LOCAL_URL_KEY = "p1_paper_url_9702_m25_qp_12";
 
 /**
  * Get the public URL for the paper PDF.
- * Checks localStorage cache first, then Supabase Storage.
- * Returns null if not yet uploaded.
+ * Checks localStorage cache first, then derives from Supabase config.
  */
 export async function getPaperPdfUrl() {
-  // Check local cache first (avoids a network round-trip on repeat visits)
+  // Check local cache first
   const cached = localStorage.getItem(LOCAL_URL_KEY);
   if (cached) return cached;
 
@@ -27,7 +25,7 @@ export async function getPaperPdfUrl() {
       .getPublicUrl(FILE_PATH);
 
     if (data?.publicUrl) {
-      // Verify the file actually exists with a HEAD request
+      // Verify the file actually exists
       const check = await fetch(data.publicUrl, { method: "HEAD" }).catch(() => null);
       if (check?.ok) {
         localStorage.setItem(LOCAL_URL_KEY, data.publicUrl);
@@ -35,36 +33,53 @@ export async function getPaperPdfUrl() {
       }
     }
   } catch {
-    // Storage not configured — return null gracefully
+    // Storage not configured
   }
 
   return null;
 }
 
 /**
- * Upload the PDF to Supabase Storage.
- * Called once from the admin upload flow.
- * @param {File} file — the PDF File object
+ * Upload the PDF via the server-side route (bypasses RLS).
+ * @param {File} file
  * @returns {{ url: string | null, error: string | null }}
  */
 export async function uploadPaperPdf(file) {
   try {
-    const { error: uploadError } = await supabaseClient.storage
-      .from(BUCKET)
-      .upload(FILE_PATH, file, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
+    // Read file as base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        // Remove data URL prefix, keep only base64 string
+        const result = reader.result;
+        const base64Str = typeof result === "string"
+          ? result.split(",")[1]
+          : null;
+        if (base64Str) resolve(base64Str);
+        else reject(new Error("Failed to read file as base64"));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
-    if (uploadError) {
-      return { url: null, error: uploadError.message };
+    // Send to server route
+    const res = await fetch("/api/upload-paper", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base64,
+        filename: "9702_m25_qp_12.pdf",
+        contentType: "application/pdf",
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return { url: null, error: errText || `Server error ${res.status}` };
     }
 
-    const { data } = supabaseClient.storage
-      .from(BUCKET)
-      .getPublicUrl(FILE_PATH);
-
-    const url = data?.publicUrl ?? null;
+    const data = await res.json();
+    const url = data.url ?? null;
     if (url) localStorage.setItem(LOCAL_URL_KEY, url);
     return { url, error: null };
   } catch (e) {
@@ -73,7 +88,7 @@ export async function uploadPaperPdf(file) {
 }
 
 /**
- * Clear the local URL cache (forces a fresh fetch from Supabase).
+ * Clear the local URL cache (forces a fresh check from Supabase).
  */
 export function clearPaperUrlCache() {
   localStorage.removeItem(LOCAL_URL_KEY);

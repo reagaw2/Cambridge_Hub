@@ -1,6 +1,6 @@
 /**
  * p1StarStore.js — persists starred questions per paper.
- * Stores: { [paperId]: { [questionId]: { starred, feedback, question } } }
+ * Each entry: { starred, questionNumber, questionText, topic, options, correctAnswer, explanation, feedback, teacherQuestion, starredAt }
  */
 
 import { supabaseClient } from "@/api/base44Client";
@@ -44,7 +44,7 @@ export function getStarredQuestions(paperId) {
   return readLocal(paperId);
 }
 
-export function starQuestion(paperId, question, feedback) {
+export function starQuestion(paperId, question, feedback, teacherQuestion) {
   const data = readLocal(paperId);
   data[question.id] = {
     starred: true,
@@ -55,10 +55,21 @@ export function starQuestion(paperId, question, feedback) {
     correctAnswer: question.correct,
     explanation: question.explanation,
     feedback,
+    teacherQuestion: teacherQuestion ?? data[question.id]?.teacherQuestion ?? "",
     starredAt: new Date().toISOString(),
   };
   writeLocal(paperId, data);
   pushToSupabase(paperId, data);
+  return data;
+}
+
+export function saveTeacherQuestion(paperId, questionId, teacherQuestion) {
+  const data = readLocal(paperId);
+  if (data[questionId]) {
+    data[questionId] = { ...data[questionId], teacherQuestion };
+    writeLocal(paperId, data);
+    pushToSupabase(paperId, data);
+  }
   return data;
 }
 

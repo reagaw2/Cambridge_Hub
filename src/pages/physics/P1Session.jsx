@@ -6,6 +6,7 @@ import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { saveMCQAttempt } from "@/lib/topicStore";
 import { loadP1Session, saveP1Session, clearP1Session } from "@/lib/p1SessionStore";
+import PaperPdfButton from "@/components/PaperPdfButton";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 
@@ -439,6 +440,14 @@ Respond ONLY in JSON:
           </div>
         </div>
 
+        {/* PDF access banner — always visible below top bar */}
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
+          <PaperPdfButton label="Open Question Paper" />
+          <p className="text-[11px] text-muted-foreground/60 leading-snug">
+            Open the PDF to see diagrams for questions with images
+          </p>
+        </div>
+
         {/* Compact overview strip */}
         <div className="flex gap-1 px-4 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-card/40">
           {questions.map((q, i) => {
@@ -474,15 +483,12 @@ Respond ONLY in JSON:
                 {question.topic}
               </span>
             </div>
-            {question.image_url && !question.image_url.startsWith("dyad-media://") && (
-              <div className="rounded-xl overflow-hidden border border-border/40" style={{ background: "#fff" }}>
-                <img src={question.image_url} alt={`Diagram for Q${question.number}`} className="w-full object-contain" loading="lazy" />
-              </div>
-            )}
-            {question.image_url && question.image_url.startsWith("dyad-media://") && (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                <p className="text-[11px] text-amber-400/80 text-center">
-                  📊 Diagram for Q{question.number} — refer to your physical paper or Cambridge past paper PDF
+            {/* Show diagram hint for questions that have images */}
+            {question.image_url && (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 flex items-center gap-2.5">
+                <span className="text-base shrink-0">📊</span>
+                <p className="text-[11px] text-primary/80 leading-snug">
+                  This question has a diagram — see <strong>Q{question.number}</strong> in the question paper PDF above
                 </p>
               </div>
             )}

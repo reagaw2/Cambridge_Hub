@@ -7,7 +7,7 @@
 import { supabaseClient } from "@/api/base44Client";
 
 const BUCKET = "paper-assets";
-const FILE_PATH = "physics/9702_m25_qp_12.pdf";
+const FILE_PATH = "9702_m25_qp_12.pdf";
 const LOCAL_URL_KEY = "p1_paper_url_9702_m25_qp_12";
 
 /**
@@ -25,7 +25,7 @@ export async function getPaperPdfUrl() {
       .getPublicUrl(FILE_PATH);
 
     if (data?.publicUrl) {
-      // Verify the file actually exists
+      // Verify the file actually exists with a HEAD request
       const check = await fetch(data.publicUrl, { method: "HEAD" }).catch(() => null);
       if (check?.ok) {
         localStorage.setItem(LOCAL_URL_KEY, data.publicUrl);
@@ -50,7 +50,6 @@ export async function uploadPaperPdf(file) {
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        // Remove data URL prefix, keep only base64 string
         const result = reader.result;
         const base64Str = typeof result === "string"
           ? result.split(",")[1]
@@ -62,13 +61,12 @@ export async function uploadPaperPdf(file) {
       reader.readAsDataURL(file);
     });
 
-    // Send to server route
     const res = await fetch("/api/upload-paper", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         base64,
-        filename: "9702_m25_qp_12.pdf",
+        filename: FILE_PATH,
         contentType: "application/pdf",
       }),
     });

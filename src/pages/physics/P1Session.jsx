@@ -1,13 +1,96 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3 } from "lucide-react";
+import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope } from "lucide-react";
 import { PHYSICS_P1_QUESTIONS, PAPER_META, FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
-import PulseFeedback from "@/components/PulseFeedback";
 import ScientificCalculator from "@/components/ScientificCalculator";
-import { saveMCQAttempt, resetGuessReviewBankLock } from "@/lib/topicStore";
+import { saveMCQAttempt } from "@/lib/topicStore";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
+
+// ── Layer 1 feedback — fast, minimal ─────────────────────────────────────────
+function Layer1Feedback({ feedback, isCorrect, isGuess }) {
+  const accent = isCorrect && !isGuess ? "text-green-400" : isGuess ? "text-amber-400" : "text-red-400";
+  const accentBg = isCorrect && !isGuess ? "bg-green-500/10 border-green-500/25" : isGuess ? "bg-amber-500/10 border-amber-500/25" : "bg-red-500/10 border-red-500/25";
+
+  return (
+    <div className="space-y-3">
+      {/* Score banner */}
+      <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${accentBg}`}>
+        <span className="text-2xl shrink-0">
+          {isCorrect && !isGuess ? "✅" : isGuess ? "🎲" : "❌"}
+        </span>
+        <div>
+          <p className={`text-sm font-bold ${accent}`}>
+            {isCorrect && !isGuess ? "Correct!" : isGuess && isCorrect ? "Correct — but flagged as a guess" : isGuess ? "Incorrect — flagged as a guess" : "Incorrect"}
+          </p>
+          {(isGuess || !isCorrect) && (
+            <p className="text-[11px] text-muted-foreground mt-0.5">Added to your review bank</p>
+          )}
+        </div>
+      </div>
+
+      {/* Takeaway (Layer 1) */}
+      {feedback.pulse_layer_1 && (
+        <div className="relative rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-transparent p-4 overflow-hidden">
+          <div className="pointer-events-none absolute -top-4 -right-4 w-20 h-20 rounded-full bg-emerald-400/10 blur-xl" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <Zap className="w-3 h-3 text-emerald-400" />
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-400/70">📌 The Exam Takeaway</p>
+          </div>
+          <p className="text-sm font-bold text-white leading-snug">{feedback.pulse_layer_1}</p>
+        </div>
+      )}
+
+      {/* Cambridge insight */}
+      {feedback.cambridge_insight && (
+        <div className="bg-card border border-border rounded-xl px-4 py-3 space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cambridge Insight</p>
+          <p className="text-sm text-foreground/80 leading-relaxed">{feedback.cambridge_insight}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Layer 2 feedback — on demand ─────────────────────────────────────────────
+function Layer2Feedback({ feedback }) {
+  const steps = [
+    { number: "1", color: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400" }, label: "The System & Objective", content: feedback.step1_system },
+    { number: "2", color: { bg: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-400" }, label: "Phrase-by-Phrase Breakdown", content: feedback.step2_phrase_breakdown },
+    { number: "3", color: { bg: "bg-amber-500/20", border: "border-amber-500/30", text: "text-amber-400" }, label: "The Tipping Point", content: feedback.step3_tipping_point },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-white/5">
+        <div className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+          <Microscope className="w-3 h-3 text-white/40" />
+        </div>
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-white/40">Layer 2 · Steps 1–3</p>
+          <p className="text-xs font-bold text-white">System · Breakdown · Tipping Point</p>
+        </div>
+      </div>
+
+      <div className="px-4 pb-4 pt-3 space-y-4">
+        {steps.map(s => s.content ? (
+          <div key={s.number} className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className={`w-5 h-5 rounded-md ${s.color.bg} border ${s.color.border} flex items-center justify-center shrink-0`}>
+                <span className={`text-[9px] font-black ${s.color.text}`}>{s.number}</span>
+              </div>
+              <p className={`text-[10px] font-black uppercase tracking-widest ${s.color.text} opacity-70`}>{s.label}</p>
+            </div>
+            <p className="text-sm text-foreground/80 leading-relaxed pl-7">{s.content}</p>
+          </div>
+        ) : null)}
+      </div>
+    </div>
+  );
+}
 
 // ── Formula sheet modal ──────────────────────────────────────────────────────
 function FormulaSheet({ onClose }) {
@@ -47,7 +130,6 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
           </button>
         </div>
 
-        {/* Legend */}
         <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground pb-1 border-b border-border/40">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-500/60 inline-block border border-green-500/40" />Correct</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/60 inline-block border border-red-500/40" />Incorrect</span>
@@ -56,7 +138,6 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded ring-2 ring-primary bg-primary/20 inline-block" />Current</span>
         </div>
 
-        {/* Question grid */}
         <div className="flex flex-wrap gap-2">
           {questions.map((q, i) => {
             const a = answers[q.id];
@@ -64,31 +145,21 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose }) {
             const isAnswered = !!a?.chosen;
             const isCorrect = a?.correct;
             const isGuess = a?.flagged_as_guess;
-
             return (
-              <button
-                key={q.id}
-                onClick={() => { onJump(i); onClose(); }}
-                title={`Q${q.number}: ${q.topic}`}
+              <button key={q.id} onClick={() => { onJump(i); onClose(); }} title={`Q${q.number}: ${q.topic}`}
                 className={`w-9 h-9 rounded-lg text-xs font-bold border transition-all ${
-                  isCurrent
-                    ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
-                    : isGuess
-                      ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                      : isAnswered && isCorrect
-                        ? "bg-green-500/20 border-green-500/40 text-green-400"
-                        : isAnswered && !isCorrect
-                          ? "bg-red-500/20 border-red-500/40 text-red-400"
-                          : "bg-secondary border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                }`}
-              >
+                  isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
+                  : isGuess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                  : isAnswered && isCorrect ? "bg-green-500/20 border-green-500/40 text-green-400"
+                  : isAnswered && !isCorrect ? "bg-red-500/20 border-red-500/40 text-red-400"
+                  : "bg-secondary border-border text-muted-foreground hover:border-primary/30"
+                }`}>
                 {q.number}
               </button>
             );
           })}
         </div>
 
-        {/* Per-topic breakdown */}
         <div className="space-y-2 pt-1 border-t border-border/40">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">By topic</p>
           {topics.map(topic => {
@@ -121,25 +192,27 @@ export default function P1Session() {
   const questions = PHYSICS_P1_QUESTIONS;
 
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [answers, setAnswers] = useState({});       // { questionId: { chosen, correct, flagged_as_guess, feedbackData } }
+  const [answers, setAnswers] = useState({});
   const [selected, setSelected] = useState(null);
   const [isGuess, setIsGuess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingL2, setLoadingL2] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showCalc, setShowCalc] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [feedbackData, setFeedbackData] = useState(null);
+  const [layer1, setLayer1] = useState(null);  // fast feedback
+  const [layer2, setLayer2] = useState(null);  // on-demand breakdown
 
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
 
-  // Restore state when navigating between questions
   useEffect(() => {
     setSelected(existingAnswer?.chosen ?? null);
     setIsGuess(existingAnswer?.flagged_as_guess ?? false);
     setSubmitted(!!existingAnswer);
-    setFeedbackData(existingAnswer?.feedbackData ?? null);
+    setLayer1(existingAnswer?.layer1 ?? null);
+    setLayer2(existingAnswer?.layer2 ?? null);
     setShowCalc(false);
   }, [currentIdx]);
 
@@ -151,9 +224,8 @@ export default function P1Session() {
     setLoading(true);
 
     const isCorrect = selected === question.correct;
-    const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
 
-    // Save to review bank — always for guesses, and for wrong answers
+    // Save to review bank
     await saveMCQAttempt({
       question_id: question.id,
       topic: question.topic,
@@ -165,84 +237,105 @@ export default function P1Session() {
       reasoning: isGuess ? null : selected,
     });
 
-    const prompt = `You are an expert Cambridge A Level Physics (9702) examiner marking Paper 1 (9702/12/F/M/25).
+    // ── Layer 1 only — fast, minimal prompt ──────────────────────────────
+    const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
+    const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}
+Options: ${optionsList}
+Correct: ${question.correct} (${question.options[question.correct]})
+Student chose: ${selected} — ${isCorrect ? "CORRECT" : "WRONG"}
+${isGuess ? "Student flagged this as a guess." : ""}
 
-Question ${question.number} [${question.topic}]: ${question.text}
-
-Options:
-${optionsList}
-
-Correct answer: ${question.correct}
-Correct answer text: ${question.options[question.correct]}
-Student's answer: ${selected}
-Result: ${isCorrect ? "CORRECT" : "INCORRECT"}
-${isGuess ? "Note: Student flagged this as a guess." : ""}
-
-${!isCorrect ? `Explain clearly why ${question.correct} is right and why ${selected} is wrong.` : `Confirm why ${question.correct} is correct.`}
-
-Respond in this exact JSON format only:
+Respond ONLY in JSON:
 {
   "marks_earned": ${isCorrect ? 1 : 0},
-  "cambridge_insight": "Two sentences: what concept is tested and why the correct answer is right.",
-  "next_step": "One sentence: what the student should revise.",
-  "step1_system": "The fundamental physics concept or law this question tests.",
-  "step2_phrase_breakdown": "The key words or quantities in the question that determine the correct option.",
-  "step3_tipping_point": "The single logical step separating ${question.correct} from the most tempting wrong answer.",
-  "step4_math_visual": "Show the key calculation or reasoning that proves ${question.correct} is correct.",
-  "step5_edge_case": "How would the answer change if one key variable were different?",
-  "step6_takeaway": "The reusable exam rule. Max 15 words.",
-  "pulse_layer_1": "Same as step6_takeaway.",
-  "pulse_layer_2_marks": [{"notation": "Key Point", "description": "${question.explanation}", "earned": ${isCorrect}, "examiner_note": ""}],
-  "pulse_layer_3": "One sentence combining the calculation proof and the edge case."
+  "cambridge_insight": "One sentence: why ${question.correct} is the right answer.",
+  "pulse_layer_1": "The reusable exam rule. Max 12 words."
 }`;
 
-    let fb = null;
+    let fb1 = null;
     try {
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt,
+      const r = await base44.integrations.Core.InvokeLLM({
+        prompt: l1prompt,
         model: "claude_sonnet_4_6",
         response_json_schema: {
           type: "object",
           properties: {
             marks_earned: { type: "number" },
             cambridge_insight: { type: "string" },
-            next_step: { type: "string" },
-            step1_system: { type: "string" },
-            step2_phrase_breakdown: { type: "string" },
-            step3_tipping_point: { type: "string" },
-            step4_math_visual: { type: "string" },
-            step5_edge_case: { type: "string" },
-            step6_takeaway: { type: "string" },
             pulse_layer_1: { type: "string" },
-            pulse_layer_2_marks: { type: "array", items: { type: "object" } },
-            pulse_layer_3: { type: "string" },
           },
+          required: ["marks_earned", "cambridge_insight", "pulse_layer_1"],
         },
       });
-      fb = result?.response ?? result;
+      fb1 = r?.response ?? r;
     } catch {
-      fb = {
+      fb1 = {
         marks_earned: isCorrect ? 1 : 0,
         cambridge_insight: question.explanation,
-        next_step: "Review this topic in your notes.",
         pulse_layer_1: question.explanation,
-        pulse_layer_2_marks: [{ notation: "Key Point", description: question.explanation, earned: isCorrect, examiner_note: "" }],
       };
     }
 
-    const answerRecord = { chosen: selected, correct: isCorrect, flagged_as_guess: isGuess, feedbackData: fb };
+    const answerRecord = { chosen: selected, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
     setAnswers(prev => ({ ...prev, [question.id]: answerRecord }));
-    setFeedbackData(fb);
+    setLayer1(fb1);
+    setLayer2(null);
     setSubmitted(true);
     setLoading(false);
   }
 
-  function handleNext() {
-    if (currentIdx < questions.length - 1) {
-      setCurrentIdx(i => i + 1);
-    } else {
-      navigate("/physics/p1-summary", { state: { answers, questions, paperId: PAPER_META.id } });
+  async function handleRequestLayer2() {
+    if (loadingL2 || layer2) return;
+    setLoadingL2(true);
+
+    const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
+    const l2prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}
+Options: ${optionsList}
+Correct: ${question.correct} (${question.options[question.correct]})
+Student chose: ${selected} — ${existingAnswer?.correct ? "CORRECT" : "WRONG"}
+
+Give a deeper breakdown. Respond ONLY in JSON:
+{
+  "step1_system": "One sentence: what fundamental concept or law this question tests.",
+  "step2_phrase_breakdown": "One to two sentences: which specific words or quantities in the question determine the answer.",
+  "step3_tipping_point": "One sentence: the exact logical step that separates ${question.correct} from the most tempting wrong option."
+}`;
+
+    let fb2 = null;
+    try {
+      const r = await base44.integrations.Core.InvokeLLM({
+        prompt: l2prompt,
+        model: "claude_sonnet_4_6",
+        response_json_schema: {
+          type: "object",
+          properties: {
+            step1_system: { type: "string" },
+            step2_phrase_breakdown: { type: "string" },
+            step3_tipping_point: { type: "string" },
+          },
+          required: ["step1_system", "step2_phrase_breakdown", "step3_tipping_point"],
+        },
+      });
+      fb2 = r?.response ?? r;
+    } catch {
+      fb2 = {
+        step1_system: "Could not load breakdown.",
+        step2_phrase_breakdown: "",
+        step3_tipping_point: "",
+      };
     }
+
+    setLayer2(fb2);
+    setAnswers(prev => ({
+      ...prev,
+      [question.id]: { ...prev[question.id], layer2: fb2 },
+    }));
+    setLoadingL2(false);
+  }
+
+  function handleNext() {
+    if (currentIdx < questions.length - 1) setCurrentIdx(i => i + 1);
+    else navigate("/physics/p1-summary", { state: { answers, questions, paperId: PAPER_META.id } });
   }
 
   function handlePrev() {
@@ -250,7 +343,6 @@ Respond in this exact JSON format only:
   }
 
   if (!question) return null;
-
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === questions.length - 1;
 
@@ -271,38 +363,26 @@ Respond in this exact JSON format only:
             </div>
 
             <div className="flex items-center gap-1.5">
-              {/* Calculator */}
-              <button
-                onClick={() => setShowCalc(c => !c)}
+              <button onClick={() => setShowCalc(c => !c)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                  showCalc
-                    ? "bg-primary/20 border-primary/50 text-primary"
-                    : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:brightness-110"
-                }`}
-              >
+                  showCalc ? "bg-primary/20 border-primary/50 text-primary" : "bg-secondary border-border text-muted-foreground hover:brightness-110"
+                }`}>
                 <Calculator className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Calc</span>
               </button>
-              {/* Formulas */}
-              <button
-                onClick={() => setShowFormulas(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground hover:brightness-110 transition-all"
-              >
+              <button onClick={() => setShowFormulas(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-all">
                 <BookOpen className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Data</span>
               </button>
-              {/* Overview */}
-              <button
-                onClick={() => setShowOverview(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground hover:brightness-110 transition-all"
-              >
+              <button onClick={() => setShowOverview(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-all">
                 <Grid3X3 className="w-3.5 h-3.5" />
                 <span className="font-mono text-[10px]">{answeredCount}/{questions.length}</span>
               </button>
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="w-full h-0.5 bg-secondary">
             <div className="h-0.5 bg-primary transition-all duration-500" style={{ width: `${progress * 100}%` }} />
           </div>
@@ -314,24 +394,15 @@ Respond in this exact JSON format only:
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
             const isAnswered = !!a?.chosen;
-            const isCorrect = a?.correct;
-            const isGuessQ = a?.flagged_as_guess;
             return (
-              <button
-                key={q.id}
-                onClick={() => setCurrentIdx(i)}
+              <button key={q.id} onClick={() => setCurrentIdx(i)}
                 className={`shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${
-                  isCurrent
-                    ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
-                    : isGuessQ
-                      ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                      : isAnswered && isCorrect
-                        ? "bg-green-500/20 border-green-500/40 text-green-400"
-                        : isAnswered && !isCorrect
-                          ? "bg-red-500/20 border-red-500/40 text-red-400"
-                          : "bg-secondary/60 border-border/40 text-muted-foreground/50"
-                }`}
-              >
+                  isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
+                  : a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                  : isAnswered && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
+                  : isAnswered && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400"
+                  : "bg-secondary/60 border-border/40 text-muted-foreground/50"
+                }`}>
                 {q.number}
               </button>
             );
@@ -340,7 +411,6 @@ Respond in this exact JSON format only:
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {/* Calculator */}
           {showCalc && <ScientificCalculator onClose={() => setShowCalc(false)} />}
 
           {/* Question card */}
@@ -353,22 +423,12 @@ Respond in this exact JSON format only:
                 {question.topic}
               </span>
             </div>
-
-            {/* Diagram image */}
             {question.image_url && (
               <div className="rounded-xl overflow-hidden border border-border/40" style={{ background: "#fff" }}>
-                <img
-                  src={question.image_url}
-                  alt={`Diagram for Q${question.number}`}
-                  className="w-full object-contain"
-                  loading="lazy"
-                />
+                <img src={question.image_url} alt={`Diagram for Q${question.number}`} className="w-full object-contain" loading="lazy" />
               </div>
             )}
-
-            <p className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-line">
-              {question.text}
-            </p>
+            <p className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-line">{question.text}</p>
           </div>
 
           {/* Options */}
@@ -394,11 +454,8 @@ Respond in this exact JSON format only:
                   <span className={`font-mono text-xs font-black shrink-0 mt-0.5 w-4 ${
                     submitted && isCorrectOption ? "text-green-400"
                     : submitted && isWrongChosen ? "text-red-400"
-                    : isSelected ? "text-primary"
-                    : "text-muted-foreground"
-                  }`}>
-                    {key}
-                  </span>
+                    : isSelected ? "text-primary" : "text-muted-foreground"
+                  }`}>{key}</span>
                   <span className="text-sm leading-relaxed flex-1">{question.options[key]}</span>
                   {submitted && isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />}
                   {submitted && isWrongChosen && <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />}
@@ -407,27 +464,20 @@ Respond in this exact JSON format only:
             })}
           </div>
 
-          {/* Guess toggle + Submit — only before submission */}
+          {/* Guess + Submit (pre-submission) */}
           {!submitted && (
             <div className="flex gap-2">
-              {/* Just a guess toggle */}
               <button
                 onClick={() => setIsGuess(g => !g)}
                 className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-all shrink-0 ${
-                  isGuess
-                    ? "bg-amber-400 text-amber-900 border-amber-400"
-                    : "bg-secondary border-border text-muted-foreground hover:brightness-110"
-                }`}
-              >
+                  isGuess ? "bg-amber-400 text-amber-900 border-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"
+                }`}>
                 🎲 {isGuess ? "Guess!" : "Just a guess"}
               </button>
-
-              {/* Submit */}
               <button
                 onClick={handleSubmit}
                 disabled={!selected || loading}
-                className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
+                className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
@@ -438,48 +488,51 @@ Respond in this exact JSON format only:
             </div>
           )}
 
-          {/* Guess badge — shown after submission */}
-          {submitted && existingAnswer?.flagged_as_guess && (
-            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5">
-              <span className="text-base">🎲</span>
-              <p className="text-xs font-semibold text-amber-400">
-                {existingAnswer.correct
-                  ? "Correct — but flagged as a guess. Added to your review bank."
-                  : "Incorrect — flagged as a guess. Added to your review bank."}
-              </p>
-            </div>
-          )}
-
-          {/* Feedback */}
-          {submitted && feedbackData && (
-            <PulseFeedback
-              feedback={feedbackData}
-              subject="physics"
-              marksTotal={1}
-              questionId={question.id}
-              questionText={question.text}
-              studentAnswer={`${selected}: ${question.options[selected]}`}
+          {/* Layer 1 feedback (appears immediately after submit) */}
+          {submitted && layer1 && (
+            <Layer1Feedback
+              feedback={layer1}
+              isCorrect={existingAnswer?.correct ?? false}
+              isGuess={existingAnswer?.flagged_as_guess ?? false}
             />
           )}
 
-          {/* Prev / Next navigation — always visible */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          {/* "Show breakdown" button — only shown after Layer 1 loads and Layer 2 not yet fetched */}
+          {submitted && layer1 && !layer2 && (
             <button
-              onClick={handlePrev}
-              disabled={isFirst}
-              className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30"
+              onClick={handleRequestLayer2}
+              disabled={loadingL2}
+              className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-all disabled:opacity-50"
             >
+              {loadingL2 ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                  Loading breakdown…
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  Show deeper breakdown
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Layer 2 — on demand, no mark scheme verdict, no Layer 3 */}
+          {layer2 && <Layer2Feedback feedback={layer2} />}
+
+          {/* Prev / Next — always visible */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button onClick={handlePrev} disabled={isFirst}
+              className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30">
               <ChevronLeft className="w-4 h-4" /> Previous
             </button>
-            <button
-              onClick={handleNext}
-              className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-            >
+            <button onClick={handleNext}
+              className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
               {isLast ? "Finish" : "Next"} <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Skip hint for unanswered */}
           {!submitted && (
             <p className="text-[11px] text-muted-foreground/40 text-center -mt-1">
               You can skip and return later using the overview strip above

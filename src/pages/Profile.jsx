@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Trash2, LogOut, AlertTriangle, Check } from "lucide-react";
+import { ArrowLeft, Trash2, LogOut, AlertTriangle, Check, CloudUpload, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { resetData } from "@/lib/topicStore";
 import { supabaseClient } from "@/api/base44Client";
+import { forceSyncAllLocalToSupabase } from "@/lib/p1SyncAll";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -21,15 +22,38 @@ export default function Profile() {
   const [nameSaving, setNameSaving] = useState(false);
   const [nameError, setNameError] = useState(null);
 
+  // Sync state
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null); // null | "success" | "error"
+  const [syncMessage, setSyncMessage] = useState("");
+
+  async function handleSyncProgress() {
+    setSyncing(true);
+    setSyncResult(null);
+    setSyncMessage("");
+    try {
+      const summary = await forceSyncAllLocalToSupabase();
+      setSyncResult("success");
+      setSyncMessage(
+        `Synced ${summary.sessionsSync} session${summary.sessionsSync !== 1 ? "s" : ""}, ` +
+        `${summary.notesSync} note${summary.notesSync !== 1 ? "s" : ""}, ` +
+        `${summary.starsSync} starred question${summary.starsSync !== 1 ? "s" : ""} — your progress is now available on all devices.`
+      );
+    } catch (err) {
+      setSyncResult("error");
+      setSyncMessage(err.message ?? "Sync failed. Please try again.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleSavePreferredName() {
     setNameSaving(true);
     setNameError(null);
     const trimmed = preferredName.trim();
 
-    // 1. Always write to localStorage for instant local access
     localStorage.setItem(`cambridge_hub_preferred_name_${user?.id ?? "anon"}`, trimmed);
 
-    // 2. Persist to Supabase user_metadata for cross-device sync
     try {
       const { data, error } = await supabaseClient.auth.updateUser({
         data: { preferred_name: trimmed },
@@ -88,6 +112,44 @@ export default function Profile() {
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">{user?.email ?? ""}</p>
             </div>
+          </div>
+
+          {/* ── Sync Progress ── */}
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Sync Progress to All Devices</p>
+              <p className="text-xs text-muted-foreground/60 leading-relaxed">
+                Push your current device's session progress, notes, and starred questions to the cloud so they appear on all your devices.
+              </p>
+            </div>
+
+            <button
+              onClick={handleSyncProgress}
+              disabled={syncing}
+              className={`w-full flex items-center justify-center gap-2 font-semibold text-sm py-3.5 rounded-xl transition-all active:scale-[0.98] ${
+                syncResult === "success"
+                  ? "bg-green-500/15 border border-green-500/40 text-green-400"
+                  : syncResult === "error"
+                    ? "bg-red-500/15 border border-red-500/40 text-red-400"
+                    : "bg-primary text-primary-foreground hover:brightness-110"
+              } disabled:opacity-60 disabled:cursor-not-allowed`}
+            >
+              {syncing ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Syncing…</>
+              ) : syncResult === "success" ? (
+                <><Check className="w-4 h-4" /> Synced successfully!</>
+              ) : syncResult === "error" ? (
+                <>⚠ Sync failed — tap to retry</>
+              ) : (
+                <><CloudUpload className="w-4 h-4" /> Push my progress to the cloud</>
+              )}
+            </button>
+
+            {syncMessage && (
+              <p className={`text-xs leading-relaxed ${syncResult === "success" ? "text-green-400/80" : "text-red-400/80"}`}>
+                {syncMessage}
+              </p>
+            )}
           </div>
 
           {/* Preferred name */}

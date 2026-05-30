@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Trash2, Undo2, Eraser, PenLine } from "lucide-react";
+import { Trash2, Undo2, Eraser, PenLine, ChevronLeft, ChevronRight } from "lucide-react";
 import { getStrokesForQuestion, saveStrokes } from "@/lib/p1ScratchpadStore";
 
 const PEN_COLORS = [
@@ -9,11 +9,12 @@ const PEN_COLORS = [
   { color: "#14532d", label: "Green" },
 ];
 
-// ── Single pad (one side) ─────────────────────────────────────────────────────
+// ── Single pad ────────────────────────────────────────────────────────────────
 
 function DrawingPad({ side, questionId, paperId, width }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const [activeTool, setActiveTool] = useState("pen");
   const [penColor, setPenColor] = useState("#0f172a");
@@ -21,7 +22,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
   const [strokes, setStrokes] = useState([]);
   const [hasContent, setHasContent] = useState(false);
 
-  // Refs to avoid stale closures in document listeners
   const strokesRef = useRef([]);
   const isDrawingRef = useRef(false);
   const currentStrokeRef = useRef([]);
@@ -45,8 +45,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
     setHasContent(s.length > 0);
   }, [questionId, paperId, side]);
 
-  // ── Canvas rendering ────────────────────────────────────────────────────────
-
   const redraw = useCallback((eraserPos = null) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -60,7 +58,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Saved strokes
     for (const stroke of strokesRef.current) {
       if (stroke.points.length < 2) continue;
       ctx.beginPath();
@@ -73,7 +70,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
       ctx.stroke();
     }
 
-    // In-progress stroke
     if (activeToolRef.current === "pen" && currentStrokeRef.current.length >= 2) {
       ctx.beginPath();
       ctx.strokeStyle = penColorRef.current;
@@ -85,7 +81,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
       ctx.stroke();
     }
 
-    // Eraser cursor preview
     if (eraserPos && activeToolRef.current === "eraser") {
       const R = 14;
       ctx.beginPath();
@@ -95,7 +90,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
       ctx.setLineDash([3, 2]);
       ctx.stroke();
       ctx.setLineDash([]);
-      // Fill slightly
       ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.beginPath();
       ctx.arc(eraserPos.x * W, eraserPos.y * H, R, 0, Math.PI * 2);
@@ -103,8 +97,9 @@ function DrawingPad({ side, questionId, paperId, width }) {
     }
   }, []);
 
-  // Resize canvas when container resizes
+  // Resize canvas
   useEffect(() => {
+    if (collapsed) return;
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -128,12 +123,9 @@ function DrawingPad({ side, questionId, paperId, width }) {
     const obs = new ResizeObserver(resize);
     obs.observe(container);
     return () => { obs.disconnect(); cancelAnimationFrame(raf); };
-  }, [redraw]);
+  }, [redraw, collapsed]);
 
-  // Redraw when strokes change
   useEffect(() => { redraw(); }, [strokes, redraw]);
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
 
   function getCanvasPos(clientX, clientY) {
     const canvas = canvasRef.current;
@@ -156,7 +148,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
   }
 
   function eraseAt(pos) {
-    const R = 0.05; // normalized eraser radius
+    const R = 0.05;
     const updated = strokesRef.current.filter(
       s => !s.points.some(pt => Math.hypot(pt.x - pos.x, pt.y - pos.y) < R)
     );
@@ -167,8 +159,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
       saveStrokes(paperIdRef.current, questionIdRef.current, side, updated);
     }
   }
-
-  // ── Document-level pointer listeners (so strokes complete outside canvas) ──
 
   useEffect(() => {
     function onMove(e) {
@@ -189,11 +179,9 @@ function DrawingPad({ side, questionId, paperId, width }) {
     function onUp() {
       if (!isDrawingRef.current) return;
       isDrawingRef.current = false;
-
       if (activeToolRef.current === "pen") {
         commitStroke([...currentStrokeRef.current]);
       }
-
       currentStrokeRef.current = [];
       redraw();
     }
@@ -241,8 +229,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
     saveStrokes(paperId, questionId, side, []);
   }
 
-  // ── Paper texture ───────────────────────────────────────────────────────────
-  // Both pads look like an open notebook page — margin line on the left, ruled lines
   const paperStyle = {
     background: "#f6f1e4",
     backgroundImage: [
@@ -251,10 +237,63 @@ function DrawingPad({ side, questionId, paperId, width }) {
     ].join(", "),
   };
 
-  const borderSide = side === "left"
-    ? "border-r border-[#d0c5a8]"
-    : "border-l border-[#d0c5a8]";
+  const borderSide = side === "left" ? "border-r border-[#d0c5a8]" : "border-l border-[#d0c5a8]";
 
+  // ── Collapsed state — thin tab with toggle arrow ──────────────────────────
+  if (collapsed) {
+    return (
+      <div
+        className={`flex flex-col items-center justify-center ${borderSide}`}
+        style={{
+          position: "fixed",
+          [side]: 0,
+          top: 0,
+          bottom: 64,
+          width: 28,
+          zIndex: 5,
+          background: "#ebe4d0",
+          cursor: "pointer",
+          transition: "width 0.25s ease",
+        }}
+        onClick={() => setCollapsed(false)}
+        title="Expand scratchpad"
+      >
+        {/* Dotted texture strip */}
+        <div className="flex-1 w-full flex flex-col items-center justify-center gap-2 select-none">
+          <div
+            style={{
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+              transform: side === "left" ? "rotate(180deg)" : "none",
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: "0.15em",
+              color: "#a89880",
+              textTransform: "uppercase",
+              userSelect: "none",
+            }}
+          >
+            Workings
+          </div>
+          {hasContent && (
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: "#a89880" }}
+              title="Contains notes"
+            />
+          )}
+        </div>
+        {/* Arrow */}
+        <div className="pb-4">
+          {side === "left"
+            ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#a89880" }} />
+            : <ChevronLeft className="w-3.5 h-3.5" style={{ color: "#a89880" }} />}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Expanded state ─────────────────────────────────────────────────────────
   return (
     <div
       className={`flex flex-col ${borderSide}`}
@@ -265,9 +304,10 @@ function DrawingPad({ side, questionId, paperId, width }) {
         bottom: 64,
         width,
         zIndex: 5,
+        transition: "width 0.25s ease",
       }}
     >
-      {/* ── Header ── */}
+      {/* Header */}
       <div
         className="shrink-0 px-2 pt-2 pb-2 space-y-1.5"
         style={{ background: "#ebe4d0", borderBottom: "1px solid #c8b89a" }}
@@ -296,6 +336,16 @@ function DrawingPad({ side, questionId, paperId, width }) {
             >
               <Trash2 className="w-3 h-3" />
             </button>
+            {/* Collapse button */}
+            <button
+              onClick={() => setCollapsed(true)}
+              title="Collapse scratchpad"
+              className="p-1 rounded hover:bg-stone-200/70 text-stone-400 hover:text-stone-700 transition-colors"
+            >
+              {side === "left"
+                ? <ChevronLeft className="w-3 h-3" />
+                : <ChevronRight className="w-3 h-3" />}
+            </button>
           </div>
         </div>
 
@@ -305,7 +355,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
         {/* Tool controls */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Pen colours */}
+          {/* Colours */}
           <div className="flex gap-0.5 items-center">
             {PEN_COLORS.map(({ color, label }) => (
               <button
@@ -374,15 +424,14 @@ function DrawingPad({ side, questionId, paperId, width }) {
           </button>
         </div>
 
-        {/* Active tool indicator */}
+        {/* Active tool hint */}
         <p className="text-[8px] text-stone-400 leading-none">
           {activeTool === "eraser" ? "🧹 Eraser active — drag to erase" : "✏ Draw mode"}
         </p>
       </div>
 
-      {/* ── Canvas (paper) ── */}
+      {/* Canvas (paper) */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden" style={paperStyle}>
-        {/* Corner fold decoration */}
         <div
           className="absolute top-0 right-0 pointer-events-none"
           style={{
@@ -406,7 +455,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
           onTouchStart={onCanvasDown}
         />
 
-        {/* Empty state */}
         {!hasContent && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 pointer-events-none select-none">
             <PenLine className="w-5 h-5 text-stone-300" />
@@ -428,7 +476,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
   );
 }
 
-// ── Main export — renders both panels only when there's room ──────────────────
+// ── Main export ───────────────────────────────────────────────────────────────
 
 export default function ScratchpadPanel({ questionId, paperId }) {
   const [windowWidth, setWindowWidth] = useState(() =>
@@ -441,7 +489,7 @@ export default function ScratchpadPanel({ questionId, paperId }) {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // Need at least 130px per side
+  // Need at least 130px per side when expanded; 28px collapsed is fine
   const sideWidth = Math.floor((windowWidth - 540) / 2);
   if (sideWidth < 130 || !questionId) return null;
 

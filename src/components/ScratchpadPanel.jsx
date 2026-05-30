@@ -15,13 +15,10 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Start collapsed — stays expanded once opened until manually collapsed
   const [collapsed, setCollapsed] = useState(true);
-
   const [activeTool, setActiveTool] = useState("pen");
   const [penColor, setPenColor] = useState("#0f172a");
   const [penSize, setPenSize] = useState(2);
-
   const [strokes, setStrokes] = useState([]);
   const [history, setHistory] = useState([]);
   const [saveFlash, setSaveFlash] = useState(false);
@@ -70,13 +67,15 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     const dpr = window.devicePixelRatio || 1;
     const W = canvas.width / dpr;
     const H = canvas.height / dpr;
-    const qId = questionIdRef.current;
-    const tool = activeToolRef.current;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+
+    // Paper background
+    ctx.fillStyle = "#f6f1e4";
+    ctx.fillRect(0, 0, W, H);
 
     for (const stroke of strokesRef.current) {
       if (stroke.points.length < 2) continue;
@@ -146,13 +145,13 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
 
   useEffect(() => { redraw(); }, [strokes, redraw]);
 
-  function getCanvasPos(clientX, clientY) {
+  function getCanvasPos(e) {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     return {
-      x: (clientX - rect.left) / rect.width,
-      y: (clientY - rect.top) / rect.height,
+      x: (e.clientX - rect.left) / rect.width,
+      y: (e.clientY - rect.top) / rect.height,
     };
   }
 
@@ -178,7 +177,7 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     function onMove(e) {
       if (!isDrawingRef.current) return;
       const src = e.touches ? e.touches[0] : e;
-      const pos = getCanvasPos(src.clientX, src.clientY);
+      const pos = getCanvasPos(src);
       if (!pos) return;
       if (activeToolRef.current === "pen") {
         currentStrokeRef.current.push(pos);
@@ -208,7 +207,7 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
       }
     }
 
-    document.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
     document.addEventListener("touchmove", onMove, { passive: true });
     document.addEventListener("touchend", onUp);
@@ -225,7 +224,7 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     e.preventDefault();
     isDrawingRef.current = true;
     const src = e.touches ? e.touches[0] : e;
-    const pos = getCanvasPos(src.clientX, src.clientY);
+    const pos = getCanvasPos(src);
     if (!pos) return;
     if (activeToolRef.current === "pen") {
       currentStrokeRef.current = [pos];
@@ -251,36 +250,45 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     applyStrokes([]);
   }
 
+  /**
+   * Capture the working by rendering strokes to an offscreen canvas at
+   * a fixed output width. Using a separate offscreen canvas ensures the
+   * output is clean and resolution-independent.
+   */
   function captureCanvas() {
+    if (strokesRef.current.length === 0) return null;
+
     const canvas = canvasRef.current;
-    if (!canvas || strokesRef.current.length === 0) return null;
+    if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return null;
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
 
-    const MAX_W = 320;
-    const scale = MAX_W / rect.width;
-    const outW = MAX_W;
-    const outH = Math.max(1, Math.round(rect.height * scale));
+    const OUT_W = 600;
+    const OUT_H = Math.max(1, Math.round((rect.height / rect.width) * OUT_W));
 
     const offscreen = document.createElement("canvas");
-    offscreen.width = outW;
-    offscreen.height = outH;
+    offscreen.width = OUT_W;
+    offscreen.height = OUT_H;
     const ctx = offscreen.getContext("2d");
 
+    // Paper background
     ctx.fillStyle = "#f6f1e4";
-    ctx.fillRect(0, 0, outW, outH);
+    ctx.fillRect(0, 0, OUT_W, OUT_H);
 
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+
     for (const stroke of strokesRef.current) {
-      if (stroke.points.length < 2) continue;
+      if (!stroke.points || stroke.points.length < 2) continue;
       ctx.beginPath();
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.size * scale;
+      ctx.strokeStyle = stroke.color ?? "#0f172a";
+      ctx.lineWidth = (stroke.size ?? 2) * (OUT_W / rect.width);
       stroke.points.forEach((pt, i) => {
-        if (i === 0) ctx.moveTo(pt.x * outW, pt.y * outH);
-        else ctx.lineTo(pt.x * outW, pt.y * outH);
+        const x = pt.x * OUT_W;
+        const y = pt.y * OUT_H;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       });
       ctx.stroke();
     }
@@ -299,17 +307,8 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
   const hasContent = strokes.length > 0;
   const canUndo = history.length > 0;
 
-  const paperStyle = {
-    background: "#f6f1e4",
-    backgroundImage: [
-      "repeating-linear-gradient(transparent, transparent 26px, #b8c8e0 26px, #b8c8e0 27.5px)",
-      "linear-gradient(90deg, transparent 28px, #d9908a 28px, #d9908a 30px, transparent 30px)",
-    ].join(", "),
-  };
-
   const borderSide = side === "left" ? "border-r border-[#d0c5a8]" : "border-l border-[#d0c5a8]";
 
-  // ── Collapsed state ───────────────────────────────────────────────────────
   if (collapsed) {
     return (
       <div
@@ -360,7 +359,6 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     );
   }
 
-  // ── Expanded state ────────────────────────────────────────────────────────
   return (
     <div
       className={`flex flex-col ${borderSide}`}
@@ -516,7 +514,17 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
       </div>
 
       {/* Canvas (paper) */}
-      <div ref={containerRef} className="flex-1 relative overflow-hidden" style={paperStyle}>
+      <div
+        ref={containerRef}
+        className="flex-1 relative overflow-hidden"
+        style={{
+          background: "#f6f1e4",
+          backgroundImage: [
+            "repeating-linear-gradient(transparent, transparent 26px, #b8c8e0 26px, #b8c8e0 27.5px)",
+            "linear-gradient(90deg, transparent 28px, #d9908a 28px, #d9908a 30px, transparent 30px)",
+          ].join(", "),
+        }}
+      >
         <div
           className="absolute top-0 right-0 pointer-events-none"
           style={{

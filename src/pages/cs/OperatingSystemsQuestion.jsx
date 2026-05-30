@@ -1,15 +1,15 @@
+import { useState } from "react";
 import { getNextOSQuestion, advanceOSIndex, OS_QUESTIONS } from "@/lib/csOSBank";
-import SupabaseCSQuestion from "./SupabaseCSQuestion";
+import CSQuestionAttempt from "./CSQuestionAttempt";
 
 export default function OperatingSystemsQuestion() {
-  return (
-    <SupabaseCSQuestion
-      topicKey="operating_systems"
-      topicLabel="Operating Systems"
-      route="/cs/operating-systems/question"
-      fallbackQuestions={OS_QUESTIONS}
-      fallbackGetNext={getNextOSQuestion}
-      fallbackAdvance={advanceOSIndex}
-    />
-  );
+  const [currentIdx, setCurrentIdx] = useState(() => getNextOSQuestion().idx);
+  const [sessionAnswers, setSessionAnswers] = useState({});
+  const question = OS_QUESTIONS[currentIdx % OS_QUESTIONS.length];
+  function handleAdvance(_s, isCorrect) {
+    setSessionAnswers(prev => ({ ...prev, [question.id]: isCorrect ? "correct" : "wrong" }));
+    advanceOSIndex();
+    setCurrentIdx(i => i + 1);
+  }
+  return <CSQuestionAttempt question={question} idx={currentIdx % OS_QUESTIONS.length} total={OS_QUESTIONS.length} allQuestions={OS_QUESTIONS} sessionAnswers={sessionAnswers} onAdvance={handleAdvance} onJumpTo={setCurrentIdx} topicLabel="Operating Systems" allQuestionsForDev={OS_QUESTIONS} />;
 }

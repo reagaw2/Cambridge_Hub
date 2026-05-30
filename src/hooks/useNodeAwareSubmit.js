@@ -2,13 +2,9 @@ import { useCallback, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { getMarkNodes, buildNodeAwarePrompt, validateMandatoryChain } from "@/lib/schemeWhisperer";
 
-// Only request L1 + L2 fields — L3 is fetched on demand in PulseFeedback
-const PULSE_EXTENSION = `
-
-Also return these CONCISE additional fields:
-"pulse_layer_1": "Identify the single KEY WORD or phrase in the question whose hidden meaning unlocks all similar Cambridge questions. State what it really means to Cambridge in ≤15 words.",
-"cambridge_insight": "What Cambridge specifically expects to award full marks. Max 2 sentences.",
-"pulse_layer_2_marks": [{"notation":"B1/M1/A1","description":"exact mark criterion","earned":true or false,"examiner_note":"one sentence only"}]`;
+// Only ask for pulse_layer_1 — everything else is already in the base prompt
+// This saves ~200 tokens per call and makes feedback noticeably faster
+const PULSE_ADDITION = `\n\nAlso add: "pulse_layer_1": "The single reusable exam rule for this question type. ≤12 words."`;
 
 export function useNodeAwareSubmit() {
   const [loading, setLoading] = useState(false);
@@ -26,19 +22,17 @@ export function useNodeAwareSubmit() {
       console.warn("[useNodeAwareSubmit] getMarkNodes failed:", e.message);
     }
 
-    // 2. Build prompt — base + node awareness + lean pulse extension
+    // 2. Build prompt — base + node awareness + pulse_layer_1 only
     const basePrompt = question.prompt(answer);
     const nodePrompt = nodes.length > 0 ? buildNodeAwarePrompt(basePrompt, nodes) : basePrompt;
-    const prompt = nodePrompt + PULSE_EXTENSION;
+    const prompt = nodePrompt + PULSE_ADDITION;
 
-    // 3. Extend schema with only L1+L2 pulse fields
-    const pulseSchema = {
+    // 3. Extend schema with just pulse_layer_1
+    const extendedSchema = {
       ...question.response_schema,
       properties: {
         ...(question.response_schema?.properties ?? {}),
         pulse_layer_1: { type: "string" },
-        cambridge_insight: { type: "string" },
-        pulse_layer_2_marks: { type: "array", items: { type: "object" } },
       },
     };
 
@@ -48,7 +42,7 @@ export function useNodeAwareSubmit() {
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
         model: "claude_sonnet_4_6",
-        response_json_schema: pulseSchema,
+        response_json_schema: extendedSchema,
       });
       rawFeedback = result?.response ?? result;
     } catch (e) {

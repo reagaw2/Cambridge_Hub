@@ -19,11 +19,12 @@ export function normaliseTopicKey(name) {
     .replace(/^_|_$/g, "");
 }
 
-// ── Word-overlap similarity (for persistent misunderstanding detection) ────────
+// ── Word-overlap similarity ────────────────────────────────────────────────────
+// Lower threshold + include shorter words (physics has many short meaningful terms)
 function _wordOverlap(a, b) {
-  if (!a || !b || a.length < 15 || b.length < 15) return 0;
-  const stop = new Set(["the", "is", "it", "and", "or", "in", "of", "to", "a", "an", "are", "was", "be", "has"]);
-  const words = s => s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stop.has(w));
+  if (!a || !b || a.length < 8 || b.length < 8) return 0;
+  const stop = new Set(["the", "is", "it", "and", "or", "in", "of", "to", "a", "an", "are", "was", "be", "has", "by", "at", "on", "as"]);
+  const words = s => s.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(w => w.length > 1 && !stop.has(w));
   const wa = new Set(words(a));
   const wb = words(b);
   if (wa.size === 0 || wb.length === 0) return 0;
@@ -31,8 +32,9 @@ function _wordOverlap(a, b) {
   return common / Math.max(wa.size, wb.length);
 }
 
+// Returns true if two answers are suspiciously similar (likely same mistake)
 export function isSimilarAnswer(a, b) {
-  return _wordOverlap(a ?? "", b ?? "") >= 0.65;
+  return _wordOverlap(a ?? "", b ?? "") >= 0.35;
 }
 
 const DEFAULT_DATA = () => ({
@@ -289,7 +291,6 @@ export async function addToReviewBank({
   const data = await ensureLoaded();
   const existing = data.written_review_bank.find(q => q.question_id === question_id);
   if (existing) {
-    // Already in bank — update last_wrong_answer so persistence tracking is accurate
     existing.last_wrong_answer = (first_attempt_answer ?? "").slice(0, 600);
     saveToDB(data);
     return;
@@ -303,7 +304,7 @@ export async function addToReviewBank({
     first_attempt_score,
     first_attempt_feedback,
     first_attempt_answer: (first_attempt_answer ?? "").slice(0, 600),
-    last_wrong_answer: (first_attempt_answer ?? "").slice(0, 600), // for persistence detection
+    last_wrong_answer: (first_attempt_answer ?? "").slice(0, 600),
     persistent_misunderstanding: false,
     date_added: toDateString(new Date()),
     priority: first_attempt_score === 0 ? 1 : 2,
@@ -312,11 +313,6 @@ export async function addToReviewBank({
   saveToDB(data);
 }
 
-/**
- * updateReviewBankEntry — call after every review attempt.
- * Detects persistent misunderstandings. Removes from bank only when correct.
- * Returns { removed, isPersistent }
- */
 export async function updateReviewBankEntry(question_id, newAnswer, isCorrect) {
   const data = await ensureLoaded();
 
@@ -330,7 +326,7 @@ export async function updateReviewBankEntry(question_id, newAnswer, isCorrect) {
   if (!entry) return { removed: false, isPersistent: false };
 
   const prevAnswer = entry.last_wrong_answer ?? entry.first_attempt_answer ?? "";
-  const isPersistent = isSimilarAnswer(newAnswer, prevAnswer);
+  const isPersistent = prevAnswer.trim().length > 5 && isSimilarAnswer(newAnswer, prevAnswer);
 
   entry.last_wrong_answer = (newAnswer ?? "").slice(0, 600);
   entry.persistent_misunderstanding = isPersistent;

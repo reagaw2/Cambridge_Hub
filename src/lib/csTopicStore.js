@@ -1,13 +1,28 @@
 /**
  * csTopicStore.js — Computer Science student data layer
- * Source of truth: Supabase. localStorage = render cache only.
  */
 
 import { supabaseClient } from "@/api/base44Client";
-import { normaliseTopicKey, toDateString, recordGlobalQuestionAnswered, isSimilarAnswer } from "./topicStore";
+import { normaliseTopicKey, toDateString, recordGlobalQuestionAnswered } from "./topicStore";
 import { buildMistakeDna, mergeMistakeDna } from "./mistakeDna";
 
 export { normaliseTopicKey, toDateString };
+
+// Same threshold as physics - 0.35
+function _wordOverlap(a, b) {
+  if (!a || !b || a.length < 8 || b.length < 8) return 0;
+  const stop = new Set(["the", "is", "it", "and", "or", "in", "of", "to", "a", "an", "are", "was", "be", "has", "by", "at", "on", "as"]);
+  const words = s => s.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(w => w.length > 1 && !stop.has(w));
+  const wa = new Set(words(a));
+  const wb = words(b);
+  if (wa.size === 0 || wb.length === 0) return 0;
+  const common = wb.filter(w => wa.has(w)).length;
+  return common / Math.max(wa.size, wb.length);
+}
+
+function isSimilarAnswer(a, b) {
+  return _wordOverlap(a ?? "", b ?? "") >= 0.35;
+}
 
 const DEFAULT_CS_DATA = () => ({
   topics: {},
@@ -158,8 +173,6 @@ export async function csGetTopicData(topicKey) {
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
-// ── CS Mistake DNA ─────────────────────────────────────────────────────────────
-
 export async function csWriteMistakeDna(feedback, questionId, topic, marksEarned, totalMarks, studentResponse = "") {
   if (!feedback || marksEarned >= totalMarks) return;
   const data = await ensureLoaded();
@@ -175,13 +188,10 @@ export async function csGetMistakeDna() {
   return data.cs_mistake_dna ?? [];
 }
 
-// ── CS Review Bank ─────────────────────────────────────────────────────────────
-
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback, first_attempt_answer = "" }) {
   const data = await ensureLoaded();
   const existing = data.cs_review_bank.find(q => q.question_id === question_id);
   if (existing) {
-    // Update last_wrong_answer for persistence tracking
     existing.last_wrong_answer = (first_attempt_answer ?? "").slice(0, 600);
     saveToDB(data);
     return;
@@ -199,10 +209,6 @@ export async function csAddToReviewBank({ question_id, topic, question_text, mar
   saveToDB(data);
 }
 
-/**
- * csUpdateReviewBankEntry — call after every CS review attempt.
- * Detects persistent misunderstandings. Removes from bank only when correct.
- */
 export async function csUpdateReviewBankEntry(question_id, newAnswer, isCorrect) {
   const data = await ensureLoaded();
 
@@ -216,7 +222,7 @@ export async function csUpdateReviewBankEntry(question_id, newAnswer, isCorrect)
   if (!entry) return { removed: false, isPersistent: false };
 
   const prevAnswer = entry.last_wrong_answer ?? entry.first_attempt_answer ?? "";
-  const isPersistent = isSimilarAnswer(newAnswer, prevAnswer);
+  const isPersistent = prevAnswer.trim().length > 5 && isSimilarAnswer(newAnswer, prevAnswer);
 
   entry.last_wrong_answer = (newAnswer ?? "").slice(0, 600);
   entry.persistent_misunderstanding = isPersistent;

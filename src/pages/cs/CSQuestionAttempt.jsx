@@ -1,13 +1,15 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { getAllNotes } from "@/lib/questionNotesStore";
 import AnswerInput from "@/components/AnswerInput";
+import QuestionAnnotator from "@/components/QuestionAnnotator";
+import QuestionNoteWidget from "@/components/QuestionNoteWidget";
+import QuestionSessionHeader from "@/components/QuestionSessionHeader";
+import QuestionMedia from "@/components/QuestionMedia";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
-import QuestionMedia from "@/components/QuestionMedia";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
-import QuestionNoteWidget from "@/components/QuestionNoteWidget";
 import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
 
 const TOPIC_ROUTES = {
@@ -22,12 +24,28 @@ const TOPIC_ROUTES = {
   data_integrity: "/cs/data-integrity/question",
 };
 
-export default function CSQuestionAttempt({ question, idx, total, onAdvance, topicLabel, allQuestions, onOverride }) {
+export default function CSQuestionAttempt({
+  question,
+  idx,
+  total,
+  allQuestions = [],
+  sessionAnswers = {},
+  onAdvance,
+  onJumpTo,
+  topicLabel,
+  allQuestionsForDev,
+  onOverride,
+}) {
   const navigate = useNavigate();
   const [answer, setAnswer] = useState("");
   const [showTeachMe, setShowTeachMe] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const { submit, loading, error, setError } = useNodeAwareSubmit();
   const submittedRef = useRef(false);
+
+  // Count notes for badge
+  const allNotes = getAllNotes();
+  const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
 
   if (!question) {
     return (
@@ -45,9 +63,8 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
 
   function goToFeedback(fb, ans) {
     const marksEarned = fb.marks_earned ?? 0;
-    const nextIdx = idx + 1;
-    const isLastQuestion = nextIdx >= total;
-    onAdvance();
+    const isLastQuestion = idx + 1 >= total;
+    onAdvance("correct", marksEarned >= question.total_marks);
     navigate("/cs/feedback", {
       state: {
         feedback: fb, answer: ans,
@@ -85,35 +102,52 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
-      <div className="w-full max-w-[480px] flex flex-col min-h-screen">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate("/cs")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <span className="text-base font-bold tracking-wide text-foreground">CAIE Computer Science</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">{question.paper_ref}</span>
-        </div>
+      <div className="w-full max-w-[540px] flex flex-col min-h-screen">
+
+        {/* ── P1-style header ─────────────────────────────────────────────── */}
+        <QuestionSessionHeader
+          paperRef={question.paper_ref}
+          subject="Computer Science"
+          currentIdx={idx}
+          total={total}
+          allQuestions={allQuestions}
+          sessionAnswers={sessionAnswers}
+          onBack={() => navigate("/cs")}
+          onJumpTo={onJumpTo}
+          notesCount={notesCount}
+          onNotesToggle={() => setShowNotes(v => !v)}
+        />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
+
+          {/* ── Question card with annotation toolbar ────────────────────── */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">{question.label}</span>
-              <span className="font-mono text-[11px] text-muted-foreground">Q{idx + 1} of {total}</span>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
+                {question.label}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+                  {question.topic}
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  [{question.total_marks}m]
+                </span>
+              </div>
             </div>
-            <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">{question.topic}</span>
             <QuestionMedia question={question} />
-            <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
-            <div className="flex justify-end">
-              <span className="font-mono text-xs text-muted-foreground">[{question.total_marks} mark{question.total_marks !== 1 ? "s" : ""}]</span>
-            </div>
+            {/* Annotation toolbar */}
+            <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
-          {/* Notes widget */}
-          <QuestionNoteWidget
-            questionId={question.id}
-            topic={question.topic}
-            questionText={question.text}
-          />
+          {/* Notes (toggled via header icon) */}
+          {showNotes && (
+            <QuestionNoteWidget
+              questionId={question.id}
+              topic={question.topic}
+              questionText={question.text}
+            />
+          )}
 
           {showTeachMe ? (
             <TeachMeHow onClose={() => setShowTeachMe(false)} />
@@ -140,12 +174,14 @@ export default function CSQuestionAttempt({ question, idx, total, onAdvance, top
             </>
           )}
 
-          {allQuestions && onOverride && (
-            <DevQuestionJumper allQuestions={allQuestions} onJump={(q) => { onOverride(q); setAnswer(""); setShowTeachMe(false); setError(null); }} />
+          {allQuestionsForDev && onOverride && (
+            <DevQuestionJumper
+              allQuestions={allQuestionsForDev}
+              onJump={(q) => { onOverride(q); setAnswer(""); setShowTeachMe(false); setError(null); }}
+            />
           )}
         </div>
       </div>
-
       {loading && <SubmittingOverlay />}
     </div>
   );

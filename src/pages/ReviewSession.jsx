@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Flame, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Flame } from "lucide-react";
 import AnswerInput from "../components/AnswerInput";
 import QuestionMedia from "../components/QuestionMedia";
+import QuestionAnnotator from "../components/QuestionAnnotator";
 import QuestionNoteWidget from "../components/QuestionNoteWidget";
+import QuestionSessionHeader from "../components/QuestionSessionHeader";
 import SubmitButton from "../components/SubmitButton";
-import { getReviewBank, recordAttempt, updateReviewBankEntry, incrementReviewBankClears, resetReviewBankLock, isSimilarAnswer } from "../lib/topicStore";
+import { getReviewBank, recordAttempt, updateReviewBankEntry, incrementReviewBankClears, isSimilarAnswer } from "../lib/topicStore";
 
 export default function ReviewSession() {
   const navigate = useNavigate();
@@ -16,6 +18,8 @@ export default function ReviewSession() {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showNotes, setShowNotes] = useState(false);
+  const [sessionAnswers, setSessionAnswers] = useState({});
 
   useEffect(() => {
     getReviewBank().then((rb) => { setBank(rb); setBankLoading(false); });
@@ -49,12 +53,20 @@ export default function ReviewSession() {
     current.last_wrong_answer ?? current.first_attempt_answer ?? ""
   );
 
+  // Build a fake question object with the fields QuestionAnnotator needs
+  const questionForAnnotator = {
+    id: current.question_id,
+    text: current.question_text,
+    topic: current.topic,
+    ...current,
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
 
     const persistenceContext = (isPersistentAttempt && answer.trim().length > 10)
-      ? `\n\nIMPORTANT: The student has given essentially the same wrong answer as before. This is a PERSISTENT MISUNDERSTANDING. In cambridge_insight, specifically name the exact misconception they keep repeating and explain why it is wrong. Be direct.`
+      ? `\n\nIMPORTANT: The student has given essentially the same wrong answer as before — a PERSISTENT MISUNDERSTANDING. In cambridge_insight, name the exact misconception and explain clearly why it is wrong.`
       : "";
 
     const feedback = await base44.integrations.Core.InvokeLLM({
@@ -65,14 +77,14 @@ Mark scheme: ${current.mark_scheme}
 Total marks: ${current.total_marks}
 Student's answer: ${answer}
 
-Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
+Respond in JSON only:
 {
   "marks_earned": [number out of ${current.total_marks}],
-  "mark_1": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence explanation" },
-  "mark_2": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence explanation" },
-  "cambridge_insight": "two to three sentences explaining what Cambridge is looking for${persistenceContext ? " — address the persistent misunderstanding directly" : ""}",
-  "pulse_layer_1": "reusable rule for this question type in ≤15 words",
-  "next_step": "one sentence telling the student exactly what to focus on"
+  "mark_1": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence" },
+  "mark_2": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence" },
+  "cambridge_insight": "two sentences on what Cambridge expects${persistenceContext ? " — address the persistent misunderstanding" : ""}",
+  "pulse_layer_1": "The reusable exam rule in ≤12 words.",
+  "next_step": "one sentence on what to focus on next"
 }`,
       model: "claude_sonnet_4_6",
       response_json_schema: {
@@ -95,24 +107,22 @@ Analyse the student's answer against the mark scheme. Respond in the following J
     const newScore = result.marks_earned ?? 0;
     const isFullMarks = newScore >= current.total_marks;
 
-    // Always record attempt for streak
-    await recordAttempt(current.topic, newScore, { total_marks: current.total_marks, question_id: current.question_id });
+    // Update session answers for dots
+    setSessionAnswers(prev => ({
+      ...prev,
+      [current.question_id]: isFullMarks ? "correct" : "wrong",
+    }));
 
-    // Signal review gate
+    await recordAttempt(current.topic, newScore, { total_marks: current.total_marks, question_id: current.question_id });
     sessionStorage.setItem("review_gate_attempt", "1");
 
-    // Update bank — persistent misunderstanding detection happens here
     const { removed, isPersistent } = await updateReviewBankEntry(current.question_id, answer, isFullMarks);
 
     if (isFullMarks) {
       await incrementReviewBankClears();
       const remainingBank = await getReviewBank();
       navigate("/review-affirmation", {
-        state: {
-          bankEmpty: remainingBank.length === 0,
-          nextIndex: currentIndex,
-          updatedBank: remainingBank,
-        },
+        state: { bankEmpty: remainingBank.length === 0, updatedBank: remainingBank },
       });
     } else {
       navigate("/feedback", {
@@ -121,78 +131,90 @@ Analyse the student's answer against the mark scheme. Respond in the following J
           answer,
           isReview: true,
           isPersistentMisunderstanding: isPersistent,
-          reviewQuestionId: current.question_id,
-          reviewBank: bank,
-          reviewIndex: currentIndex,
+          topicKey: current.topic?.toLowerCase().replace(/\s+/g, "_"),
+          questionId: current.question_id,
+          backRoute: "/physics",
+          paperRef: "Review Bank",
         },
       });
     }
   };
 
+  // Build the question list for the dots row
+  const allBankQuestions = bank.map(q => ({
+    id: q.question_id,
+    topic: q.topic,
+    label: q.topic,
+  }));
+
   return (
     <div className="min-h-screen bg-background flex justify-center">
-      <div className="w-full max-w-[480px] flex flex-col min-h-screen">
+      <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <span className="text-base font-bold tracking-wide text-foreground">Review Session</span>
-          <span className="font-mono text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-md">
-            {currentIndex + 1} / {bank.length}
-          </span>
-        </div>
+        {/* ── Shared P1-style header ─────────────────────────────────────── */}
+        <QuestionSessionHeader
+          paperRef="Written Review Bank"
+          subject="Physics"
+          currentIdx={currentIndex}
+          total={bank.length}
+          allQuestions={allBankQuestions}
+          sessionAnswers={sessionAnswers}
+          onBack={() => navigate("/review-bank")}
+          onJumpTo={(i) => { setCurrentIndex(i); setAnswer(""); setError(null); setShowNotes(false); }}
+          onNotesToggle={() => setShowNotes(v => !v)}
+        />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
           {/* Context banner */}
-          <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3 space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/70">Previous attempt</p>
+          <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
             <p className="text-xs text-foreground/60 leading-relaxed">
               <span className="text-amber-400/80 font-medium">{current.first_attempt_score}/{current.total_marks} marks</span>
               {" · "}
               {current.persistent_misunderstanding
-                ? "⚠ Persistent misunderstanding detected on last review — focus on what's different this time."
+                ? "⚠ Persistent misunderstanding — focus on what's different this time."
                 : current.first_attempt_score === 0
-                  ? "You did not get this last time. Trust what you have learned since then."
-                  : "You were close last time. One more piece and this is yours."}
+                  ? "You missed this last time. Trust what you've learned since."
+                  : "You were close. One more piece and this is yours."}
             </p>
           </div>
 
-          {/* Persistent misunderstanding warning before submit */}
+          {/* Persistent warning WHILE typing */}
           {isPersistentAttempt && answer.trim().length > 10 && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
               <p className="text-xs text-red-300/90 leading-relaxed">
-                Your answer looks very similar to what you wrote before. Make sure you're not repeating the same mistake — review the mark scheme keywords before submitting.
+                ⚠ This looks very similar to your previous wrong answer. Try a fundamentally different approach.
               </p>
             </div>
           )}
 
-          {/* Question card */}
+          {/* ── Question card with annotation toolbar ────────────────────── */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">
-                Review Question
+                Review Q{currentIndex + 1}
+              </span>
+              <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+                {current.topic}
               </span>
             </div>
-            <span className="inline-block text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-              {current.topic}
-            </span>
             <QuestionMedia question={current} />
-            <p className="text-[15px] leading-relaxed text-foreground/90">{current.question_text}</p>
+            {/* Annotation toolbar on question text */}
+            <QuestionAnnotator text={current.question_text} questionId={current.question_id} />
             <div className="flex justify-end">
               <span className="font-mono text-xs text-muted-foreground">[{current.total_marks} mark{current.total_marks !== 1 ? "s" : ""}]</span>
             </div>
           </div>
 
-          {/* Notes */}
-          <QuestionNoteWidget
-            questionId={current.question_id}
-            topic={current.topic}
-            questionText={current.question_text}
-          />
+          {/* Notes (toggled via header icon) */}
+          {showNotes && (
+            <QuestionNoteWidget
+              questionId={current.question_id}
+              topic={current.topic}
+              questionText={current.question_text}
+            />
+          )}
 
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />

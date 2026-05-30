@@ -19,10 +19,14 @@ function DrawingPad({ side, questionId, paperId, width }) {
   const [activeTool, setActiveTool] = useState("pen");
   const [penColor, setPenColor] = useState("#0f172a");
   const [penSize, setPenSize] = useState(2);
+
+  // Current strokes (what's drawn)
   const [strokes, setStrokes] = useState([]);
-  const [hasContent, setHasContent] = useState(false);
+  // Undo history — each entry is a full snapshot of strokes before a change
+  const [history, setHistory] = useState([]);
 
   const strokesRef = useRef([]);
+  const historyRef = useRef([]);
   const isDrawingRef = useRef(false);
   const currentStrokeRef = useRef([]);
   const activeToolRef = useRef("pen");
@@ -42,8 +46,24 @@ function DrawingPad({ side, questionId, paperId, width }) {
     const s = getStrokesForQuestion(paperId, questionId, side);
     setStrokes(s);
     strokesRef.current = s;
-    setHasContent(s.length > 0);
+    // Reset history when changing question
+    setHistory([]);
+    historyRef.current = [];
   }, [questionId, paperId, side]);
+
+  // Push current strokes onto the history stack before a change
+  function pushHistory(currentStrokes) {
+    const snapshot = [...currentStrokes];
+    historyRef.current = [...historyRef.current, snapshot];
+    setHistory([...historyRef.current]);
+  }
+
+  // Apply a new stroke array, persist, and update state
+  function applyStrokes(newStrokes) {
+    strokesRef.current = newStrokes;
+    setStrokes(newStrokes);
+    saveStrokes(paperIdRef.current, questionIdRef.current, side, newStrokes);
+  }
 
   const redraw = useCallback((eraserPos = null) => {
     const canvas = canvasRef.current;
@@ -140,12 +160,14 @@ function DrawingPad({ side, questionId, paperId, width }) {
   function commitStroke(pts) {
     if (pts.length < 2) return;
     const newStroke = { points: pts, color: penColorRef.current, size: penSizeRef.current };
-    const updated = [...strokesRef.current, newStroke];
-    strokesRef.current = updated;
-    setStrokes(updated);
-    setHasContent(true);
-    saveStrokes(paperIdRef.current, questionIdRef.current, side, updated);
+    // Snapshot before adding the stroke
+    pushHistory([...strokesRef.current]);
+    applyStrokes([...strokesRef.current, newStroke]);
   }
+
+  // Erasing is done stroke-by-stroke during a drag. We snapshot before the
+  // erase drag begins (in onCanvasPointerDown) and commit the result on pointerup.
+  const eraseSnapshotRef = useRef(null);
 
   function eraseAt(pos) {
     const R = 0.05;
@@ -155,8 +177,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
     if (updated.length !== strokesRef.current.length) {
       strokesRef.current = updated;
       setStrokes(updated);
-      setHasContent(updated.length > 0);
-      saveStrokes(paperIdRef.current, questionIdRef.current, side, updated);
+      // Don't persist every intermediate erase — persist on pointerup
     }
   }
 
@@ -179,11 +200,22 @@ function DrawingPad({ side, questionId, paperId, width }) {
     function onUp() {
       if (!isDrawingRef.current) return;
       isDrawingRef.current = false;
+
       if (activeToolRef.current === "pen") {
         commitStroke([...currentStrokeRef.current]);
+        currentStrokeRef.current = [];
+        redraw();
+      } else if (activeToolRef.current === "eraser") {
+        // Commit the erase result — push history if anything actually changed
+        const current = strokesRef.current;
+        if (eraseSnapshotRef.current && eraseSnapshotRef.current.length !== current.length) {
+          pushHistory(eraseSnapshotRef.current);
+          saveStrokes(paperIdRef.current, questionIdRef.current, side, current);
+          setStrokes([...current]);
+        }
+        eraseSnapshotRef.current = null;
+        redraw();
       }
-      currentStrokeRef.current = [];
-      redraw();
     }
 
     document.addEventListener("pointermove", onMove, { passive: true });
@@ -209,25 +241,32 @@ function DrawingPad({ side, questionId, paperId, width }) {
     if (activeToolRef.current === "pen") {
       currentStrokeRef.current = [pos];
     } else if (activeToolRef.current === "eraser") {
+      // Snapshot before the erase drag begins
+      eraseSnapshotRef.current = [...strokesRef.current];
       eraseAt(pos);
       redraw(pos);
     }
   }
 
   function handleUndo() {
-    const updated = strokesRef.current.slice(0, -1);
-    strokesRef.current = updated;
-    setStrokes(updated);
-    setHasContent(updated.length > 0);
-    saveStrokes(paperId, questionId, side, updated);
+    if (historyRef.current.length === 0) return;
+    // Pop the most recent snapshot
+    const prev = [...historyRef.current];
+    const snapshot = prev.pop();
+    historyRef.current = prev;
+    setHistory([...prev]);
+    applyStrokes(snapshot);
   }
 
   function handleClear() {
-    strokesRef.current = [];
-    setStrokes([]);
-    setHasContent(false);
-    saveStrokes(paperId, questionId, side, []);
+    if (strokesRef.current.length === 0) return;
+    // Save entire current state to history before clearing
+    pushHistory([...strokesRef.current]);
+    applyStrokes([]);
   }
+
+  const hasContent = strokes.length > 0;
+  const canUndo = history.length > 0;
 
   const paperStyle = {
     background: "#f6f1e4",
@@ -239,7 +278,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
   const borderSide = side === "left" ? "border-r border-[#d0c5a8]" : "border-l border-[#d0c5a8]";
 
-  // ── Collapsed state — thin tab with toggle arrow ──────────────────────────
+  // ── Collapsed state ───────────────────────────────────────────────────────
   if (collapsed) {
     return (
       <div
@@ -258,7 +297,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
         onClick={() => setCollapsed(false)}
         title="Expand scratchpad"
       >
-        {/* Dotted texture strip */}
         <div className="flex-1 w-full flex flex-col items-center justify-center gap-2 select-none">
           <div
             style={{
@@ -276,14 +314,9 @@ function DrawingPad({ side, questionId, paperId, width }) {
             Workings
           </div>
           {hasContent && (
-            <div
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: "#a89880" }}
-              title="Contains notes"
-            />
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#a89880" }} title="Contains notes" />
           )}
         </div>
-        {/* Arrow */}
         <div className="pb-4">
           {side === "left"
             ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#a89880" }} />
@@ -293,7 +326,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
     );
   }
 
-  // ── Expanded state ─────────────────────────────────────────────────────────
+  // ── Expanded state ────────────────────────────────────────────────────────
   return (
     <div
       className={`flex flex-col ${borderSide}`}
@@ -320,18 +353,20 @@ function DrawingPad({ side, questionId, paperId, width }) {
             </p>
           </div>
           <div className="flex items-center gap-0.5">
+            {/* Undo — works for strokes AND clears */}
             <button
               onClick={handleUndo}
-              disabled={strokes.length === 0}
-              title="Undo last stroke"
+              disabled={!canUndo}
+              title={`Undo (${history.length} step${history.length !== 1 ? "s" : ""} available)`}
               className="p-1 rounded hover:bg-stone-200/70 text-stone-400 hover:text-stone-700 disabled:opacity-25 transition-colors"
             >
               <Undo2 className="w-3 h-3" />
             </button>
+            {/* Clear all — undoable */}
             <button
               onClick={handleClear}
-              disabled={strokes.length === 0}
-              title="Clear all"
+              disabled={!hasContent}
+              title="Clear all (undoable)"
               className="p-1 rounded hover:bg-red-100 text-stone-400 hover:text-red-500 disabled:opacity-25 transition-colors"
             >
               <Trash2 className="w-3 h-3" />
@@ -349,8 +384,11 @@ function DrawingPad({ side, questionId, paperId, width }) {
           </div>
         </div>
 
+        {/* Undo depth hint */}
         <p className="text-[8.5px] text-stone-400 leading-none italic">
-          Stylus / touch pen recommended
+          {canUndo
+            ? `${history.length} undo step${history.length !== 1 ? "s" : ""} available`
+            : "Stylus / touch pen recommended"}
         </p>
 
         {/* Tool controls */}
@@ -489,7 +527,6 @@ export default function ScratchpadPanel({ questionId, paperId }) {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // Need at least 130px per side when expanded; 28px collapsed is fine
   const sideWidth = Math.floor((windowWidth - 540) / 2);
   if (sideWidth < 130 || !questionId) return null;
 

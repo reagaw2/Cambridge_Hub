@@ -40,6 +40,29 @@ async function pushToSupabase(paperId, data) {
     .catch(e => console.warn("[p1StarStore] push failed:", e));
 }
 
+/**
+ * Load starred questions for a paper — checks Supabase first, falls back to localStorage.
+ * Call this on mount instead of the synchronous getStarredQuestions().
+ */
+export async function loadStarredQuestions(paperId) {
+  const local = readLocal(paperId);
+
+  try {
+    const row = await getStudentRow();
+    if (!row) return local;
+    const paperKey = (paperId ?? "default").replace(/\//g, "_");
+    const remote = row.p1_stars?.[paperKey];
+    if (!remote) return local;
+    // Remote is source of truth — merge over local and update cache
+    const merged = { ...local, ...remote };
+    writeLocal(paperId, merged);
+    return merged;
+  } catch {
+    return local;
+  }
+}
+
+/** Synchronous read from localStorage only — use after loadStarredQuestions() has run */
 export function getStarredQuestions(paperId) {
   return readLocal(paperId);
 }

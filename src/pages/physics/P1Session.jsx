@@ -6,9 +6,9 @@ import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { saveMCQAttempt } from "@/lib/topicStore";
 import { loadP1Session, saveP1Session, clearP1Session } from "@/lib/p1SessionStore";
-import { getStarredQuestions, starQuestion, unstarQuestion, saveTeacherQuestion } from "@/lib/p1StarStore";
+import { loadStarredQuestions, getStarredQuestions, starQuestion, unstarQuestion, saveTeacherQuestion } from "@/lib/p1StarStore";
 import { generateStarredPdf } from "@/lib/p1StarPdf";
-import { getNotes, saveNote } from "@/lib/p1NotesStore";
+import { loadNotes, getNotes, saveNote } from "@/lib/p1NotesStore";
 import { generateNotesPdf } from "@/lib/p1NotesPdf";
 import { loadScratchpadForPaper } from "@/lib/p1ScratchpadStore";
 import PaperPdfButton from "@/components/PaperPdfButton";
@@ -405,7 +405,6 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
   );
 }
 
-// ── Main session ──────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -433,24 +432,26 @@ export default function P1Session() {
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
 
-  const [starredQuestions, setStarredQuestions] = useState(() => getStarredQuestions(paperId));
-  const [notes, setNotes] = useState(() => getNotes(paperId));
+  const [starredQuestions, setStarredQuestions] = useState({});
+  const [notes, setNotes] = useState({});
   const [showTeacherPrompt, setShowTeacherPrompt] = useState(false);
 
   const autoAdvanceTimer = useRef(null);
 
-  // Load session + scratchpad data on mount
+  // Load session, notes, and stars from Supabase on mount
   useEffect(() => {
     setSessionLoading(true);
-    setStarredQuestions(getStarredQuestions(paperId));
-    setNotes(getNotes(paperId));
 
     Promise.all([
       loadP1Session(paperId),
-      loadScratchpadForPaper(paperId).catch(() => {}), // non-blocking
-    ]).then(([session]) => {
+      loadNotes(paperId),
+      loadStarredQuestions(paperId),
+      loadScratchpadForPaper(paperId).catch(() => {}),
+    ]).then(([session, loadedNotes, loadedStars]) => {
       setAnswers(session.answers ?? {});
       setCurrentIdx(session.currentIdx ?? 0);
+      setNotes(loadedNotes ?? {});
+      setStarredQuestions(loadedStars ?? {});
       setSessionLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -728,7 +729,6 @@ Respond ONLY in JSON:
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
-          {/* Elimination hint */}
           {!submitted && (
             <p className="text-[11px] text-muted-foreground/50 text-center -mt-1">
               Hover an option and tap <span className="font-mono bg-secondary px-1 rounded">✕</span> to cross it out by elimination
@@ -736,14 +736,12 @@ Respond ONLY in JSON:
             </p>
           )}
 
-          {/* Options */}
           <div className="flex flex-col gap-2.5">
             {OPTION_KEYS.map(key => (
               <OptionRow key={key} optKey={key} text={question.options[key]} selected={selected} crossedOut={crossedOut.has(key)} submitted={submitted} correctOption={question.correct} onSelect={setSelected} onToggleCrossOut={handleToggleCrossOut} />
             ))}
           </div>
 
-          {/* Guess + Submit */}
           {!submitted && (
             <div className="flex gap-2">
               <button onClick={() => setIsGuess(g => !g)}
@@ -814,7 +812,6 @@ Respond ONLY in JSON:
         </div>
       </div>
 
-      {/* ── Dual scratchpads — only render when there's room (≥130px each side) ── */}
       <ScratchpadPanel questionId={question?.id} paperId={paperId} />
 
       {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}

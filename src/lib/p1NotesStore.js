@@ -40,6 +40,29 @@ async function pushToSupabase(paperId, data) {
     .catch(e => console.warn("[p1NotesStore] push failed:", e));
 }
 
+/**
+ * Load notes for a paper — checks Supabase first, falls back to localStorage.
+ * Call this on mount instead of the synchronous getNotes().
+ */
+export async function loadNotes(paperId) {
+  const local = readLocal(paperId);
+
+  try {
+    const row = await getStudentRow();
+    if (!row) return local;
+    const paperKey = (paperId ?? "default").replace(/\//g, "_");
+    const remote = row.p1_notes?.[paperKey];
+    if (!remote) return local;
+    // Remote is source of truth — merge over local and update cache
+    const merged = { ...local, ...remote };
+    writeLocal(paperId, merged);
+    return merged;
+  } catch {
+    return local;
+  }
+}
+
+/** Synchronous read from localStorage only — use after loadNotes() has run */
 export function getNotes(paperId) {
   return readLocal(paperId);
 }

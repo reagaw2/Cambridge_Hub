@@ -6,8 +6,6 @@ import { getWorking, saveWorking as saveTopicalWorking, deleteWorking, getAllWor
 import { getAllStarred, saveTeacherQuestion, unstarQuestion } from "@/lib/writtenStarStore";
 import { AnimatePresence, motion } from "framer-motion";
 
-// ── Canvas workspace ──────────────────────────────────────────────────────────
-
 function WorkingsCanvas({ questionId }) {
   const canvasRef = useRef(null);
   const [tool, setTool] = useState("pen");
@@ -77,7 +75,7 @@ function WorkingsCanvas({ questionId }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        {["pen","eraser"].map(t => (
+        {["pen", "eraser"].map(t => (
           <button key={t} onClick={() => setTool(t)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${tool === t ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground hover:brightness-110"}`}>
             {t === "pen" ? "✏️ Pen" : "🧹 Eraser"}
@@ -92,26 +90,23 @@ function WorkingsCanvas({ questionId }) {
           {saved ? <><Check className="w-3 h-3" /> Saved!</> : <><Save className="w-3 h-3" /> Save working</>}
         </button>
       </div>
-      <div className="rounded-xl border border-border overflow-hidden" style={{ background: "#ffffff", cursor: tool === "eraser" ? "crosshair" : "default" }}>
+      <div className="rounded-xl border border-border overflow-hidden" style={{ background: "#ffffff" }}>
         <canvas ref={canvasRef} width={800} height={300}
           style={{ width: "100%", height: "auto", display: "block", touchAction: "none" }}
           onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
           onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} />
       </div>
-      <p className="text-[10px] text-muted-foreground/50 text-center">Draw your working · Save to keep it · Stylus/finger supported</p>
     </div>
   );
 }
 
-// ── Starred entry card ────────────────────────────────────────────────────────
-
-function StarredEntryCard({ entry, onUnstar, onSaveTeacherQ }) {
+function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
   const [teacherQ, setTeacherQ] = useState(entry.teacherQuestion ?? "");
   const [editing, setEditing] = useState(!entry.teacherQuestion);
   const [saved, setSaved] = useState(false);
 
   return (
-    <div className="border border-amber-500/20 bg-amber-500/5 rounded-xl overflow-hidden space-y-0">
+    <div className="border border-amber-500/20 bg-amber-500/5 rounded-xl overflow-hidden">
       <div className="flex items-start justify-between gap-2 px-4 py-3">
         <div className="space-y-0.5 flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -144,7 +139,7 @@ function StarredEntryCard({ entry, onUnstar, onSaveTeacherQ }) {
         ) : (
           <div className="space-y-1.5">
             <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setSaved(false); }}
-              placeholder="What would you like to ask your teacher about this question?"
+              placeholder="What would you like to ask your teacher?"
               rows={2}
               className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
             <div className="flex items-center justify-between">
@@ -164,8 +159,6 @@ function StarredEntryCard({ entry, onUnstar, onSaveTeacherQ }) {
   );
 }
 
-// ── Main panel ────────────────────────────────────────────────────────────────
-
 export default function SessionNotesPanel({
   open, onClose, allQuestions = [], currentIdx = 0, onJumpTo,
   subject = "physics", userEmail = "",
@@ -181,10 +174,10 @@ export default function SessionNotesPanel({
     if (!open) return;
     setNotesData(getAllNotes());
     const allW = getAllWorkings();
-    const count = allQuestions.filter(q => allW[q.id]?.imageData).length;
-    setWorkingsCount(count);
-    setStarredData(getAllStarred());
-  }, [open, allQuestions]);
+    setWorkingsCount(allQuestions.filter(q => allW[q.id]?.imageData).length);
+    // Only load starred for this subject
+    setStarredData(getAllStarred(subject));
+  }, [open, allQuestions, subject]);
 
   const currentQuestion = allQuestions[currentIdx] ?? null;
   const sessionNotes = allQuestions.map((q, i) => ({ q, i, note: notesData[q.id] })).filter(({ note }) => note?.text?.trim());
@@ -192,13 +185,13 @@ export default function SessionNotesPanel({
   const starredCount = starredData.length;
 
   function handleUnstar(questionId) {
-    unstarQuestion(questionId);
-    setStarredData(getAllStarred());
+    unstarQuestion(questionId, subject);
+    setStarredData(getAllStarred(subject));
   }
 
   function handleSaveTeacherQ(questionId, teacherQuestion) {
-    saveTeacherQuestion(questionId, teacherQuestion);
-    setStarredData(getAllStarred());
+    saveTeacherQuestion(questionId, teacherQuestion, subject);
+    setStarredData(getAllStarred(subject));
   }
 
   async function handleDownloadNotes() {
@@ -219,12 +212,7 @@ export default function SessionNotesPanel({
       const { generateStarredPdf } = await import("@/lib/p1StarPdf");
       const starredForPdf = {};
       starredData.forEach((entry, i) => {
-        starredForPdf[entry.questionId] = {
-          ...entry,
-          questionNumber: i + 1,
-          correctAnswer: null,
-          options: null,
-        };
+        starredForPdf[entry.questionId] = { ...entry, questionNumber: i + 1, correctAnswer: null, options: null };
       });
       await generateStarredPdf({ paperId: "written", displayName: subject === "physics" ? "Physics Written Practice" : "CS Written Practice", userEmail, starredQuestions: starredForPdf });
     } catch (e) { console.error(e); }
@@ -241,7 +229,6 @@ export default function SessionNotesPanel({
             transition={{ type: "spring", damping: 28, stiffness: 300 }}>
             <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl flex flex-col" style={{ height: "88vh" }}>
 
-              {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
                 <p className="font-bold text-foreground">Notes, Workings & Starred</p>
                 <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
@@ -249,7 +236,6 @@ export default function SessionNotesPanel({
                 </button>
               </div>
 
-              {/* Tabs */}
               <div className="flex shrink-0 border-b border-border/50">
                 <button onClick={() => setActiveTab("notes")}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -268,7 +254,6 @@ export default function SessionNotesPanel({
                 </button>
               </div>
 
-              {/* Content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
 
                 {activeTab === "notes" && (
@@ -277,7 +262,7 @@ export default function SessionNotesPanel({
                       <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                         <Pencil className="w-8 h-8 text-muted-foreground/30" />
                         <p className="text-sm text-muted-foreground">No notes yet.</p>
-                        <p className="text-xs text-muted-foreground/50 max-w-[260px] leading-relaxed">Tap the ✎ MY NOTE section on the feedback page to take notes.</p>
+                        <p className="text-xs text-muted-foreground/50 max-w-[260px] leading-relaxed">Tap MY NOTE on the feedback page to take notes.</p>
                       </div>
                     ) : sessionNotes.map(({ q, i, note }) => (
                       <div key={q.id} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-2">
@@ -289,9 +274,7 @@ export default function SessionNotesPanel({
                             </div>
                             <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{note.text}</p>
                           </div>
-                          <button onClick={() => { onJumpTo?.(i); onClose(); }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">
-                            Go to →
-                          </button>
+                          <button onClick={() => { onJumpTo?.(i); onClose(); }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>
                         </div>
                       </div>
                     ))}
@@ -299,43 +282,36 @@ export default function SessionNotesPanel({
                 )}
 
                 {activeTab === "workings" && (
-                  <>
-                    {currentQuestion ? (
-                      <>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">Q{currentIdx + 1}</span>
-                          <span className="text-[11px] text-muted-foreground">{currentQuestion.topic ?? ""}</span>
-                          <span className="text-[10px] text-muted-foreground/40 ml-auto">Working for current question</span>
-                        </div>
-                        <WorkingsCanvas questionId={currentQuestion.id} key={currentQuestion.id} />
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                        <PenLine className="w-8 h-8 text-muted-foreground/30" />
-                        <p className="text-sm text-muted-foreground">No question selected.</p>
+                  currentQuestion ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">Q{currentIdx + 1}</span>
+                        <span className="text-[11px] text-muted-foreground">{currentQuestion.topic ?? ""}</span>
+                        <span className="text-[10px] text-muted-foreground/40 ml-auto">Working for current question</span>
                       </div>
-                    )}
-                  </>
+                      <WorkingsCanvas questionId={currentQuestion.id} key={currentQuestion.id} />
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+                      <PenLine className="w-8 h-8 text-muted-foreground/30" />
+                      <p className="text-sm text-muted-foreground">No question selected.</p>
+                    </div>
+                  )
                 )}
 
                 {activeTab === "starred" && (
-                  <>
-                    {starredData.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                        <Star className="w-8 h-8 text-muted-foreground/30" />
-                        <p className="text-sm text-muted-foreground">No starred questions yet.</p>
-                        <p className="text-xs text-muted-foreground/50 max-w-[260px] leading-relaxed">
-                          Tap ☆ Star on the feedback page to flag questions for your teacher.
-                        </p>
-                      </div>
-                    ) : starredData.map((entry, i) => (
-                      <StarredEntryCard key={entry.questionId} entry={entry} onUnstar={handleUnstar} onSaveTeacherQ={handleSaveTeacherQ} />
-                    ))}
-                  </>
+                  starredData.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+                      <Star className="w-8 h-8 text-muted-foreground/30" />
+                      <p className="text-sm text-muted-foreground">No starred questions yet.</p>
+                      <p className="text-xs text-muted-foreground/50 max-w-[260px] leading-relaxed">Tap ☆ Star on the feedback page to flag questions for your teacher.</p>
+                    </div>
+                  ) : starredData.map((entry) => (
+                    <StarredEntryCard key={entry.questionId} entry={entry} subject={subject} onUnstar={handleUnstar} onSaveTeacherQ={handleSaveTeacherQ} />
+                  ))
                 )}
               </div>
 
-              {/* Footer */}
               <div className="shrink-0 px-4 py-4 border-t border-border/50 bg-card">
                 {activeTab === "notes" && (
                   <button onClick={handleDownloadNotes} disabled={notesCount === 0 || downloadingNotes}

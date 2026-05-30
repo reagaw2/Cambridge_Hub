@@ -19,13 +19,11 @@ import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
 import { useAuth } from "@/lib/AuthContext";
 import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 
+const SUBJECT = "physics";
+
 function sessionKey(topicKey) { return `q_session_answers_${topicKey}`; }
-function loadSessionAnswers(topicKey) {
-  try { return JSON.parse(sessionStorage.getItem(sessionKey(topicKey)) ?? "{}"); } catch { return {}; }
-}
-function saveSessionAnswers(topicKey, answers) {
-  sessionStorage.setItem(sessionKey(topicKey), JSON.stringify(answers));
-}
+function loadSessionAnswers(topicKey) { try { return JSON.parse(sessionStorage.getItem(sessionKey(topicKey)) ?? "{}"); } catch { return {}; } }
+function saveSessionAnswers(topicKey, answers) { sessionStorage.setItem(sessionKey(topicKey), JSON.stringify(answers)); }
 
 function FormulaSheetModal({ onClose }) {
   return (
@@ -45,12 +43,7 @@ function FormulaSheetModal({ onClose }) {
   );
 }
 
-export default function TopicalQuestionPage({
-  getNext,
-  advance,
-  allQuestions = [],
-  backRoute = "/physics",
-}) {
+export default function TopicalQuestionPage({ getNext, advance, allQuestions = [], backRoute = "/physics" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -70,15 +63,12 @@ export default function TopicalQuestionPage({
 
   const { submit, loading, error, setError } = useNodeAwareSubmit();
 
-  useEffect(() => {
-    loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {}));
-  }, [topicKey]);
+  useEffect(() => { loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {})); }, [topicKey]);
 
-  // Recount panel badge items
   useEffect(() => {
     const allNotes = getAllNotes();
     const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
-    const starredCount = getAllStarred().length;
+    const starredCount = getAllStarred(SUBJECT).length;
     setPanelItemCount(notesCount + starredCount);
   });
 
@@ -87,81 +77,38 @@ export default function TopicalQuestionPage({
   const thisRoute = location.pathname;
 
   useEffect(() => {
-    setCurrentStarred(question ? isStarred(question.id) : false);
+    setCurrentStarred(question ? isStarred(question.id, SUBJECT) : false);
   }, [question?.id]);
 
-  function jumpToQuestion(idx) {
-    setCurrentBankIdx(idx);
-    setAnswer("");
-    setShowTeachMe(false);
-    setError(null);
-  }
+  function jumpToQuestion(idx) { setCurrentBankIdx(idx); setAnswer(""); setShowTeachMe(false); setError(null); }
 
   function handleToggleStar() {
     if (!question) return;
-    if (currentStarred) {
-      unstarQuestion(question.id);
-      setCurrentStarred(false);
-    } else {
-      starQuestion(question.id, {
-        topic: question.topic,
-        questionText: question.text,
-        markScheme: question.mark_scheme ?? "",
-      });
-      setCurrentStarred(true);
-    }
+    if (currentStarred) { unstarQuestion(question.id, SUBJECT); setCurrentStarred(false); }
+    else { starQuestion(question.id, { topic: question.topic, questionText: question.text, markScheme: question.mark_scheme ?? "" }, SUBJECT); setCurrentStarred(true); }
   }
 
   function handleSaveWorking(side, imageData) {
     if (!question) return;
-    const updated = saveTopicWorking(topicKey, question.id, side, imageData, {
-      questionNumber: currentBankIdx + 1,
-      topic: question.topic,
-      questionText: question.text,
-    });
+    const updated = saveTopicWorking(topicKey, question.id, side, imageData, { questionNumber: currentBankIdx + 1, topic: question.topic, questionText: question.text });
     setWorkings({ ...updated });
   }
 
   const handleSubmit = useCallback(async () => {
     const fb = await submit(question, answer);
     if (!fb) return;
-
     const marksEarned = fb.marks_earned ?? 0;
     const isCorrect = marksEarned >= question.total_marks;
-
     const updated = { ...sessionAnswers, [question.id]: isCorrect ? "correct" : "wrong" };
     setSessionAnswers(updated);
     saveSessionAnswers(topicKey, updated);
-
     await recordAttempt(question.topic_key, marksEarned, { total_marks: question.total_marks, question_id: question.id });
-
     if (!isCorrect) {
       writeMistakeDna(fb, question.id, question.topic, marksEarned, question.total_marks, answer).catch(() => {});
-      await addToReviewBank({
-        question_id: question.id, topic: question.topic, question_text: question.text,
-        mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks,
-        first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "",
-        first_attempt_answer: answer,
-      });
+      await addToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "", first_attempt_answer: answer });
     }
-
     advance();
-
-    navigate("/feedback", {
-      state: {
-        feedback: fb,
-        answer,
-        topicKey: question.topic_key,
-        questionId: question.id,
-        questionText: question.text,
-        markScheme: question.mark_scheme ?? "",
-        topicLabel: question.topic,
-        nextFullRoute: thisRoute,
-        nextRetryRoute: thisRoute,
-        backRoute,
-        paperRef: question.paper_ref,
-      },
-    });
+    navigate("/feedback", { state: { feedback: fb, answer, topicKey: question.topic_key, questionId: question.id, questionText: question.text, markScheme: question.mark_scheme ?? "", topicLabel: question.topic, nextFullRoute: thisRoute, nextRetryRoute: thisRoute, backRoute, paperRef: question.paper_ref } });
   }, [question, answer, sessionAnswers, topicKey, submit, advance, navigate, thisRoute, backRoute]);
 
   const isEmpty = answer.trim().length === 0;
@@ -169,49 +116,28 @@ export default function TopicalQuestionPage({
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
-
         <QuestionSessionHeader
-          paperRef={question.paper_ref}
-          subject="Physics"
-          currentIdx={currentBankIdx}
-          total={total}
-          allQuestions={allQuestions}
-          sessionAnswers={sessionAnswers}
-          onBack={() => navigate(backRoute)}
-          onJumpTo={jumpToQuestion}
-          notesCount={panelItemCount}
-          onNotesPanel={() => setNotesPanelOpen(true)}
-          showCalculator={true}
-          calcActive={calcActive}
+          paperRef={question.paper_ref} subject="Physics"
+          currentIdx={currentBankIdx} total={total}
+          allQuestions={allQuestions} sessionAnswers={sessionAnswers}
+          onBack={() => navigate(backRoute)} onJumpTo={jumpToQuestion}
+          notesCount={panelItemCount} onNotesPanel={() => setNotesPanelOpen(true)}
+          showCalculator={true} calcActive={calcActive}
           onCalcToggle={() => setCalcActive(a => !a)}
           onFormulaSheet={() => setFormulaSheetOpen(true)}
         />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
+          {calcActive && <div className="relative z-10"><ScientificCalculator onClose={() => setCalcActive(false)} /></div>}
 
-          {calcActive && (
-            <div className="relative z-10">
-              <ScientificCalculator onClose={() => setCalcActive(false)} />
-            </div>
-          )}
-
-          {/* Question card with Star button */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
-                {question.label}
-              </span>
+              <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">{question.label}</span>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
-                  {question.topic}
-                </span>
+                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">{question.topic}</span>
                 <span className="font-mono text-xs text-muted-foreground">[{question.total_marks}m]</span>
                 <button onClick={handleToggleStar}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-                    currentStarred
-                      ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
-                      : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"
-                  }`}>
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${currentStarred ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
                   <Star className={`w-3 h-3 ${currentStarred ? "fill-amber-400" : ""}`} />
                   {currentStarred ? "Starred" : "Star"}
                 </button>
@@ -221,18 +147,12 @@ export default function TopicalQuestionPage({
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
-          {showTeachMe ? (
-            <TeachMeHow onClose={() => setShowTeachMe(false)} />
-          ) : (
+          {showTeachMe ? <TeachMeHow onClose={() => setShowTeachMe(false)} /> : (
             <>
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
-                <button onClick={() => setShowTeachMe(true)} disabled={!isEmpty}
-                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-                  Teach Me How
-                </button>
-                <button onClick={handleSubmit} disabled={isEmpty || loading}
-                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                <button onClick={() => setShowTeachMe(true)} disabled={!isEmpty} className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">Teach Me How</button>
+                <button onClick={handleSubmit} disabled={isEmpty || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                   {loading ? "Marking…" : "Submit"}
                 </button>
               </div>
@@ -240,31 +160,12 @@ export default function TopicalQuestionPage({
             </>
           )}
 
-          <DevQuestionJumper
-            allQuestions={allQuestions}
-            onJump={(q) => {
-              const idx = allQuestions.findIndex(aq => aq.id === q.id);
-              jumpToQuestion(idx >= 0 ? idx : 0);
-              setAnswer(""); setShowTeachMe(false); setError(null);
-            }}
-          />
+          <DevQuestionJumper allQuestions={allQuestions} onJump={(q) => { const idx = allQuestions.findIndex(aq => aq.id === q.id); jumpToQuestion(idx >= 0 ? idx : 0); setAnswer(""); setShowTeachMe(false); setError(null); }} />
         </div>
       </div>
 
-      {/* Side scratchpad panels */}
       <ScratchpadPanel questionId={question?.id} paperId={topicKey} workings={workings} onSaveWorking={handleSaveWorking} />
-
-      {/* Notes / Workings / Starred panel */}
-      <SessionNotesPanel
-        open={notesPanelOpen}
-        onClose={() => setNotesPanelOpen(false)}
-        allQuestions={allQuestions}
-        currentIdx={currentBankIdx}
-        onJumpTo={(i) => { jumpToQuestion(i); setNotesPanelOpen(false); }}
-        subject="physics"
-        userEmail={user?.email ?? ""}
-      />
-
+      <SessionNotesPanel open={notesPanelOpen} onClose={() => setNotesPanelOpen(false)} allQuestions={allQuestions} currentIdx={currentBankIdx} onJumpTo={(i) => { jumpToQuestion(i); setNotesPanelOpen(false); }} subject={SUBJECT} userEmail={user?.email ?? ""} />
       {formulaSheetOpen && <FormulaSheetModal onClose={() => setFormulaSheetOpen(false)} />}
       {loading && <SubmittingOverlay />}
     </div>

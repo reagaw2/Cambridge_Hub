@@ -1,18 +1,20 @@
-const KEY = "written_starred_questions_v1";
-
-function readAll() {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? "{}"); } catch { return {}; }
-}
-function writeAll(data) {
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {}
+function key(subject) {
+  return `written_starred_${subject ?? "physics"}_v1`;
 }
 
-export function isStarred(questionId) {
-  return !!readAll()[questionId];
+function readAll(subject) {
+  try { return JSON.parse(localStorage.getItem(key(subject)) ?? "{}"); } catch { return {}; }
+}
+function writeAll(subject, data) {
+  try { localStorage.setItem(key(subject), JSON.stringify(data)); } catch {}
 }
 
-export function starQuestion(questionId, { topic = "", questionText = "", markScheme = "", feedback = null, answer = "" } = {}) {
-  const all = readAll();
+export function isStarred(questionId, subject = "physics") {
+  return !!readAll(subject)[questionId];
+}
+
+export function starQuestion(questionId, { topic = "", questionText = "", markScheme = "", feedback = null, answer = "" } = {}, subject = "physics") {
+  const all = readAll(subject);
   all[questionId] = {
     questionId,
     topic,
@@ -20,39 +22,40 @@ export function starQuestion(questionId, { topic = "", questionText = "", markSc
     markScheme,
     feedback,
     answer,
+    subject,
     teacherQuestion: all[questionId]?.teacherQuestion ?? "",
     teacherResponse: all[questionId]?.teacherResponse ?? "",
     starredAt: new Date().toISOString(),
   };
-  writeAll(all);
+  writeAll(subject, all);
   return all;
 }
 
-export function unstarQuestion(questionId) {
-  const all = readAll();
+export function unstarQuestion(questionId, subject = "physics") {
+  const all = readAll(subject);
   delete all[questionId];
-  writeAll(all);
+  writeAll(subject, all);
   return all;
 }
 
-export function saveTeacherQuestion(questionId, teacherQuestion) {
-  const all = readAll();
+export function saveTeacherQuestion(questionId, teacherQuestion, subject = "physics") {
+  const all = readAll(subject);
   if (all[questionId]) {
     all[questionId] = { ...all[questionId], teacherQuestion };
-    writeAll(all);
+    writeAll(subject, all);
   }
   return all;
 }
 
-export function saveTeacherResponse(questionId, teacherResponse) {
-  const all = readAll();
+export function saveTeacherResponse(questionId, teacherResponse, subject = "physics") {
+  const all = readAll(subject);
   if (all[questionId]) {
     all[questionId] = { ...all[questionId], teacherResponse };
-    writeAll(all);
+    writeAll(subject, all);
   }
   return all;
 }
 
-export function getAllStarred() {
-  return Object.values(readAll()).sort((a, b) => new Date(a.starredAt) - new Date(b.starredAt));
+export function getAllStarred(subject = "physics") {
+  return Object.values(readAll(subject)).sort((a, b) => new Date(a.starredAt) - new Date(b.starredAt));
 }

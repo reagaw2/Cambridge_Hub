@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download, Pencil, NotebookPen, MessageCircleQuestion, PenLine, Trash2 } from "lucide-react";
+import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download, Pencil, NotebookPen, MessageCircleQuestion, PenLine, Trash2, Check } from "lucide-react";
 import { getP1Paper } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
@@ -136,26 +136,18 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
             <p className="font-bold text-foreground">Question Overview</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {Object.keys(answers).length} of {questions.length} answered
-              {starredIds.size > 0 && <span className="ml-2 text-amber-400">· {starredIds.size} ⭐</span>}
-              {notedIds.size > 0 && <span className="ml-2 text-green-400">· {notedIds.size} 📝</span>}
+              {starredIds.size > 0 && <span className="ml-2 text-amber-400">· {starredIds.size} starred</span>}
+              {notedIds.size > 0 && <span className="ml-2 text-green-400">· {notedIds.size} noted</span>}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
-        <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground pb-1 border-b border-border/40">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-500/60 inline-block border border-green-500/40" />Correct</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/60 inline-block border border-red-500/40" />Incorrect</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-500/60 inline-block border border-amber-500/40" />Guessed</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-secondary inline-block border border-border" />Not answered</span>
-          <span>⭐ Starred · 📝 Note</span>
-        </div>
         <div className="flex flex-wrap gap-2">
           {questions.map((q, i) => {
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
-            const isAnswered = !!a?.chosen;
             const isStarred = starredIds.has(q.id);
             const hasNote = notedIds.has(q.id);
             return (
@@ -163,19 +155,18 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
                 className={`relative w-9 h-9 rounded-lg text-xs font-bold border transition-all ${
                   isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
                   : a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                  : isAnswered && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
-                  : isAnswered && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400"
+                  : a?.chosen && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
+                  : a?.chosen && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400"
                   : "bg-secondary border-border text-muted-foreground hover:border-primary/30"
                 }`}>
                 {q.number}
-                {isStarred && <span className="absolute -top-1 -right-1 text-[7px] leading-none">⭐</span>}
-                {hasNote && !isStarred && <span className="absolute -top-1 -right-1 text-[7px] leading-none">📝</span>}
+                {isStarred && <span className="absolute -top-1 -right-1 text-[7px]">★</span>}
+                {hasNote && !isStarred && <span className="absolute -top-1 -right-1 text-[7px]">✎</span>}
               </button>
             );
           })}
         </div>
         <div className="space-y-2 pt-1 border-t border-border/40">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">By topic</p>
           {topics.map(topic => {
             const topicQs = questions.filter(q => q.topic === topic);
             const answered = topicQs.filter(q => answers[q.id]?.chosen);
@@ -185,11 +176,7 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
                 <span className="text-xs text-foreground/70 flex-1 truncate">{topic}</span>
                 <span className="text-[11px] font-mono text-muted-foreground shrink-0">
                   {answered.length}/{topicQs.length}
-                  {answered.length > 0 && (
-                    <span className={` ml-1 ${correct === answered.length ? "text-green-400" : "text-amber-400"}`}>
-                      ({correct} ✓)
-                    </span>
-                  )}
+                  {answered.length > 0 && <span className={` ml-1 ${correct === answered.length ? "text-green-400" : "text-amber-400"}`}>({correct} ✓)</span>}
                 </span>
               </div>
             );
@@ -203,8 +190,53 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
   );
 }
 
-// ── Notes, Starred & Workings panel ──────────────────────────────────────────
-function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, workings, onClose, onJump, questions, userEmail, onTeacherQuestionSave, onDeleteWorking }) {
+// ── Teacher response component used inside the starred panel ──────────────────
+function TeacherResponseBlock({ questionId, paperId, starredQuestions, onSave }) {
+  const existing = starredQuestions[questionId]?.teacherResponse ?? "";
+  const [text, setText] = useState(existing);
+  const [saved, setSaved] = useState(false);
+
+  function handleSave() {
+    onSave(questionId, text);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-500/20 bg-amber-500/10">
+        <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+        <p className="text-[11px] font-black uppercase tracking-widest text-amber-400">
+          What the teacher said
+        </p>
+      </div>
+
+      {/* Response textarea */}
+      <div className="p-3 space-y-2">
+        <textarea
+          value={text}
+          onChange={e => { setText(e.target.value); setSaved(false); }}
+          placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…"
+          rows={4}
+          className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all leading-relaxed"
+        />
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] text-muted-foreground/40">Saved responses appear in the teacher review PDF</p>
+          <button
+            onClick={handleSave}
+            disabled={text === existing}
+            className="flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:brightness-110 transition-all bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {saved ? <><Check className="w-3 h-3" /> Saved</> : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarredQuestions, notes, workings, onClose, onJump, questions, userEmail, onTeacherQuestionSave, onDeleteWorking }) {
   const [activeTab, setActiveTab] = useState("notes");
   const [downloading, setDownloading] = useState(false);
   const [downloadingNotes, setDownloadingNotes] = useState(false);
@@ -218,22 +250,25 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, wor
   const starred = Object.entries(starredQuestions).sort((a, b) => a[1].questionNumber - b[1].questionNumber);
   const noteCount = Object.keys(notes).length;
   const starredCount = starred.length;
-
-  // Sort workings by question number
-  const workingEntries = Object.entries(workings)
-    .sort((a, b) => {
-      const qa = questions.find(q => q.id === a[0]);
-      const qb = questions.find(q => q.id === b[0]);
-      return (qa?.number ?? a[1].questionNumber ?? 0) - (qb?.number ?? b[1].questionNumber ?? 0);
-    });
+  const workingEntries = Object.entries(workings).sort((a, b) => {
+    const qa = questions.find(q => q.id === a[0]);
+    const qb = questions.find(q => q.id === b[0]);
+    return (qa?.number ?? a[1].questionNumber ?? 0) - (qb?.number ?? b[1].questionNumber ?? 0);
+  });
   const workingsCount = workingEntries.length;
+  const allNotes = Object.entries(notes).sort(([, a], [, b]) => new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0));
 
-  const allNotes = Object.entries(notes).sort(([, a], [, b]) =>
-    new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0)
-  );
+  function getQuestion(questionId) { return questions.find(q => q.id === questionId); }
 
-  function getQuestion(questionId) {
-    return questions.find(q => q.id === questionId);
+  function handleSaveTeacherResponse(questionId, response) {
+    const updated = { ...starredQuestions };
+    if (updated[questionId]) {
+      updated[questionId] = { ...updated[questionId], teacherResponse: response };
+      // Persist to localStorage via starStore pattern
+      const localKey = `p1_stars_${(paperId ?? "default").replace(/\//g, "_")}`;
+      try { localStorage.setItem(localKey, JSON.stringify(updated)); } catch {}
+      setStarredQuestions(updated);
+    }
   }
 
   async function handleDownloadStarred() {
@@ -266,56 +301,32 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, wor
           </button>
         </div>
 
-        {/* Tabs — three tabs now */}
+        {/* Tabs */}
         <div className="flex shrink-0 border-b border-border/50">
-          <button
-            onClick={() => setActiveTab("notes")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${
-              activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
+          <button onClick={() => setActiveTab("notes")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             <Pencil className="w-3 h-3" />
             Notes
-            {noteCount > 0 && (
-              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
-                {noteCount}
-              </span>
-            )}
+            {noteCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>{noteCount}</span>}
           </button>
-          <button
-            onClick={() => setActiveTab("workings")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${
-              activeTab === "workings" ? "border-blue-400 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
+          <button onClick={() => setActiveTab("workings")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "workings" ? "border-blue-400 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             <PenLine className="w-3 h-3" />
             Workings
-            {workingsCount > 0 && (
-              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "workings" ? "bg-blue-500/20 text-blue-400" : "bg-secondary text-muted-foreground"}`}>
-                {workingsCount}
-              </span>
-            )}
+            {workingsCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "workings" ? "bg-blue-500/20 text-blue-400" : "bg-secondary text-muted-foreground"}`}>{workingsCount}</span>}
           </button>
-          <button
-            onClick={() => setActiveTab("teacher")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${
-              activeTab === "teacher" ? "border-amber-400 text-amber-400" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
+          <button onClick={() => setActiveTab("teacher")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "teacher" ? "border-amber-400 text-amber-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             <Star className={`w-3 h-3 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} />
             Teacher
-            {starredCount > 0 && (
-              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>
-                {starredCount}
-              </span>
-            )}
+            {starredCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>{starredCount}</span>}
           </button>
         </div>
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
 
-          {/* ── MY NOTES TAB ── */}
+          {/* ── NOTES TAB ── */}
           {activeTab === "notes" && (
             <>
               {allNotes.length === 0 && (
@@ -335,16 +346,13 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, wor
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-bold text-primary">Q{q.number}</span>
                             <span className="text-[11px] text-muted-foreground">{q.topic}</span>
-                            {starredQuestions[questionId] && <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />}
                           </div>
                         )}
                         <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">{note.text}</p>
                       </div>
                       {q && (
-                        <button
-                          onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
-                          className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
-                        >
+                        <button onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
+                          className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">
                           Go to →
                         </button>
                       )}
@@ -355,25 +363,16 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, wor
             </>
           )}
 
-          {/* ── MY WORKINGS TAB ── */}
+          {/* ── WORKINGS TAB ── */}
           {activeTab === "workings" && (
             <>
               {workingEntries.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
                   <PenLine className="w-8 h-8 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground">No workings saved yet.</p>
-                  <p className="text-xs text-muted-foreground/50 max-w-[240px] leading-relaxed">
-                    Use the scratchpad panels on the sides of the screen to write your workings, then tap "Save working" to store them here.
-                  </p>
+                  <p className="text-xs text-muted-foreground/50 max-w-[240px] leading-relaxed">Use the scratchpad panels on the sides of the screen, then tap "Save working".</p>
                 </div>
               )}
-
-              {workingEntries.length > 0 && (
-                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-                  Saved workings are synced across all your devices and can be downloaded as a PDF to submit to your teacher.
-                </p>
-              )}
-
               {workingEntries.map(([questionId, entry]) => {
                 const q = getQuestion(questionId);
                 const qNumber = entry.questionNumber ?? q?.number ?? "?";
@@ -381,7 +380,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, wor
                 const sides = entry.sides ?? {};
                 return (
                   <div key={questionId} className="bg-blue-500/5 border border-blue-500/20 rounded-xl overflow-hidden">
-                    {/* Header row */}
                     <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-blue-500/10">
                       <div className="flex items-center gap-2">
                         <PenLine className="w-3.5 h-3.5 text-blue-400 shrink-0" />
@@ -389,44 +387,17 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, wor
                         <span className="text-[11px] text-muted-foreground">{qTopic}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {q && (
-                          <button
-                            onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
-                            className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
-                          >
-                            Go to →
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onDeleteWorking(questionId)}
-                          className="p-1 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                          title="Delete this working"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {q && <button onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>}
+                        <button onClick={() => onDeleteWorking(questionId)} className="p-1 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
-
-                    {/* Images */}
                     <div className="p-3 space-y-3">
                       {Object.entries(sides).sort().map(([sideKey, imageData]) => (
                         <div key={sideKey} className="space-y-1">
-                          {Object.keys(sides).length > 1 && (
-                            <p className="text-[10px] font-semibold text-blue-400/70 uppercase tracking-widest">
-                              {sideKey} side
-                            </p>
-                          )}
-                          <img
-                            src={imageData}
-                            alt={`Working for Q${qNumber}`}
-                            className="w-full rounded-lg border border-blue-500/20"
-                            style={{ background: "#f6f1e4", maxHeight: 200, objectFit: "contain" }}
-                          />
+                          {Object.keys(sides).length > 1 && <p className="text-[10px] font-semibold text-blue-400/70 uppercase tracking-widest">{sideKey} side</p>}
+                          <img src={imageData} alt={`Working for Q${qNumber}`} className="w-full rounded-lg border border-blue-500/20" style={{ background: "#f6f1e4", maxHeight: 200, objectFit: "contain" }} />
                         </div>
                       ))}
-                      <p className="text-[10px] text-muted-foreground/40">
-                        Saved {new Date(entry.savedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </p>
                     </div>
                   </div>
                 );
@@ -434,127 +405,104 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, wor
             </>
           )}
 
-          {/* ── TEACHER REVIEW TAB ── */}
+          {/* ── TEACHER TAB ── */}
           {activeTab === "teacher" && (
             <>
               {starred.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
                   <Star className="w-8 h-8 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground">No starred questions yet.</p>
-                  <p className="text-xs text-muted-foreground/50">After answering a question incorrectly, tap ⭐ Star to flag it for your teacher.</p>
+                  <p className="text-xs text-muted-foreground/50">After answering a question, tap Star to flag it for your teacher.</p>
                 </div>
               )}
               {starred.map(([questionId, entry]) => (
-                <div key={questionId} className="bg-secondary/40 border border-amber-500/20 rounded-xl overflow-hidden">
-                  <div className="flex items-start justify-between gap-2 p-4 pb-2">
+                <div key={questionId} className="bg-secondary/40 border border-amber-500/20 rounded-xl overflow-hidden space-y-0">
+
+                  {/* Question header */}
+                  <div className="flex items-start justify-between gap-2 p-4 pb-3">
                     <div className="space-y-0.5 flex-1">
                       <div className="flex items-center gap-2">
                         <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
                         <span className="font-mono text-xs font-bold text-primary">Q{entry.questionNumber}</span>
                         <span className="text-[11px] text-muted-foreground">{entry.topic}</span>
                       </div>
-                      <p className="text-xs text-foreground/70 leading-relaxed line-clamp-2">{entry.questionText}</p>
+                      <p className="text-xs text-foreground/70 leading-relaxed line-clamp-2 pl-5">{entry.questionText}</p>
                     </div>
-                    <button
-                      onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
-                      className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
-                    >
+                    <button onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
+                      className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">
                       Go to →
                     </button>
                   </div>
 
+                  {/* AI takeaway */}
                   {entry.feedback?.pulse_layer_1 && (
-                    <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
+                    <div className="mx-4 mb-3 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
                       <p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.pulse_layer_1}</p>
                     </div>
                   )}
 
-                  {notes[questionId]?.text && (
-                    <div className="mx-4 mb-2 bg-green-500/8 border border-green-500/20 rounded-lg px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 mb-0.5">📝 My Note</p>
-                      <p className="text-[11px] text-foreground/70 leading-relaxed">{notes[questionId].text}</p>
-                    </div>
-                  )}
-
-                  {workings[questionId] && (
-                    <div className="mx-4 mb-2 bg-blue-500/8 border border-blue-500/20 rounded-lg px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/60 mb-1">✏ Working saved</p>
-                      {Object.values(workings[questionId].sides ?? {}).slice(0, 1).map((img, i) => (
-                        <img key={i} src={img} alt="Working thumbnail" className="w-full rounded border border-blue-500/20 max-h-24 object-contain" style={{ background: "#f6f1e4" }} />
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="px-4 pb-4 space-y-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
-                      <MessageCircleQuestion className="w-3 h-3" /> Question for teacher
+                  {/* Student's question for teacher */}
+                  <div className="px-4 pb-3 space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5">
+                      <MessageCircleQuestion className="w-3 h-3" /> Your question for teacher
                     </p>
                     {entry.teacherQuestion ? (
-                      <div className="space-y-1.5">
-                        <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2">
-                          <p className="text-[11px] text-foreground/80 leading-relaxed">{entry.teacherQuestion}</p>
-                        </div>
-                        <button onClick={() => onTeacherQuestionSave(questionId, "")} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">Edit question</button>
+                      <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+                        <p className="text-[11px] text-foreground/80 leading-relaxed italic flex-1">"{entry.teacherQuestion}"</p>
+                        <button onClick={() => onTeacherQuestionSave(questionId, "")} className="text-[10px] text-amber-400/50 hover:text-amber-400 transition-colors shrink-0">Edit</button>
                       </div>
                     ) : (
                       <div className="space-y-1.5">
                         <textarea
                           value={teacherInputs[questionId] ?? ""}
                           onChange={e => setTeacherInputs(p => ({ ...p, [questionId]: e.target.value }))}
-                          placeholder="What would you like to ask your teacher about this question?"
+                          placeholder="What would you like to ask your teacher?"
                           rows={2}
                           className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all"
                         />
-                        <button
-                          onClick={() => onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? "")}
-                          disabled={!teacherInputs[questionId]?.trim()}
-                          className="text-xs font-semibold text-amber-400 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
+                        <button onClick={() => onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? "")} disabled={!teacherInputs[questionId]?.trim()}
+                          className="text-xs font-semibold text-amber-400 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                           Save question →
                         </button>
                       </div>
                     )}
                   </div>
+
+                  {/* ── What the teacher said ── */}
+                  <div className="px-4 pb-4">
+                    <TeacherResponseBlock
+                      questionId={questionId}
+                      paperId={paperId}
+                      starredQuestions={starredQuestions}
+                      onSave={handleSaveTeacherResponse}
+                    />
+                  </div>
+
                 </div>
               ))}
             </>
           )}
         </div>
 
-        {/* Footer — always pinned */}
+        {/* Footer */}
         <div className="shrink-0 px-4 py-4 border-t border-border/50 bg-card">
           {activeTab === "notes" && (
-            <button
-              onClick={handleDownloadNotes}
-              disabled={noteCount === 0 || downloadingNotes}
-              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {downloadingNotes
-                ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Generating…</>
-                : <><NotebookPen className="w-4 h-4" /> Download My Notes (PDF)</>}
+            <button onClick={handleDownloadNotes} disabled={noteCount === 0 || downloadingNotes}
+              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              {downloadingNotes ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Generating…</> : <><NotebookPen className="w-4 h-4" />Download My Notes (PDF)</>}
             </button>
           )}
           {activeTab === "workings" && (
-            <button
-              onClick={handleDownloadWorkings}
-              disabled={workingsCount === 0 || downloadingWorkings}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {downloadingWorkings
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating…</>
-                : <><Download className="w-4 h-4" /> Download My Workings (PDF)</>}
+            <button onClick={handleDownloadWorkings} disabled={workingsCount === 0 || downloadingWorkings}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              {downloadingWorkings ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating…</> : <><Download className="w-4 h-4" />Download My Workings (PDF)</>}
             </button>
           )}
           {activeTab === "teacher" && (
-            <button
-              onClick={handleDownloadStarred}
-              disabled={starredCount === 0 || downloading}
-              className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {downloading
-                ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Generating…</>
-                : <><Download className="w-4 h-4" /> Download Teacher Review (PDF)</>}
+            <button onClick={handleDownloadStarred} disabled={starredCount === 0 || downloading}
+              className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              {downloading ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />Generating…</> : <><Download className="w-4 h-4" />Download Teacher Review (PDF)</>}
             </button>
           )}
         </div>
@@ -599,7 +547,7 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
               <button onClick={handleSave} className="text-xs font-bold text-green-400 hover:brightness-110 transition-all bg-green-500/15 px-3 py-1.5 rounded-lg border border-green-500/30">{saved ? "Saved ✓" : "Save note"}</button>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground/30">⌘ + Enter to save</p>
+          <p className="text-[10px] text-muted-foreground/30">Cmd/Ctrl + Enter to save</p>
         </>
       ) : (
         <p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">{existing?.text}</p>
@@ -674,7 +622,6 @@ export default function P1Session() {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [answers, setAnswers] = useState({});
   const [currentIdx, setCurrentIdx] = useState(0);
-
   const [selected, setSelected] = useState(null);
   const [isGuess, setIsGuess] = useState(false);
   const [crossedOut, setCrossedOut] = useState(new Set());
@@ -688,7 +635,6 @@ export default function P1Session() {
   const [showCorrectBanner, setShowCorrectBanner] = useState(false);
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
-
   const [starredQuestions, setStarredQuestions] = useState({});
   const [notes, setNotes] = useState({});
   const [workings, setWorkings] = useState({});
@@ -726,9 +672,7 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, currentIdx, sessionLoading]);
 
-  useEffect(() => {
-    return () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); };
-  }, []);
+  useEffect(() => { return () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); }; }, []);
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -750,8 +694,6 @@ export default function P1Session() {
   const starredIds = new Set(Object.keys(starredQuestions));
   const notedIds = new Set(Object.keys(notes));
   const isCurrentStarred = question ? starredIds.has(question.id) : false;
-
-  // Count of things in the panel badge
   const totalPanelItems = starredIds.size + notedIds.size + Object.keys(workings).length;
 
   function handleToggleCrossOut(key) {
@@ -790,6 +732,7 @@ export default function P1Session() {
   }, [layer2]);
 
   function handleTeacherQuestionSave(questionId, value) {
+    const { saveTeacherQuestion } = require("@/lib/p1StarStore");
     const updated = saveTeacherQuestion(paperId, questionId, value);
     setStarredQuestions({ ...updated });
   }
@@ -895,7 +838,6 @@ Respond ONLY in JSON:
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === questions.length - 1;
   const showFeedbackPanel = submitted && layer1 !== null;
-  const crossedCount = crossedOut.size;
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -914,12 +856,10 @@ Respond ONLY in JSON:
               <button onClick={() => setShowCalc(c => !c)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${showCalc ? "bg-primary/20 border-primary/50 text-primary" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}>
                 <Calculator className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Calc</span>
               </button>
               <button onClick={() => setShowFormulas(true)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-all">
                 <BookOpen className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Data</span>
               </button>
               <button onClick={() => setShowStarred(true)}
                 className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${totalPanelItems > 0 ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}>
@@ -940,32 +880,23 @@ Respond ONLY in JSON:
 
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
           <PaperPdfButton label="Open Question Paper" paperId={paperId} />
-          <p className="text-[11px] text-muted-foreground/60 leading-snug">
-            Open the PDF to see diagrams for image questions
-          </p>
+          <p className="text-[11px] text-muted-foreground/60 leading-snug">Open the PDF to see diagrams</p>
         </div>
 
         <div className="flex gap-1 px-4 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-card/40">
           {questions.map((q, i) => {
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
-            const isAnswered = !!a?.chosen;
-            const isStarred = starredIds.has(q.id);
-            const hasNote = notedIds.has(q.id);
-            const hasWorking = !!workings[q.id];
             return (
               <button key={q.id} onClick={() => setCurrentIdx(i)}
                 className={`relative shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${
                   isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110"
                   : a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                  : isAnswered && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
-                  : isAnswered && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400"
+                  : a?.chosen && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400"
+                  : a?.chosen && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400"
                   : "bg-secondary/60 border-border/40 text-muted-foreground/50"
                 }`}>
                 {q.number}
-                {isStarred && <span className="absolute -top-1 -right-1 text-[7px] leading-none">⭐</span>}
-                {!isStarred && hasNote && <span className="absolute -top-1 -right-1 text-[7px] leading-none">📝</span>}
-                {!isStarred && !hasNote && hasWorking && <span className="absolute -top-1 -right-1 text-[7px] leading-none">✏</span>}
               </button>
             );
           })}
@@ -989,31 +920,30 @@ Respond ONLY in JSON:
                 )}
               </div>
             </div>
-
             {question.image_required && (
               <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 flex items-center gap-2.5">
                 <span className="text-base shrink-0">📊</span>
-                <p className="text-[11px] text-primary/80 leading-snug">
-                  This question has a diagram — see <strong>Q{question.number}</strong> in the question paper PDF above
-                </p>
+                <p className="text-[11px] text-primary/80 leading-snug">This question has a diagram — see <strong>Q{question.number}</strong> in the question paper PDF above</p>
               </div>
             )}
-
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
           {!submitted && (
-            <p className="text-[11px] text-muted-foreground/50 text-center -mt-1">
-              Hover an option and tap <span className="font-mono bg-secondary px-1 rounded">✕</span> to cross it out by elimination
-              {crossedCount > 0 && <span className="text-red-400/70 ml-1">· {crossedCount} crossed out</span>}
-            </p>
+            <div className="flex flex-col gap-2.5">
+              {OPTION_KEYS.map(key => (
+                <OptionRow key={key} optKey={key} text={question.options[key]} selected={selected} crossedOut={crossedOut.has(key)} submitted={submitted} correctOption={question.correct} onSelect={setSelected} onToggleCrossOut={handleToggleCrossOut} />
+              ))}
+            </div>
           )}
 
-          <div className="flex flex-col gap-2.5">
-            {OPTION_KEYS.map(key => (
-              <OptionRow key={key} optKey={key} text={question.options[key]} selected={selected} crossedOut={crossedOut.has(key)} submitted={submitted} correctOption={question.correct} onSelect={setSelected} onToggleCrossOut={handleToggleCrossOut} />
-            ))}
-          </div>
+          {submitted && (
+            <div className="flex flex-col gap-2.5">
+              {OPTION_KEYS.map(key => (
+                <OptionRow key={key} optKey={key} text={question.options[key]} selected={selected} crossedOut={false} submitted={submitted} correctOption={question.correct} onSelect={() => {}} onToggleCrossOut={() => {}} />
+              ))}
+            </div>
+          )}
 
           {!submitted && (
             <div className="flex gap-2">
@@ -1052,7 +982,7 @@ Respond ONLY in JSON:
               )}
               {!showTeacherPrompt && starredQuestions[question.id]?.teacherQuestion && (
                 <div className="px-4 pb-3 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/60 flex items-center gap-1"><MessageCircleQuestion className="w-3 h-3" /> Question for teacher</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/60 flex items-center gap-1"><MessageCircleQuestion className="w-3 h-3" /> Your question for teacher</p>
                   <p className="text-xs text-foreground/70 leading-relaxed italic">"{starredQuestions[question.id].teacherQuestion}"</p>
                   <button onClick={() => setShowTeacherPrompt(true)} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">Edit</button>
                 </div>
@@ -1081,16 +1011,10 @@ Respond ONLY in JSON:
               </button>
             </div>
           )}
-
         </div>
       </div>
 
-      <ScratchpadPanel
-        questionId={question?.id}
-        paperId={paperId}
-        workings={workings}
-        onSaveWorking={handleSaveWorking}
-      />
+      <ScratchpadPanel questionId={question?.id} paperId={paperId} workings={workings} onSaveWorking={handleSaveWorking} />
 
       {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
       {showOverview && <OverviewPanel questions={questions} answers={answers} currentIdx={currentIdx} onJump={setCurrentIdx} onClose={() => setShowOverview(false)} onClear={handleClear} starredIds={starredIds} notedIds={notedIds} />}
@@ -1100,6 +1024,7 @@ Respond ONLY in JSON:
           paperLabel={paper.label}
           paper={paper}
           starredQuestions={starredQuestions}
+          setStarredQuestions={setStarredQuestions}
           notes={notes}
           workings={workings}
           onClose={() => setShowStarred(false)}

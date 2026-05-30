@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Star, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, Check, MessageCircleQuestion } from "lucide-react";
 import { getAllNotes, saveNote } from "@/lib/questionNotesStore";
-import { isStarred, starQuestion, unstarQuestion } from "@/lib/writtenStarStore";
+import { isStarred, starQuestion, unstarQuestion, saveTeacherQuestion, saveTeacherResponse, getAllStarred } from "@/lib/writtenStarStore";
 import { loadWorkings as loadTopicWorkings, saveWorking as saveTopicWorking } from "@/lib/p1WorkingsStore";
 import ScratchpadPanel from "@/components/ScratchpadPanel";
 
@@ -59,33 +59,127 @@ function MyNoteWidget({ questionId, topic, questionText }) {
   );
 }
 
-// ── Star for teacher review ───────────────────────────────────────────────────
-function StarButton({ questionId, topic, questionText, feedback, answer }) {
+// ── Star section — full P1Session functionality ────────────────────────────────
+function StarSection({ questionId, topic, questionText, feedback, answer }) {
   const [starred, setStarred] = useState(() => isStarred(questionId ?? ""));
+  const existingEntry = getAllStarred().find(e => e.questionId === questionId);
 
-  function handleToggle() {
+  const [showTeacherQInput, setShowTeacherQInput] = useState(false);
+  const [teacherQ, setTeacherQ] = useState(existingEntry?.teacherQuestion ?? "");
+  const [teacherQSaved, setTeacherQSaved] = useState(!!existingEntry?.teacherQuestion);
+  const [teacherResponse, setTeacherResponse] = useState(existingEntry?.teacherResponse ?? "");
+  const [teacherResponseSaved, setTeacherResponseSaved] = useState(false);
+
+  function handleToggleStar() {
     if (!questionId) return;
-    if (starred) { unstarQuestion(questionId); setStarred(false); }
-    else {
+    if (starred) {
+      unstarQuestion(questionId);
+      setStarred(false);
+      setShowTeacherQInput(false);
+    } else {
       starQuestion(questionId, {
-        topic, questionText,
-        markScheme: "",
+        topic, questionText, markScheme: "",
         feedback: { pulse_layer_1: feedback?.pulse_layer_1, cambridge_insight: feedback?.cambridge_insight },
         answer: answer ?? "",
       });
       setStarred(true);
+      setShowTeacherQInput(!existingEntry?.teacherQuestion);
     }
   }
 
+  function handleSaveTeacherQ() {
+    if (!teacherQ.trim()) return;
+    saveTeacherQuestion(questionId, teacherQ);
+    setTeacherQSaved(true);
+    setShowTeacherQInput(false);
+    setTimeout(() => setTeacherQSaved(false), 2000);
+  }
+
+  function handleSaveTeacherResponse() {
+    saveTeacherResponse(questionId, teacherResponse);
+    setTeacherResponseSaved(true);
+    setTimeout(() => setTeacherResponseSaved(false), 2500);
+  }
+
+  if (!starred) {
+    return (
+      <button onClick={handleToggleStar}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border font-semibold text-sm transition-all active:scale-[0.98] bg-card border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5">
+        <Star className="w-4 h-4" />
+        Star for teacher review
+      </button>
+    );
+  }
+
   return (
-    <button onClick={handleToggle}
-      className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border font-semibold text-sm transition-all active:scale-[0.98] ${
-        starred ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
-          : "bg-card border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5"
-      }`}>
-      <Star className={`w-4 h-4 ${starred ? "fill-amber-400" : ""}`} />
-      {starred ? "Starred for teacher review" : "Star for teacher review"}
-    </button>
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden space-y-0">
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-amber-500/15">
+        <div className="flex items-center gap-2">
+          <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
+          <p className="text-xs text-amber-400 font-semibold">Starred — will appear in Teacher Review PDF</p>
+        </div>
+        <button onClick={handleToggleStar} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Remove</button>
+      </div>
+
+      {/* Student's question for teacher */}
+      <div className="px-4 py-3 space-y-1.5 border-b border-amber-500/10">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5">
+          <MessageCircleQuestion className="w-3 h-3" /> Your question for teacher
+        </p>
+        {teacherQSaved && !showTeacherQInput && teacherQ.trim() ? (
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[11px] text-foreground/80 leading-relaxed italic flex-1">"{teacherQ}"</p>
+            <button onClick={() => setShowTeacherQInput(true)} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Edit</button>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }}
+              placeholder="What would you like to ask your teacher about this question?"
+              rows={2}
+              autoFocus
+              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
+            <div className="flex items-center justify-between">
+              {existingEntry?.teacherQuestion && (
+                <button onClick={() => { setShowTeacherQInput(false); setTeacherQ(existingEntry.teacherQuestion); }} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>
+              )}
+              <button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()}
+                className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">
+                Save question →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* What the teacher said */}
+      <div className="px-4 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+          <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">What the teacher said</p>
+        </div>
+        <p className="text-[10px] text-muted-foreground/50 leading-snug">
+          Fill this in after your teacher reviews the question — or leave blank to write in by hand when printed.
+        </p>
+        <textarea value={teacherResponse} onChange={e => { setTeacherResponse(e.target.value); setTeacherResponseSaved(false); }}
+          placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…"
+          rows={4}
+          className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all leading-relaxed" />
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] text-muted-foreground/40">
+            {teacherResponse.trim()
+              ? "Saved response will appear as text in the PDF"
+              : "Blank = 5 ruled lines appear in the PDF for handwriting"}
+          </p>
+          <button onClick={handleSaveTeacherResponse}
+            disabled={teacherResponse === (existingEntry?.teacherResponse ?? "")}
+            className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">
+            {teacherResponseSaved ? <><Check className="w-3 h-3" /> Saved</> : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -216,13 +310,13 @@ export default function CSFeedback() {
           {/* MY NOTE */}
           <MyNoteWidget questionId={questionId ?? "cs-unknown"} topic={topic} questionText={qText} />
 
-          {/* Star for teacher review */}
-          <StarButton questionId={questionId} topic={topic} questionText={qText} feedback={feedback} answer={answer ?? ""} />
+          {/* Star for teacher review — full functionality */}
+          <StarSection questionId={questionId} topic={topic} questionText={qText} feedback={feedback} answer={answer ?? ""} />
 
           {/* Show deeper breakdown */}
           <DeeperBreakdown feedback={feedback} />
 
-          {/* Navigation buttons */}
+          {/* Navigation */}
           <div className="grid grid-cols-2 gap-3 mt-1">
             <button onClick={() => navigate(dashRoute ?? "/cs")}
               className="flex items-center justify-center gap-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">

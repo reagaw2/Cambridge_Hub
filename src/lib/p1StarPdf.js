@@ -1,8 +1,3 @@
-/**
- * p1StarPdf.js — Teacher Review PDF for starred questions.
- * Includes a 'What the teacher said' lined box after each question.
- */
-
 const JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 
 async function loadJsPDF() {
@@ -34,7 +29,7 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
   const pageW = 210;
   const pageH = 297;
   const margin = 18;
-  const contentW = pageW - margin * 2;  // 174 mm
+  const contentW = pageW - margin * 2;
   const LINE_H = 5.5;
   const dateStr = new Date().toLocaleDateString("en-GB", {
     day: "2-digit", month: "short", year: "numeric",
@@ -42,7 +37,6 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
   let pageNum = 1;
   let y = margin;
 
-  // Always set font+size before splitTextToSize so metrics are correct
   function wrapAt(text, fontSize, fontStyle, maxW) {
     doc.setFont("helvetica", fontStyle ?? "normal");
     doc.setFontSize(fontSize);
@@ -83,55 +77,75 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
   }
 
   /**
-   * Draw the "What the teacher said" response box.
-   * Uses plain rect (more reliable in jsPDF than roundedRect with fill).
-   * 5 ruled lines for writing, cream background, amber border.
+   * Draw "What the teacher said" box.
+   * If teacherResponse is filled in: render as text inside the box.
+   * If empty: draw 5 ruled blank lines for handwriting.
    */
-  function drawTeacherResponseBox() {
+  function drawTeacherResponseBox(teacherResponse) {
+    const hasResponse = teacherResponse?.trim();
     const NUM_RULES = 5;
     const RULE_SPACING = 8;
     const labelH = 10;
     const bottomPad = 6;
-    const boxH = labelH + NUM_RULES * RULE_SPACING + bottomPad; // ~56 mm
+
+    let boxH;
+    let responseLines = [];
+    if (hasResponse) {
+      responseLines = wrapAt(teacherResponse.trim(), 10, "normal", contentW - 10);
+      boxH = labelH + responseLines.length * LINE_H + bottomPad + 4;
+    } else {
+      boxH = labelH + NUM_RULES * RULE_SPACING + bottomPad;
+    }
 
     checkSpace(boxH + 8);
 
-    // ── Fill background (cream) ─────────────────────────────────────────────
+    // Background
     doc.setFillColor(255, 251, 230);
     doc.rect(margin, y, contentW, boxH, "F");
 
-    // ── Border ─────────────────────────────────────────────────────────────
+    // Border
     doc.setDrawColor(190, 150, 30);
     doc.setLineWidth(0.8);
     doc.rect(margin, y, contentW, boxH, "S");
 
-    // ── Left accent bar ─────────────────────────────────────────────────────
+    // Left accent bar
     doc.setFillColor(190, 150, 30);
     doc.rect(margin, y, 3, boxH, "F");
 
-    // ── Label ───────────────────────────────────────────────────────────────
+    // Label
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(120, 80, 0);
     doc.text("WHAT THE TEACHER SAID", margin + 7, y + 7);
 
-    // ── Separator line under label ──────────────────────────────────────────
+    // Separator under label
     doc.setDrawColor(210, 175, 90);
     doc.setLineWidth(0.4);
     doc.line(margin + 3, y + labelH, margin + contentW, y + labelH);
 
-    // ── Ruled writing lines ─────────────────────────────────────────────────
-    doc.setDrawColor(210, 190, 130);
-    doc.setLineWidth(0.3);
-    for (let i = 0; i < NUM_RULES; i++) {
-      const lineY = y + labelH + 4 + i * RULE_SPACING;
-      doc.line(margin + 7, lineY, margin + contentW - 5, lineY);
+    if (hasResponse) {
+      // Render typed teacher response
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(60, 40, 0);
+      responseLines.forEach((line, i) => {
+        doc.text(line, margin + 7, y + labelH + 5 + i * LINE_H);
+      });
+    } else {
+      // Blank ruled lines for handwriting
+      doc.setDrawColor(210, 190, 130);
+      doc.setLineWidth(0.3);
+      for (let i = 0; i < NUM_RULES; i++) {
+        const lineY = y + labelH + 4 + i * RULE_SPACING;
+        doc.line(margin + 7, lineY, margin + contentW - 5, lineY);
+      }
     }
 
+    doc.setTextColor(30, 30, 30);
     y += boxH + 10;
   }
 
-  // ── Cover page ─────────────────────────────────────────────────────────────
+  // ── Cover page ──────────────────────────────────────────────────────────────
   drawHeader();
   y = 30;
 
@@ -162,12 +176,12 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
 
   drawFooter();
 
-  // ── Per-question entries ───────────────────────────────────────────────────
+  // ── Per-question entries ────────────────────────────────────────────────────
   entries.forEach((entry, ei) => {
 
     checkSpace(50);
 
-    // ── Question header card ────────────────────────────────────────────────
+    // Question header card
     const starredFmt = fmtDate(entry.starredAt);
     const headerH = starredFmt ? 30 : 22;
 
@@ -197,7 +211,7 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
     doc.setTextColor(30, 30, 30);
     y += headerH + 6;
 
-    // ── Question text ───────────────────────────────────────────────────────
+    // Question text
     if (entry.questionText) {
       const qLines = wrapAt(entry.questionText, 10, "normal", contentW);
       checkSpace(qLines.length * LINE_H + 6);
@@ -212,91 +226,26 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
       y += 5;
     }
 
-    // ── Options ─────────────────────────────────────────────────────────────
-    if (entry.options) {
-      checkSpace(10);
+    // AI takeaway
+    if (entry.feedback?.pulse_layer_1) {
+      const tLines = wrapAt(entry.feedback.pulse_layer_1, 9, "italic", contentW - 6);
+      checkSpace(tLines.length * 5 + 10);
+      doc.setFillColor(232, 248, 236);
+      const tBoxH = tLines.length * 5 + 10;
+      doc.rect(margin, y, contentW, tBoxH, "F");
       doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(10, 80, 40);
+      doc.text("EXAM TAKEAWAY", margin + 5, y + 6);
+      doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
-      doc.setTextColor(70, 70, 70);
-      doc.text("Options", margin, y);
-      y += 5;
-
-      ["A", "B", "C", "D"].forEach(k => {
-        const isCorrect = k === entry.correctAnswer;
-        const optLines = wrapAt(`${k}.   ${entry.options[k] ?? ""}`, 10, isCorrect ? "bold" : "normal", contentW - 6);
-        checkSpace(optLines.length * 5.2 + 3);
-        if (isCorrect) {
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(22, 120, 60);
-        } else {
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(65, 65, 65);
-        }
-        doc.setFontSize(10);
-        optLines.forEach(line => {
-          checkSpace(6);
-          doc.text(line, margin + 3, y);
-          y += 5.2;
-        });
-      });
-
-      y += 4;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(22, 120, 60);
-      doc.text(`Correct answer: ${entry.correctAnswer}`, margin, y);
-      y += 8;
+      doc.setTextColor(20, 80, 40);
+      tLines.forEach((line, i) => { doc.text(line, margin + 5, y + 11 + i * 5); });
+      y += tBoxH + 4;
       doc.setTextColor(30, 30, 30);
     }
 
-    // ── AI Feedback ─────────────────────────────────────────────────────────
-    const fb = entry.feedback;
-    if (fb) {
-      const sections = [
-        { title: "Exam Takeaway",               content: fb.pulse_layer_1,          r: 22,  g: 120, b: 60  },
-        { title: "Cambridge Insight",           content: fb.cambridge_insight,       r: 37,  g: 99,  b: 200 },
-        { title: "Step 1 — Concept Tested",    content: fb.step1_system,            r: 60,  g: 60,  b: 60  },
-        { title: "Step 2 — Key Phrases",       content: fb.step2_phrase_breakdown,  r: 60,  g: 60,  b: 60  },
-        { title: "Step 3 — The Tipping Point", content: fb.step3_tipping_point,     r: 60,  g: 60,  b: 60  },
-      ].filter(s => s.content?.trim());
-
-      if (sections.length > 0) {
-        checkSpace(14);
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9.5);
-        doc.setTextColor(40, 40, 40);
-        doc.text("AI Feedback", margin, y);
-        y += 2;
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.line(margin, y + 1, pageW - margin, y + 1);
-        y += 6;
-
-        sections.forEach(s => {
-          const lines = wrapAt(s.content, 10, "normal", contentW - 4);
-          checkSpace(lines.length * LINE_H + 10);
-
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(8.5);
-          doc.setTextColor(s.r, s.g, s.b);
-          doc.text(s.title, margin, y);
-          y += 5;
-
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(10);
-          doc.setTextColor(40, 40, 40);
-          lines.forEach(line => {
-            checkSpace(LINE_H + 1);
-            doc.text(line, margin + 3, y);
-            y += LINE_H;
-          });
-          y += 4;
-        });
-      }
-    }
-
-    // ── Student's question for teacher ──────────────────────────────────────
+    // Student's question for teacher
     if (entry.teacherQuestion?.trim()) {
       const tqLines = wrapAt(entry.teacherQuestion, 10, "bolditalic", contentW - 10);
       const tqBoxH = tqLines.length * LINE_H + 14;
@@ -312,7 +261,7 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(140, 100, 0);
-      doc.text("Student's Question", margin + 5, y + 6);
+      doc.text("STUDENT'S QUESTION FOR TEACHER", margin + 5, y + 6);
 
       doc.setFont("helvetica", "bolditalic");
       doc.setFontSize(10);
@@ -325,9 +274,9 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
 
     // ── TEACHER RESPONSE BOX ────────────────────────────────────────────────
     y += 2;
-    drawTeacherResponseBox();
+    drawTeacherResponseBox(entry.teacherResponse ?? "");
 
-    // ── Divider ─────────────────────────────────────────────────────────────
+    // Divider
     if (ei < entries.length - 1) {
       checkSpace(10);
       y += 4;

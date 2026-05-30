@@ -21,6 +21,7 @@ export function starQuestion(questionId, { topic = "", questionText = "", markSc
     feedback,
     answer,
     teacherQuestion: all[questionId]?.teacherQuestion ?? "",
+    teacherResponse: all[questionId]?.teacherResponse ?? "",
     starredAt: new Date().toISOString(),
   };
   writeAll(all);
@@ -34,21 +35,19 @@ export function unstarQuestion(questionId) {
   return all;
 }
 
-export function toggleStar(questionId, meta = {}) {
-  const all = readAll();
-  if (all[questionId]) {
-    delete all[questionId];
-    writeAll(all);
-    return false;
-  }
-  starQuestion(questionId, meta);
-  return true;
-}
-
 export function saveTeacherQuestion(questionId, teacherQuestion) {
   const all = readAll();
   if (all[questionId]) {
     all[questionId] = { ...all[questionId], teacherQuestion };
+    writeAll(all);
+  }
+  return all;
+}
+
+export function saveTeacherResponse(questionId, teacherResponse) {
+  const all = readAll();
+  if (all[questionId]) {
+    all[questionId] = { ...all[questionId], teacherResponse };
     writeAll(all);
   }
   return all;

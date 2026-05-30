@@ -11,6 +11,7 @@ import { generateStarredPdf } from "@/lib/p1StarPdf";
 import { getNotes, saveNote } from "@/lib/p1NotesStore";
 import { generateNotesPdf } from "@/lib/p1NotesPdf";
 import PaperPdfButton from "@/components/PaperPdfButton";
+import QuestionAnnotator from "@/components/QuestionAnnotator";
 import { useAuth } from "@/lib/AuthContext";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
@@ -539,7 +540,6 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
 
   return (
     <div className={containerCls}>
-      {/* Click area for selecting */}
       <button
         type="button"
         disabled={submitted}
@@ -559,7 +559,6 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
         }`}>{text}</span>
       </button>
 
-      {/* Cross-out indicator / button — only shown before submission */}
       {!submitted && (
         <button
           type="button"
@@ -575,7 +574,6 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
         </button>
       )}
 
-      {/* Submitted state icons */}
       {submitted && isCorrectOption && (
         <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
       )}
@@ -583,12 +581,8 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
         <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
       )}
 
-      {/* Cross-out line overlay */}
       {crossedOut && !submitted && (
-        <div
-          className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden"
-          aria-hidden="true"
-        >
+        <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" aria-hidden="true">
           <div className="absolute top-1/2 left-3 right-3 h-px bg-muted-foreground/30" />
         </div>
       )}
@@ -612,7 +606,7 @@ export default function P1Session() {
 
   const [selected, setSelected] = useState(null);
   const [isGuess, setIsGuess] = useState(false);
-  const [crossedOut, setCrossedOut] = useState(new Set()); // per-question crossed-out options
+  const [crossedOut, setCrossedOut] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [loadingL2, setLoadingL2] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
@@ -657,13 +651,12 @@ export default function P1Session() {
     return () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); };
   }, []);
 
-  // Reset per-question state when moving to a new question
   useEffect(() => {
     if (sessionLoading) return;
     if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     setSelected(existingAnswer?.chosen ?? null);
     setIsGuess(existingAnswer?.flagged_as_guess ?? false);
-    setCrossedOut(new Set()); // always reset cross-outs per question
+    setCrossedOut(new Set());
     setSubmitted(!!existingAnswer);
     setShowCorrectBanner(false);
     setLayer1(existingAnswer?.layer1 ?? null);
@@ -682,13 +675,8 @@ export default function P1Session() {
   function handleToggleCrossOut(key) {
     setCrossedOut(prev => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-        // If the crossed-out option was selected, deselect it
-        if (selected === key) setSelected(null);
-      }
+      if (next.has(key)) { next.delete(key); }
+      else { next.add(key); if (selected === key) setSelected(null); }
       return next;
     });
   }
@@ -764,21 +752,16 @@ export default function P1Session() {
       reasoning: isGuess ? null : selected,
     });
 
-    // Correct and NOT a guess → no AI call, instant banner + auto-advance
     if (isCorrect && !isGuess) {
       const record = { chosen: selected, correct: true, flagged_as_guess: false, layer1: null, layer2: null };
       setAnswers(prev => ({ ...prev, [question.id]: record }));
       setSubmitted(true);
       setShowCorrectBanner(true);
       setLoading(false);
-
-      autoAdvanceTimer.current = setTimeout(() => {
-        advanceQuestion();
-      }, 1500);
+      autoAdvanceTimer.current = setTimeout(() => { advanceQuestion(); }, 1500);
       return;
     }
 
-    // Wrong answer or guess → fetch AI feedback
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
     const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}
 Options: ${optionsList}
@@ -1009,7 +992,8 @@ Respond ONLY in JSON:
               </div>
             )}
 
-            <p className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-line">{question.text}</p>
+            {/* ── Annotatable question text ── */}
+            <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
           {/* Elimination hint */}
@@ -1061,10 +1045,8 @@ Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Correct banner */}
           {showCorrectBanner && <CorrectBanner />}
 
-          {/* AI feedback */}
           {showFeedbackPanel && (
             <Layer1Feedback
               feedback={layer1}
@@ -1073,7 +1055,6 @@ Respond ONLY in JSON:
             />
           )}
 
-          {/* Note widget */}
           {submitted && !showCorrectBanner && (
             <MiniNoteWidget
               questionId={question.id}
@@ -1083,7 +1064,6 @@ Respond ONLY in JSON:
             />
           )}
 
-          {/* Star prompt */}
           {showFeedbackPanel && !isCurrentStarred && (
             <button
               onClick={handleToggleStar}
@@ -1094,7 +1074,6 @@ Respond ONLY in JSON:
             </button>
           )}
 
-          {/* Starred confirmation */}
           {showFeedbackPanel && isCurrentStarred && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-4 py-2.5">
@@ -1135,7 +1114,6 @@ Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Show breakdown button */}
           {showFeedbackPanel && !layer2 && (
             <button
               onClick={handleRequestLayer2}
@@ -1158,7 +1136,6 @@ Respond ONLY in JSON:
 
           {layer2 && <Layer2Feedback feedback={layer2} />}
 
-          {/* Prev / Next */}
           {!showCorrectBanner && (
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={isFirst}

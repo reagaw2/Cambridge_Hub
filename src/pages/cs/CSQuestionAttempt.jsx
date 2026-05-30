@@ -1,13 +1,16 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Star } from "lucide-react";
 import { getAllNotes } from "@/lib/questionNotesStore";
 import AnswerInput from "@/components/AnswerInput";
 import QuestionAnnotator from "@/components/QuestionAnnotator";
-import QuestionNoteWidget from "@/components/QuestionNoteWidget";
 import QuestionSessionHeader from "@/components/QuestionSessionHeader";
 import SessionNotesPanel from "@/components/SessionNotesPanel";
 import QuestionMedia from "@/components/QuestionMedia";
+import ScratchpadPanel from "@/components/ScratchpadPanel";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
+import { loadWorkings as loadTopicWorkings, saveWorking as saveTopicWorking } from "@/lib/p1WorkingsStore";
+import { isStarred, starQuestion, unstarQuestion, getAllStarred } from "@/lib/writtenStarStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
@@ -43,12 +46,27 @@ export default function CSQuestionAttempt({
   const [answer, setAnswer] = useState("");
   const [showTeachMe, setShowTeachMe] = useState(false);
   const [notesPanelOpen, setNotesPanelOpen] = useState(false);
+  const [workings, setWorkings] = useState({});
+  const [currentStarred, setCurrentStarred] = useState(false);
   const { submit, loading, error, setError } = useNodeAwareSubmit();
   const submittedRef = useRef(false);
 
-  // Notes badge count
+  const topicKey = question?.topic_key ?? "unknown";
+
+  // Load workings
+  useEffect(() => {
+    loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {}));
+  }, [topicKey]);
+
+  // Sync star state
+  useEffect(() => {
+    setCurrentStarred(question ? isStarred(question.id) : false);
+  }, [question?.id]);
+
+  // Notes/starred badge
   const allNotes = getAllNotes();
   const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
+  const totalPanelItems = notesCount + getAllStarred().length;
 
   if (!question) {
     return (
@@ -64,25 +82,31 @@ export default function CSQuestionAttempt({
   const topicRoute = TOPIC_ROUTES[question.topic_key] ?? "/cs";
   const isEmpty = answer.trim().length === 0;
 
-  function goToFeedback(fb, ans) {
-    const marksEarned = fb.marks_earned ?? 0;
-    const isLastQuestion = idx + 1 >= total;
-    onAdvance("correct", marksEarned >= question.total_marks);
-    navigate("/cs/feedback", {
-      state: {
-        feedback: fb, answer: ans,
-        topicKey: question.topic_key, questionId: question.id,
-        totalMarks: question.total_marks,
-        topicRoute: isLastQuestion ? null : topicRoute,
-        backRoute: topicRoute, dashRoute: "/cs",
-        paperRef: question.paper_ref,
-        topicLabel: topicLabel ?? question.topic,
-        isLastQuestion,
-      },
-    });
+  function handleToggleStar() {
+    if (currentStarred) {
+      unstarQuestion(question.id);
+      setCurrentStarred(false);
+    } else {
+      starQuestion(question.id, {
+        topic: question.topic,
+        questionText: question.text,
+        markScheme: "",
+      });
+      setCurrentStarred(true);
+    }
   }
 
-  const handleSubmit = async () => {
+  function handleSaveWorking(side, imageData) {
+    if (!question) return;
+    const updated = saveTopicWorking(topicKey, question.id, side, imageData, {
+      questionNumber: idx + 1,
+      topic: question.topic,
+      questionText: question.text,
+    });
+    setWorkings({ ...updated });
+  }
+
+  async function handleSubmit() {
     if (submittedRef.current) return;
     submittedRef.current = true;
 
@@ -100,14 +124,33 @@ export default function CSQuestionAttempt({
         first_attempt_answer: answer,
       });
     }
-    goToFeedback(fb, answer);
-  };
+
+    onAdvance("correct", marksEarned >= question.total_marks);
+
+    navigate("/cs/feedback", {
+      state: {
+        feedback: fb,
+        answer,
+        topicKey: question.topic_key,
+        questionId: question.id,
+        questionText: question.text,
+        markScheme: "",
+        totalMarks: question.total_marks,
+        topicRoute: idx + 1 >= total ? null : topicRoute,
+        backRoute: topicRoute,
+        dashRoute: "/cs",
+        paperRef: question.paper_ref,
+        topicLabel: topicLabel ?? question.topic,
+        isLastQuestion: idx + 1 >= total,
+      },
+    });
+  }
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* ── P1-style header (no calculator/formula for CS) ───────────── */}
+        {/* ── P1-style header ─────────────────────────────────────────── */}
         <QuestionSessionHeader
           paperRef={question.paper_ref}
           subject="Computer Science"
@@ -117,24 +160,36 @@ export default function CSQuestionAttempt({
           sessionAnswers={sessionAnswers}
           onBack={() => navigate("/cs")}
           onJumpTo={onJumpTo}
-          notesCount={notesCount}
+          notesCount={totalPanelItems}
           onNotesPanel={() => setNotesPanelOpen(true)}
           showCalculator={false}
         />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* Question card with annotation toolbar */}
+          {/* Question card with annotation toolbar + Star */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
                 {question.label}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
                   {question.topic}
                 </span>
                 <span className="font-mono text-xs text-muted-foreground">[{question.total_marks}m]</span>
+                {/* ── Star button ── */}
+                <button
+                  onClick={handleToggleStar}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                    currentStarred
+                      ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+                      : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"
+                  }`}
+                >
+                  <Star className={`w-3 h-3 ${currentStarred ? "fill-amber-400" : ""}`} />
+                  {currentStarred ? "Starred" : "Star"}
+                </button>
               </div>
             </div>
             <QuestionMedia question={question} />
@@ -147,18 +202,12 @@ export default function CSQuestionAttempt({
             <>
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowTeachMe(true)}
-                  disabled={!isEmpty}
-                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
+                <button onClick={() => setShowTeachMe(true)} disabled={!isEmpty}
+                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">
                   Teach Me How
                 </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isEmpty || loading}
-                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
+                <button onClick={handleSubmit} disabled={isEmpty || loading}
+                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                   {loading ? "Marking…" : "Submit"}
                 </button>
               </div>
@@ -175,7 +224,15 @@ export default function CSQuestionAttempt({
         </div>
       </div>
 
-      {/* Notes / Workings panel */}
+      {/* ── Side scratchpad panels ─────────────────────────────────────── */}
+      <ScratchpadPanel
+        questionId={question?.id}
+        paperId={topicKey}
+        workings={workings}
+        onSaveWorking={handleSaveWorking}
+      />
+
+      {/* Notes / Workings / Starred panel */}
       <SessionNotesPanel
         open={notesPanelOpen}
         onClose={() => setNotesPanelOpen(false)}

@@ -1,8 +1,3 @@
-/**
- * writtenStarStore.js — star written questions for teacher review.
- * Mirrors the P1 star store but for topical written questions.
- */
-
 const KEY = "written_starred_questions_v1";
 
 function readAll() {
@@ -16,13 +11,8 @@ export function isStarred(questionId) {
   return !!readAll()[questionId];
 }
 
-export function toggleStar(questionId, { topic = "", questionText = "", markScheme = "", feedback = null, answer = "" } = {}) {
+export function starQuestion(questionId, { topic = "", questionText = "", markScheme = "", feedback = null, answer = "" } = {}) {
   const all = readAll();
-  if (all[questionId]) {
-    delete all[questionId];
-    writeAll(all);
-    return false;
-  }
   all[questionId] = {
     questionId,
     topic,
@@ -30,20 +20,40 @@ export function toggleStar(questionId, { topic = "", questionText = "", markSche
     markScheme,
     feedback,
     answer,
+    teacherQuestion: all[questionId]?.teacherQuestion ?? "",
     starredAt: new Date().toISOString(),
   };
   writeAll(all);
+  return all;
+}
+
+export function unstarQuestion(questionId) {
+  const all = readAll();
+  delete all[questionId];
+  writeAll(all);
+  return all;
+}
+
+export function toggleStar(questionId, meta = {}) {
+  const all = readAll();
+  if (all[questionId]) {
+    delete all[questionId];
+    writeAll(all);
+    return false;
+  }
+  starQuestion(questionId, meta);
   return true;
 }
 
-export function saveTeacherNote(questionId, note) {
+export function saveTeacherQuestion(questionId, teacherQuestion) {
   const all = readAll();
   if (all[questionId]) {
-    all[questionId].teacherNote = note;
+    all[questionId] = { ...all[questionId], teacherQuestion };
     writeAll(all);
   }
+  return all;
 }
 
 export function getAllStarred() {
-  return Object.values(readAll());
+  return Object.values(readAll()).sort((a, b) => new Date(a.starredAt) - new Date(b.starredAt));
 }

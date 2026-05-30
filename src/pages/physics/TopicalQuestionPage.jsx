@@ -1,15 +1,17 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { X } from "lucide-react";
+import { X, Star } from "lucide-react";
 import { getAllNotes } from "@/lib/questionNotesStore";
 import AnswerInput from "@/components/AnswerInput";
 import QuestionAnnotator from "@/components/QuestionAnnotator";
-import QuestionNoteWidget from "@/components/QuestionNoteWidget";
 import QuestionSessionHeader from "@/components/QuestionSessionHeader";
 import SessionNotesPanel from "@/components/SessionNotesPanel";
 import QuestionMedia from "@/components/QuestionMedia";
 import ScientificCalculator from "@/components/ScientificCalculator";
+import ScratchpadPanel from "@/components/ScratchpadPanel";
 import { recordAttempt, addToReviewBank, writeMistakeDna } from "@/lib/topicStore";
+import { loadWorkings as loadTopicWorkings, saveWorking as saveTopicWorking } from "@/lib/p1WorkingsStore";
+import { isStarred, starQuestion, unstarQuestion, getAllStarred } from "@/lib/writtenStarStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
@@ -17,7 +19,6 @@ import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
 import { useAuth } from "@/lib/AuthContext";
 import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 
-// Session answers tracked in sessionStorage
 function sessionKey(topicKey) { return `q_session_answers_${topicKey}`; }
 function loadSessionAnswers(topicKey) {
   try { return JSON.parse(sessionStorage.getItem(sessionKey(topicKey)) ?? "{}"); } catch { return {}; }
@@ -26,7 +27,6 @@ function saveSessionAnswers(topicKey, answers) {
   sessionStorage.setItem(sessionKey(topicKey), JSON.stringify(answers));
 }
 
-// Formula sheet modal
 function FormulaSheetModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
@@ -60,28 +60,66 @@ export default function TopicalQuestionPage({
   const [currentBankIdx, setCurrentBankIdx] = useState(() => getNext().idx);
   const [answer, setAnswer] = useState("");
   const [showTeachMe, setShowTeachMe] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);  // inline note widget toggle
   const [notesPanelOpen, setNotesPanelOpen] = useState(false);
   const [calcActive, setCalcActive] = useState(false);
   const [formulaSheetOpen, setFormulaSheetOpen] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState(() => loadSessionAnswers(topicKey));
+  const [workings, setWorkings] = useState({});
+  const [currentStarred, setCurrentStarred] = useState(false);
+  const [panelItemCount, setPanelItemCount] = useState(0);
 
   const { submit, loading, error, setError } = useNodeAwareSubmit();
+
+  useEffect(() => {
+    loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {}));
+  }, [topicKey]);
+
+  // Recount panel badge items
+  useEffect(() => {
+    const allNotes = getAllNotes();
+    const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
+    const starredCount = getAllStarred().length;
+    setPanelItemCount(notesCount + starredCount);
+  });
 
   const question = allQuestions[currentBankIdx] ?? getNext().question;
   const total = allQuestions.length || getNext().total;
   const thisRoute = location.pathname;
 
-  // Notes badge = count of notes for questions in this session
-  const allNotes = getAllNotes();
-  const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
+  useEffect(() => {
+    setCurrentStarred(question ? isStarred(question.id) : false);
+  }, [question?.id]);
 
   function jumpToQuestion(idx) {
     setCurrentBankIdx(idx);
     setAnswer("");
     setShowTeachMe(false);
-    setShowNotes(false);
     setError(null);
+  }
+
+  function handleToggleStar() {
+    if (!question) return;
+    if (currentStarred) {
+      unstarQuestion(question.id);
+      setCurrentStarred(false);
+    } else {
+      starQuestion(question.id, {
+        topic: question.topic,
+        questionText: question.text,
+        markScheme: question.mark_scheme ?? "",
+      });
+      setCurrentStarred(true);
+    }
+  }
+
+  function handleSaveWorking(side, imageData) {
+    if (!question) return;
+    const updated = saveTopicWorking(topicKey, question.id, side, imageData, {
+      questionNumber: currentBankIdx + 1,
+      topic: question.topic,
+      questionText: question.text,
+    });
+    setWorkings({ ...updated });
   }
 
   const handleSubmit = useCallback(async () => {
@@ -111,10 +149,17 @@ export default function TopicalQuestionPage({
 
     navigate("/feedback", {
       state: {
-        feedback: fb, answer,
-        topicKey: question.topic_key, questionId: question.id,
-        nextFullRoute: thisRoute, nextRetryRoute: thisRoute,
-        backRoute, paperRef: question.paper_ref,
+        feedback: fb,
+        answer,
+        topicKey: question.topic_key,
+        questionId: question.id,
+        questionText: question.text,
+        markScheme: question.mark_scheme ?? "",
+        topicLabel: question.topic,
+        nextFullRoute: thisRoute,
+        nextRetryRoute: thisRoute,
+        backRoute,
+        paperRef: question.paper_ref,
       },
     });
   }, [question, answer, sessionAnswers, topicKey, submit, advance, navigate, thisRoute, backRoute]);
@@ -125,7 +170,6 @@ export default function TopicalQuestionPage({
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* ── P1-style header with ALL icons ──────────────────────────── */}
         <QuestionSessionHeader
           paperRef={question.paper_ref}
           subject="Physics"
@@ -135,69 +179,60 @@ export default function TopicalQuestionPage({
           sessionAnswers={sessionAnswers}
           onBack={() => navigate(backRoute)}
           onJumpTo={jumpToQuestion}
-          notesCount={notesCount}
+          notesCount={panelItemCount}
           onNotesPanel={() => setNotesPanelOpen(true)}
           showCalculator={true}
           calcActive={calcActive}
           onCalcToggle={() => setCalcActive(a => !a)}
           onFormulaSheet={() => setFormulaSheetOpen(true)}
-          onOverview={undefined}
         />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* Calculator overlay */}
           {calcActive && (
             <div className="relative z-10">
               <ScientificCalculator onClose={() => setCalcActive(false)} />
             </div>
           )}
 
-          {/* Question card with annotation toolbar */}
+          {/* Question card with Star button */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+              <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
                 {question.label}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
                   {question.topic}
                 </span>
                 <span className="font-mono text-xs text-muted-foreground">[{question.total_marks}m]</span>
+                <button onClick={handleToggleStar}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                    currentStarred
+                      ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+                      : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"
+                  }`}>
+                  <Star className={`w-3 h-3 ${currentStarred ? "fill-amber-400" : ""}`} />
+                  {currentStarred ? "Starred" : "Star"}
+                </button>
               </div>
             </div>
             <QuestionMedia question={question} />
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
-          {/* Inline note widget (toggled separately from the panel) */}
-          {showNotes && (
-            <QuestionNoteWidget
-              questionId={question.id}
-              topic={question.topic}
-              questionText={question.text}
-            />
-          )}
-
-          {/* Answer area */}
           {showTeachMe ? (
             <TeachMeHow onClose={() => setShowTeachMe(false)} />
           ) : (
             <>
               <AnswerInput value={answer} onChange={setAnswer} />
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowTeachMe(true)}
-                  disabled={!isEmpty}
-                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
+                <button onClick={() => setShowTeachMe(true)} disabled={!isEmpty}
+                  className="flex-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed">
                   Teach Me How
                 </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isEmpty || loading}
-                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                >
+                <button onClick={handleSubmit} disabled={isEmpty || loading}
+                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                   {loading ? "Marking…" : "Submit"}
                 </button>
               </div>
@@ -216,7 +251,10 @@ export default function TopicalQuestionPage({
         </div>
       </div>
 
-      {/* Notes / Workings panel */}
+      {/* Side scratchpad panels */}
+      <ScratchpadPanel questionId={question?.id} paperId={topicKey} workings={workings} onSaveWorking={handleSaveWorking} />
+
+      {/* Notes / Workings / Starred panel */}
       <SessionNotesPanel
         open={notesPanelOpen}
         onClose={() => setNotesPanelOpen(false)}
@@ -227,9 +265,7 @@ export default function TopicalQuestionPage({
         userEmail={user?.email ?? ""}
       />
 
-      {/* Formula sheet modal */}
       {formulaSheetOpen && <FormulaSheetModal onClose={() => setFormulaSheetOpen(false)} />}
-
       {loading && <SubmittingOverlay />}
     </div>
   );

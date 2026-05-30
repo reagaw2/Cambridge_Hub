@@ -1,7 +1,5 @@
 /**
  * p1WorkingsPdf.js — PDF export of saved scratchpad workings.
- * Clean layout: question number + topic on separate lines, question text wrapped,
- * working image below with a labelled border.
  */
 
 const JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -25,35 +23,37 @@ export async function generateWorkingsPdf({ paperId, paperLabel, workings, quest
   const pageW = 210;
   const pageH = 297;
   const margin = 20;
-  const contentW = pageW - margin * 2;
+  const contentW = pageW - margin * 2;  // 170 mm
+  const LINE_H = 5.5;
   const dateStr = new Date().toLocaleDateString("en-GB", {
     day: "2-digit", month: "short", year: "numeric",
   });
   let pageNum = 1;
   let y = margin;
 
-  function newPage() {
-    drawFooter();
-    doc.addPage();
-    pageNum++;
-    y = margin;
-  }
-
-  function checkSpace(needed) {
-    if (y + needed > pageH - 22) newPage();
+  // IMPORTANT: always set font + size before calling splitTextToSize
+  function wrapAt(text, fontSize, fontStyle, maxW) {
+    doc.setFont("helvetica", fontStyle ?? "normal");
+    doc.setFontSize(fontSize);
+    return doc.splitTextToSize(String(text ?? ""), maxW);
   }
 
   function drawFooter() {
-    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
     doc.setTextColor(170, 170, 170);
     doc.text("Cambridge Hub — My Workings", margin, pageH - 10);
     doc.text(`Page ${pageNum}`, pageW - margin, pageH - 10, { align: "right" });
+    pageNum++;
     doc.setTextColor(30, 30, 30);
   }
 
-  function wrap(text, maxW) {
-    return doc.splitTextToSize(String(text ?? ""), maxW);
+  function checkSpace(needed) {
+    if (y + needed > pageH - 22) {
+      drawFooter();
+      doc.addPage();
+      y = margin;
+    }
   }
 
   // ── Cover page ──────────────────────────────────────────────────────────────
@@ -78,14 +78,12 @@ export async function generateWorkingsPdf({ paperId, paperLabel, workings, quest
 
   doc.setFontSize(10.5);
   doc.setTextColor(55, 55, 75);
-  const meta = [
+  [
     paperLabel ?? paperId ? `Paper:     ${paperLabel ?? paperId}` : null,
     userEmail                ? `Student:   ${userEmail}`           : null,
     `Generated: ${dateStr}`,
-  ].filter(Boolean);
-  meta.forEach(line => { doc.text(line, margin, y); y += 7; });
+  ].filter(Boolean).forEach(line => { doc.text(line, margin, y); y += 7; });
 
-  // Sort by question number
   const workingEntries = Object.entries(workings).sort((a, b) => {
     const qa = questions.find(q => q.id === a[0]);
     const qb = questions.find(q => q.id === b[0]);
@@ -118,30 +116,25 @@ export async function generateWorkingsPdf({ paperId, paperLabel, workings, quest
     const sides    = entry.sides ?? {};
     const sideKeys = Object.keys(sides).sort();
 
-    // Estimate height needed for this entry
-    const qTextLines = wrap(qText, contentW);
-    const textBlockH = qTextLines.length * 5.5 + 6;
-    const imgH       = 80; // consistent working image height
-    const totalNeeded = 40 + textBlockH + sideKeys.length * (imgH + 22);
+    // Pre-calculate lines with correct font set first
+    const qTextLines = wrapAt(qText, 10, "normal", contentW);
+    const textBlockH = qTextLines.length * LINE_H + 6;
+    const imgH = 80;
 
-    // If not enough space on this page start a new one (unless it's the very first entry)
-    if (entryIdx > 0) checkSpace(Math.min(totalNeeded, 80));
+    if (entryIdx > 0) checkSpace(Math.min(40 + textBlockH + sideKeys.length * (imgH + 22), 80));
 
     // ── Question header card ──────────────────────────────────────────────────
-    // Blue header band: question number (large) + topic below it on a second line
     const headerH = 22;
     doc.setFillColor(232, 240, 255);
     doc.setDrawColor(170, 200, 240);
     doc.setLineWidth(0.5);
     doc.roundedRect(margin, y, contentW, headerH, 3, 3, "FD");
 
-    // "Question N" — large bold
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(15, 40, 100);
     doc.text(`Question ${qNumber}`, margin + 5, y + 9);
 
-    // topic — smaller, muted, below the number
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(80, 110, 160);
@@ -150,46 +143,42 @@ export async function generateWorkingsPdf({ paperId, paperLabel, workings, quest
     y += headerH + 6;
 
     // ── Question text ─────────────────────────────────────────────────────────
-    if (qText) {
+    if (qTextLines.length > 0) {
       checkSpace(textBlockH + 4);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(30, 30, 30);
       qTextLines.forEach(line => {
-        checkSpace(6);
+        checkSpace(LINE_H + 1);
         doc.text(line, margin, y);
-        y += 5.5;
+        y += LINE_H;
       });
       y += 6;
     }
 
     // ── Working image(s) ──────────────────────────────────────────────────────
-    sideKeys.forEach((sideKey, si) => {
+    sideKeys.forEach(sideKey => {
       const imageData = sides[sideKey];
       if (!imageData) return;
 
       checkSpace(imgH + 20);
 
-      // "Working" label
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(80, 80, 100);
-      const workingLabel = sideKeys.length > 1 ? `Working — ${sideKey} side` : "Working";
-      doc.text(workingLabel, margin, y);
+      doc.text(sideKeys.length > 1 ? `Working — ${sideKey} side` : "Working", margin, y);
       y += 5;
 
-      // Bordered image box with paper-coloured background
       doc.setDrawColor(190, 195, 210);
       doc.setFillColor(246, 241, 228);
       doc.setLineWidth(0.5);
       doc.roundedRect(margin, y, contentW, imgH, 2, 2, "FD");
 
       try {
-        const base64  = imageData.replace(/^data:image\/\w+;base64,/, "");
-        const format  = imageData.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
-        // 1 mm padding inside the border
+        const base64 = imageData.replace(/^data:image\/\w+;base64,/, "");
+        const format = imageData.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
         doc.addImage(base64, format, margin + 1, y + 1, contentW - 2, imgH - 2, undefined, "FAST");
-      } catch (e) {
+      } catch {
         doc.setFont("helvetica", "italic");
         doc.setFontSize(9);
         doc.setTextColor(160, 160, 160);
@@ -198,7 +187,6 @@ export async function generateWorkingsPdf({ paperId, paperLabel, workings, quest
 
       y += imgH + 4;
 
-      // Saved timestamp
       if (entry.savedAt) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
@@ -214,7 +202,7 @@ export async function generateWorkingsPdf({ paperId, paperLabel, workings, quest
       }
     });
 
-    // ── Divider between questions ─────────────────────────────────────────────
+    // ── Divider ───────────────────────────────────────────────────────────────
     y += 4;
     checkSpace(6);
     doc.setDrawColor(210, 215, 230);
@@ -226,8 +214,7 @@ export async function generateWorkingsPdf({ paperId, paperLabel, workings, quest
   drawFooter();
 
   const safeLabel = (paperLabel ?? paperId ?? "workings")
-    .replace(/[\/\s]/g, "_")
-    .replace(/[^a-zA-Z0-9_]/g, "");
+    .replace(/[\/\s]/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
   const filename = `Workings_${safeLabel}_${dateStr.replace(/\s/g, "")}.pdf`;
   try { doc.save(filename); } catch { window.open(doc.output("bloburl"), "_blank"); }
 }

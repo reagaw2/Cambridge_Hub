@@ -6,9 +6,9 @@ import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
 import { saveMCQAttempt } from "@/lib/topicStore";
 import { loadP1Session, saveP1Session, clearP1Session } from "@/lib/p1SessionStore";
-import { loadStarredQuestions, getStarredQuestions, starQuestion, unstarQuestion, saveTeacherQuestion } from "@/lib/p1StarStore";
+import { loadStarredQuestions, starQuestion, unstarQuestion, saveTeacherQuestion } from "@/lib/p1StarStore";
 import { generateStarredPdf } from "@/lib/p1StarPdf";
-import { loadNotes, getNotes, saveNote } from "@/lib/p1NotesStore";
+import { loadNotes, saveNote } from "@/lib/p1NotesStore";
 import { generateNotesPdf } from "@/lib/p1NotesPdf";
 import { loadScratchpadForPaper } from "@/lib/p1ScratchpadStore";
 import PaperPdfButton from "@/components/PaperPdfButton";
@@ -201,7 +201,9 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
   );
 }
 
+// ── Starred & Notes panel with tabs ──────────────────────────────────────────
 function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onClose, onJump, questions, userEmail, onTeacherQuestionSave }) {
+  const [activeTab, setActiveTab] = useState("notes");
   const [downloading, setDownloading] = useState(false);
   const [downloadingNotes, setDownloadingNotes] = useState(false);
   const [teacherInputs, setTeacherInputs] = useState(() => {
@@ -212,51 +214,133 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
 
   const starred = Object.entries(starredQuestions).sort((a, b) => a[1].questionNumber - b[1].questionNumber);
   const noteCount = Object.keys(notes).length;
+  const starredCount = starred.length;
 
-  // Notes on questions that are NOT starred — shown in their own section
-  const standaloneNotes = Object.entries(notes)
-    .filter(([questionId]) => !starredQuestions[questionId])
-    .sort(([, a], [, b]) => new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0));
+  // All notes (including those on starred questions)
+  const allNotes = Object.entries(notes).sort(([, a], [, b]) => {
+    const qa = questions.find(q => q.id === Object.keys(notes)[0]);
+    return new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0);
+  });
 
-  async function handleDownloadStarred() { setDownloading(true); await generateStarredPdf({ paperId, paperLabel, starredQuestions, userEmail }); setDownloading(false); }
+  function getQuestion(questionId) {
+    return questions.find(q => q.id === questionId);
+  }
+
+  async function handleDownloadStarred() {
+    setDownloading(true);
+    await generateStarredPdf({ paperId, paperLabel, starredQuestions, userEmail });
+    setDownloading(false);
+  }
+
   async function handleDownloadNotes() {
     setDownloadingNotes(true);
     await generateNotesPdf({ paperId, paperLabel, session: paper.session, variant: paper.id?.split("/")?.[1] ?? "", notes, questions, userEmail });
     setDownloadingNotes(false);
   }
 
-  function getQuestionByNoteId(questionId) {
-    return questions.find(q => q.id === questionId);
-  }
-
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
       <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl max-h-[88vh] flex flex-col">
+
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-              <p className="font-bold text-foreground">Starred & Notes</p>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{starred.length} starred · {noteCount} note{noteCount !== 1 ? "s" : ""}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4 text-muted-foreground" /></button>
+          <p className="font-bold text-foreground">Notes & Starred</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        {/* Tabs */}
+        <div className="flex shrink-0 border-b border-border/50">
+          <button
+            onClick={() => setActiveTab("notes")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
+              activeTab === "notes"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            My Notes
+            {noteCount > 0 && (
+              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                {noteCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("teacher")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
+              activeTab === "teacher"
+                ? "border-amber-400 text-amber-400"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Star className={`w-3.5 h-3.5 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} />
+            Teacher Review
+            {starredCount > 0 && (
+              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>
+                {starredCount}
+              </span>
+            )}
+          </button>
+        </div>
 
-          {starred.length === 0 && noteCount === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-              <Star className="w-8 h-8 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No stars or notes yet.</p>
-              <p className="text-xs text-muted-foreground/50">Answer a question and tap ⭐ to star it, or use the ✏ note button below each question.</p>
-            </div>
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+          {/* ── MY NOTES TAB ── */}
+          {activeTab === "notes" && (
+            <>
+              {allNotes.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                  <Pencil className="w-8 h-8 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">No notes yet.</p>
+                  <p className="text-xs text-muted-foreground/50">After answering a question, use the "Add a note" button below it.</p>
+                </div>
+              )}
+              {allNotes.map(([questionId, note]) => {
+                const q = getQuestion(questionId);
+                return (
+                  <div key={questionId} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-1">
+                        {q && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-primary">Q{q.number}</span>
+                            <span className="text-[11px] text-muted-foreground">{q.topic}</span>
+                            {starredQuestions[questionId] && (
+                              <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                            )}
+                          </div>
+                        )}
+                        <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                      </div>
+                      {q && (
+                        <button
+                          onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
+                          className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
+                        >
+                          Go to →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
 
-          {/* ── Starred questions ── */}
-          {starred.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70">⭐ Starred for teacher review</p>
+          {/* ── TEACHER REVIEW TAB ── */}
+          {activeTab === "teacher" && (
+            <>
+              {starred.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                  <Star className="w-8 h-8 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">No starred questions yet.</p>
+                  <p className="text-xs text-muted-foreground/50">After answering a question incorrectly, tap ⭐ Star to flag it for your teacher.</p>
+                </div>
+              )}
               {starred.map(([questionId, entry]) => (
                 <div key={questionId} className="bg-secondary/40 border border-amber-500/20 rounded-xl overflow-hidden">
                   <div className="flex items-start justify-between gap-2 p-4 pb-2">
@@ -268,20 +352,31 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                       </div>
                       <p className="text-xs text-foreground/70 leading-relaxed line-clamp-2">{entry.questionText}</p>
                     </div>
-                    <button onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>
+                    <button
+                      onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
+                      className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
+                    >
+                      Go to →
+                    </button>
                   </div>
+
+                  {/* AI takeaway */}
                   {entry.feedback?.pulse_layer_1 && (
                     <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
                       <p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.pulse_layer_1}</p>
                     </div>
                   )}
+
+                  {/* Note on this question (if any) */}
                   {notes[questionId]?.text && (
                     <div className="mx-4 mb-2 bg-green-500/8 border border-green-500/20 rounded-lg px-3 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 mb-0.5">📝 My Note</p>
                       <p className="text-[11px] text-foreground/70 leading-relaxed">{notes[questionId].text}</p>
                     </div>
                   )}
+
+                  {/* Teacher question */}
                   <div className="px-4 pb-4 space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
                       <MessageCircleQuestion className="w-3 h-3" /> Question for teacher
@@ -314,57 +409,34 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                   </div>
                 </div>
               ))}
-            </div>
+            </>
           )}
-
-          {/* ── Standalone notes (not starred) ── */}
-          {standaloneNotes.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/70">📝 My Notes</p>
-              {standaloneNotes.map(([questionId, note]) => {
-                const q = getQuestionByNoteId(questionId);
-                return (
-                  <div key={questionId} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-0.5 flex-1">
-                        {q && (
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-mono text-xs font-bold text-primary">Q{q.number}</span>
-                            <span className="text-[11px] text-muted-foreground">{q.topic}</span>
-                          </div>
-                        )}
-                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{note.text}</p>
-                      </div>
-                      {q && (
-                        <button
-                          onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
-                          className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
-                        >
-                          Go to →
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
         </div>
 
-        <div className="shrink-0 px-4 py-4 border-t border-border/50 space-y-2">
-          <button onClick={handleDownloadNotes} disabled={noteCount === 0 || downloadingNotes}
-            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {downloadingNotes
-              ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Generating…</>
-              : <><NotebookPen className="w-4 h-4" /> Download My Notes (PDF)</>}
-          </button>
-          <button onClick={handleDownloadStarred} disabled={starred.length === 0 || downloading}
-            className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {downloading
-              ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Generating…</>
-              : <><Download className="w-4 h-4" /> Teacher Review PDF (starred only)</>}
-          </button>
+        {/* Footer — tab-specific download button */}
+        <div className="shrink-0 px-4 py-4 border-t border-border/50">
+          {activeTab === "notes" && (
+            <button
+              onClick={handleDownloadNotes}
+              disabled={noteCount === 0 || downloadingNotes}
+              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {downloadingNotes
+                ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Generating…</>
+                : <><NotebookPen className="w-4 h-4" /> Download My Notes (PDF)</>}
+            </button>
+          )}
+          {activeTab === "teacher" && (
+            <button
+              onClick={handleDownloadStarred}
+              disabled={starredCount === 0 || downloading}
+              className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {downloading
+                ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Generating…</>
+                : <><Download className="w-4 h-4" /> Download Teacher Review (PDF)</>}
+            </button>
+          )}
         </div>
       </div>
     </div>

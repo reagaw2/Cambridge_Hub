@@ -209,11 +209,25 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
     Object.entries(starredQuestions).forEach(([id, entry]) => { init[id] = entry.teacherQuestion ?? ""; });
     return init;
   });
+
   const starred = Object.entries(starredQuestions).sort((a, b) => a[1].questionNumber - b[1].questionNumber);
   const noteCount = Object.keys(notes).length;
 
+  // Notes on questions that are NOT starred — shown in their own section
+  const standaloneNotes = Object.entries(notes)
+    .filter(([questionId]) => !starredQuestions[questionId])
+    .sort(([, a], [, b]) => new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0));
+
   async function handleDownloadStarred() { setDownloading(true); await generateStarredPdf({ paperId, paperLabel, starredQuestions, userEmail }); setDownloading(false); }
-  async function handleDownloadNotes() { setDownloadingNotes(true); await generateNotesPdf({ paperId, paperLabel, session: paper.session, variant: paper.id?.split("/")?.[1] ?? "", notes, starredQuestions, questions, userEmail }); setDownloadingNotes(false); }
+  async function handleDownloadNotes() {
+    setDownloadingNotes(true);
+    await generateNotesPdf({ paperId, paperLabel, session: paper.session, variant: paper.id?.split("/")?.[1] ?? "", notes, questions, userEmail });
+    setDownloadingNotes(false);
+  }
+
+  function getQuestionByNoteId(questionId) {
+    return questions.find(q => q.id === questionId);
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
@@ -228,77 +242,128 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
           {starred.length === 0 && noteCount === 0 && (
             <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
               <Star className="w-8 h-8 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">Nothing here yet.</p>
+              <p className="text-sm text-muted-foreground">No stars or notes yet.</p>
+              <p className="text-xs text-muted-foreground/50">Answer a question and tap ⭐ to star it, or use the ✏ note button below each question.</p>
             </div>
           )}
-          {starred.map(([questionId, entry]) => (
-            <div key={questionId} className="bg-secondary/40 border border-border rounded-xl overflow-hidden">
-              <div className="flex items-start justify-between gap-2 p-4 pb-2">
-                <div className="space-y-0.5 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-                    <span className="font-mono text-xs font-bold text-primary">Q{entry.questionNumber}</span>
-                    <span className="text-[11px] text-muted-foreground">{entry.topic}</span>
-                  </div>
-                  <p className="text-xs text-foreground/70 leading-relaxed line-clamp-2">{entry.questionText}</p>
-                </div>
-                <button onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>
-              </div>
-              {entry.feedback?.pulse_layer_1 && (
-                <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
-                  <p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.pulse_layer_1}</p>
-                </div>
-              )}
-              {notes[questionId]?.text && (
-                <div className="mx-4 mb-2 bg-green-500/8 border border-green-500/20 rounded-lg px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 mb-0.5">📝 My Note</p>
-                  <p className="text-[11px] text-foreground/70 leading-relaxed">{notes[questionId].text}</p>
-                </div>
-              )}
-              <div className="px-4 pb-4 space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
-                  <MessageCircleQuestion className="w-3 h-3" /> Question for teacher
-                </p>
-                {entry.teacherQuestion ? (
-                  <div className="space-y-1.5">
-                    <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2">
-                      <p className="text-[11px] text-foreground/80 leading-relaxed">{entry.teacherQuestion}</p>
+
+          {/* ── Starred questions ── */}
+          {starred.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70">⭐ Starred for teacher review</p>
+              {starred.map(([questionId, entry]) => (
+                <div key={questionId} className="bg-secondary/40 border border-amber-500/20 rounded-xl overflow-hidden">
+                  <div className="flex items-start justify-between gap-2 p-4 pb-2">
+                    <div className="space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                        <span className="font-mono text-xs font-bold text-primary">Q{entry.questionNumber}</span>
+                        <span className="text-[11px] text-muted-foreground">{entry.topic}</span>
+                      </div>
+                      <p className="text-xs text-foreground/70 leading-relaxed line-clamp-2">{entry.questionText}</p>
                     </div>
-                    <button onClick={() => { onTeacherQuestionSave(questionId, ""); }} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">Edit question</button>
+                    <button onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>
                   </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <textarea
-                      value={teacherInputs[questionId] ?? ""}
-                      onChange={e => setTeacherInputs(p => ({ ...p, [questionId]: e.target.value }))}
-                      placeholder="What would you like to ask your teacher about this question?"
-                      rows={2}
-                      className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all"
-                    />
-                    <button
-                      onClick={() => onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? "")}
-                      disabled={!teacherInputs[questionId]?.trim()}
-                      className="text-xs font-semibold text-amber-400 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Save question →
-                    </button>
+                  {entry.feedback?.pulse_layer_1 && (
+                    <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
+                      <p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.pulse_layer_1}</p>
+                    </div>
+                  )}
+                  {notes[questionId]?.text && (
+                    <div className="mx-4 mb-2 bg-green-500/8 border border-green-500/20 rounded-lg px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 mb-0.5">📝 My Note</p>
+                      <p className="text-[11px] text-foreground/70 leading-relaxed">{notes[questionId].text}</p>
+                    </div>
+                  )}
+                  <div className="px-4 pb-4 space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
+                      <MessageCircleQuestion className="w-3 h-3" /> Question for teacher
+                    </p>
+                    {entry.teacherQuestion ? (
+                      <div className="space-y-1.5">
+                        <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2">
+                          <p className="text-[11px] text-foreground/80 leading-relaxed">{entry.teacherQuestion}</p>
+                        </div>
+                        <button onClick={() => onTeacherQuestionSave(questionId, "")} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">Edit question</button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <textarea
+                          value={teacherInputs[questionId] ?? ""}
+                          onChange={e => setTeacherInputs(p => ({ ...p, [questionId]: e.target.value }))}
+                          placeholder="What would you like to ask your teacher about this question?"
+                          rows={2}
+                          className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all"
+                        />
+                        <button
+                          onClick={() => onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? "")}
+                          disabled={!teacherInputs[questionId]?.trim()}
+                          className="text-xs font-semibold text-amber-400 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Save question →
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* ── Standalone notes (not starred) ── */}
+          {standaloneNotes.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/70">📝 My Notes</p>
+              {standaloneNotes.map(([questionId, note]) => {
+                const q = getQuestionByNoteId(questionId);
+                return (
+                  <div key={questionId} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5 flex-1">
+                        {q && (
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-bold text-primary">Q{q.number}</span>
+                            <span className="text-[11px] text-muted-foreground">{q.topic}</span>
+                          </div>
+                        )}
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                      </div>
+                      {q && (
+                        <button
+                          onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
+                          className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
+                        >
+                          Go to →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
         </div>
+
         <div className="shrink-0 px-4 py-4 border-t border-border/50 space-y-2">
-          <button onClick={handleDownloadNotes} disabled={(starred.length === 0 && noteCount === 0) || downloadingNotes} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {downloadingNotes ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Generating…</> : <><NotebookPen className="w-4 h-4" /> Download My Notes (PDF)</>}
+          <button onClick={handleDownloadNotes} disabled={noteCount === 0 || downloadingNotes}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            {downloadingNotes
+              ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Generating…</>
+              : <><NotebookPen className="w-4 h-4" /> Download My Notes (PDF)</>}
           </button>
-          <button onClick={handleDownloadStarred} disabled={starred.length === 0 || downloading} className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {downloading ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Generating…</> : <><Download className="w-4 h-4" /> Teacher Review PDF (starred only)</>}
+          <button onClick={handleDownloadStarred} disabled={starred.length === 0 || downloading}
+            className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            {downloading
+              ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Generating…</>
+              : <><Download className="w-4 h-4" /> Teacher Review PDF (starred only)</>}
           </button>
         </div>
       </div>
@@ -438,10 +503,8 @@ export default function P1Session() {
 
   const autoAdvanceTimer = useRef(null);
 
-  // Load session, notes, and stars from Supabase on mount
   useEffect(() => {
     setSessionLoading(true);
-
     Promise.all([
       loadP1Session(paperId),
       loadNotes(paperId),
@@ -626,7 +689,6 @@ Respond ONLY in JSON:
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* Sticky top bar */}
         <div className="sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border/50">
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
             <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
@@ -664,7 +726,6 @@ Respond ONLY in JSON:
           </div>
         </div>
 
-        {/* PDF access banner */}
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
           <PaperPdfButton label="Open Question Paper" paperId={paperId} />
           <p className="text-[11px] text-muted-foreground/60 leading-snug">
@@ -672,7 +733,6 @@ Respond ONLY in JSON:
           </p>
         </div>
 
-        {/* Compact overview strip */}
         <div className="flex gap-1 px-4 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-card/40">
           {questions.map((q, i) => {
             const a = answers[q.id];
@@ -701,14 +761,13 @@ Respond ONLY in JSON:
 
           {showCalc && <ScientificCalculator onClose={() => setShowCalc(false)} />}
 
-          {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">Question {question.number}</span>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">{question.topic}</span>
                 {submitted && (
-                  <button onClick={handleToggleStar} title={isCurrentStarred ? "Remove star" : "Star for teacher review"}
+                  <button onClick={handleToggleStar}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${isCurrentStarred ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
                     <Star className={`w-3.5 h-3.5 ${isCurrentStarred ? "fill-amber-400" : ""}`} />
                     <span>{isCurrentStarred ? "Starred" : "Star"}</span>
@@ -816,7 +875,20 @@ Respond ONLY in JSON:
 
       {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
       {showOverview && <OverviewPanel questions={questions} answers={answers} currentIdx={currentIdx} onJump={setCurrentIdx} onClose={() => setShowOverview(false)} onClear={handleClear} starredIds={starredIds} notedIds={notedIds} />}
-      {showStarred && <StarredPanel paperId={paperId} paperLabel={paper.label} paper={paper} starredQuestions={starredQuestions} notes={notes} onClose={() => setShowStarred(false)} onJump={setCurrentIdx} questions={questions} userEmail={user?.email} onTeacherQuestionSave={handleTeacherQuestionSave} />}
+      {showStarred && (
+        <StarredPanel
+          paperId={paperId}
+          paperLabel={paper.label}
+          paper={paper}
+          starredQuestions={starredQuestions}
+          notes={notes}
+          onClose={() => setShowStarred(false)}
+          onJump={setCurrentIdx}
+          questions={questions}
+          userEmail={user?.email}
+          onTeacherQuestionSave={handleTeacherQuestionSave}
+        />
+      )}
     </div>
   );
 }

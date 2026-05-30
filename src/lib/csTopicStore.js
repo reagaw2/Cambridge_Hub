@@ -4,7 +4,7 @@
  */
 
 import { supabaseClient } from "@/api/base44Client";
-import { normaliseTopicKey, toDateString, recordGlobalQuestionAnswered } from "./topicStore";
+import { normaliseTopicKey, toDateString, recordGlobalQuestionAnswered, isSimilarAnswer } from "./topicStore";
 import { buildMistakeDna, mergeMistakeDna } from "./mistakeDna";
 
 export { normaliseTopicKey, toDateString };
@@ -35,13 +35,6 @@ async function fetchFromSupabase(userId) {
   if (rows && rows.length > 0) {
     const r = rows[0];
     const raw = r.cs_data ?? {};
-
-    // ── DIAGNOSTIC: log what came back from Supabase ──────────────────
-    console.log('[csTopicStore] fetched cs_data from Supabase. cs_mistake_dna entries:',
-      Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna.length : 'missing/null',
-      raw.cs_mistake_dna ?? '(field absent)'
-    );
-
     const data = (raw && typeof raw === "object" && Object.keys(raw).length > 0)
       ? {
           topics: raw.topics || {},
@@ -49,7 +42,6 @@ async function fetchFromSupabase(userId) {
           cs_review_bank_clears: raw.cs_review_bank_clears ?? 0,
           cs_mcq_attempts: raw.cs_mcq_attempts || [],
           cs_guess_review_bank: raw.cs_guess_review_bank || [],
-          // Explicitly parse cs_mistake_dna — falls back to [] if missing
           cs_mistake_dna: Array.isArray(raw.cs_mistake_dna) ? raw.cs_mistake_dna : [],
         }
       : DEFAULT_CS_DATA();
@@ -62,12 +54,10 @@ async function pushToSupabase(data) {
   if (!_userId) return;
   try {
     if (_recordId) {
-      const { error } = await supabaseClient.from('StudentData').update({ cs_data: data }).eq('id', _recordId);
-      if (error) console.error('[csStore] UPDATE ERROR:', error.message);
+      await supabaseClient.from('StudentData').update({ cs_data: data }).eq('id', _recordId);
     } else {
-      const { data: rows, error } = await supabaseClient.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select();
-      if (error) console.error('[csStore] UPDATE-BY-USER_ID ERROR:', error.message);
-      else if (rows?.[0]) { _recordId = rows[0].id; if (_userEmail) writeLocal(_userEmail, { id: _recordId, data }); }
+      const { data: rows } = await supabaseClient.from('StudentData').update({ cs_data: data }).eq('user_id', _userId).select();
+      if (rows?.[0]) { _recordId = rows[0].id; if (_userEmail) writeLocal(_userEmail, { id: _recordId, data }); }
     }
   } catch (e) { console.error('[csStore] pushToSupabase exception:', e); }
 }
@@ -168,7 +158,7 @@ export async function csGetTopicData(topicKey) {
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
-// ── CS Mistake DNA ─────────────────────────────────────────────────────────
+// ── CS Mistake DNA ─────────────────────────────────────────────────────────────
 
 export async function csWriteMistakeDna(feedback, questionId, topic, marksEarned, totalMarks, studentResponse = "") {
   if (!feedback || marksEarned >= totalMarks) return;
@@ -177,31 +167,63 @@ export async function csWriteMistakeDna(feedback, questionId, topic, marksEarned
   if (!incoming.length) return;
   if (!Array.isArray(data.cs_mistake_dna)) data.cs_mistake_dna = [];
   data.cs_mistake_dna = mergeMistakeDna(data.cs_mistake_dna, incoming);
-  console.log('[csTopicStore] csWriteMistakeDna — wrote', incoming.length, 'entries. Total:', data.cs_mistake_dna.length);
   saveToDB(data);
 }
 
 export async function csGetMistakeDna() {
   const data = await ensureLoaded();
-  const dna = data.cs_mistake_dna ?? [];
-  console.log('[csTopicStore] csGetMistakeDna — returning', dna.length, 'entries');
-  return dna;
+  return data.cs_mistake_dna ?? [];
 }
 
-// ── CS Review Bank ─────────────────────────────────────────────────────────
+// ── CS Review Bank ─────────────────────────────────────────────────────────────
 
 export async function csAddToReviewBank({ question_id, topic, question_text, mark_scheme, total_marks, first_attempt_score, first_attempt_feedback, first_attempt_answer = "" }) {
   const data = await ensureLoaded();
-  if (data.cs_review_bank.find(q => q.question_id === question_id)) return;
+  const existing = data.cs_review_bank.find(q => q.question_id === question_id);
+  if (existing) {
+    // Update last_wrong_answer for persistence tracking
+    existing.last_wrong_answer = (first_attempt_answer ?? "").slice(0, 600);
+    saveToDB(data);
+    return;
+  }
   data.cs_review_bank.push({
     question_id, topic, question_text, mark_scheme, total_marks,
     first_attempt_score, first_attempt_feedback,
     first_attempt_answer: (first_attempt_answer ?? "").slice(0, 600),
+    last_wrong_answer: (first_attempt_answer ?? "").slice(0, 600),
+    persistent_misunderstanding: false,
     date_added: toDateString(new Date()),
     priority: first_attempt_score === 0 ? 1 : 2,
     locked_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   });
   saveToDB(data);
+}
+
+/**
+ * csUpdateReviewBankEntry — call after every CS review attempt.
+ * Detects persistent misunderstandings. Removes from bank only when correct.
+ */
+export async function csUpdateReviewBankEntry(question_id, newAnswer, isCorrect) {
+  const data = await ensureLoaded();
+
+  if (isCorrect) {
+    data.cs_review_bank = data.cs_review_bank.filter(q => q.question_id !== question_id);
+    saveToDB(data);
+    return { removed: true, isPersistent: false };
+  }
+
+  const entry = data.cs_review_bank.find(q => q.question_id === question_id);
+  if (!entry) return { removed: false, isPersistent: false };
+
+  const prevAnswer = entry.last_wrong_answer ?? entry.first_attempt_answer ?? "";
+  const isPersistent = isSimilarAnswer(newAnswer, prevAnswer);
+
+  entry.last_wrong_answer = (newAnswer ?? "").slice(0, 600);
+  entry.persistent_misunderstanding = isPersistent;
+  entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  saveToDB(data);
+  return { removed: false, isPersistent };
 }
 
 export async function csGetReviewBank() {

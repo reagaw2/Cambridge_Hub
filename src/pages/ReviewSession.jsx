@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Flame } from "lucide-react";
+import { ArrowLeft, Flame, AlertTriangle } from "lucide-react";
 import AnswerInput from "../components/AnswerInput";
 import QuestionMedia from "../components/QuestionMedia";
+import QuestionNoteWidget from "../components/QuestionNoteWidget";
 import SubmitButton from "../components/SubmitButton";
-import { getReviewBank, recordAttempt, removeFromReviewBank, incrementReviewBankClears, resetReviewBankLock } from "../lib/topicStore";
+import { getReviewBank, recordAttempt, updateReviewBankEntry, incrementReviewBankClears, resetReviewBankLock, isSimilarAnswer } from "../lib/topicStore";
 
 export default function ReviewSession() {
   const navigate = useNavigate();
@@ -43,15 +44,25 @@ export default function ReviewSession() {
     );
   }
 
+  const isPersistentAttempt = isSimilarAnswer(
+    answer,
+    current.last_wrong_answer ?? current.first_attempt_answer ?? ""
+  );
+
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
 
+    const persistenceContext = (isPersistentAttempt && answer.trim().length > 10)
+      ? `\n\nIMPORTANT: The student has given essentially the same wrong answer as before. This is a PERSISTENT MISUNDERSTANDING. In cambridge_insight, specifically name the exact misconception they keep repeating and explain why it is wrong. Be direct.`
+      : "";
+
     const feedback = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are a Cambridge A Level Physics examiner. A student is reviewing a question they previously got wrong.
+      prompt: `You are a Cambridge A Level Physics examiner. A student is reviewing a question they previously got wrong.${persistenceContext}
 
 Question: "${current.question_text}"
 Mark scheme: ${current.mark_scheme}
+Total marks: ${current.total_marks}
 Student's answer: ${answer}
 
 Analyse the student's answer against the mark scheme. Respond in the following JSON format only, no extra text:
@@ -59,7 +70,8 @@ Analyse the student's answer against the mark scheme. Respond in the following J
   "marks_earned": [number out of ${current.total_marks}],
   "mark_1": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence explanation" },
   "mark_2": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence explanation" },
-  "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why, written in an encouraging but precise tone",
+  "cambridge_insight": "two to three sentences explaining what Cambridge is looking for${persistenceContext ? " — address the persistent misunderstanding directly" : ""}",
+  "pulse_layer_1": "reusable rule for this question type in ≤15 words",
   "next_step": "one sentence telling the student exactly what to focus on"
 }`,
       model: "claude_sonnet_4_6",
@@ -70,9 +82,10 @@ Analyse the student's answer against the mark scheme. Respond in the following J
           mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
           mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
           cambridge_insight: { type: "string" },
-          next_step: { type: "string" }
-        }
-      }
+          pulse_layer_1: { type: "string" },
+          next_step: { type: "string" },
+        },
+      },
     }).catch(() => null);
 
     setLoading(false);
@@ -80,38 +93,38 @@ Analyse the student's answer against the mark scheme. Respond in the following J
 
     const result = feedback.response ?? feedback;
     const newScore = result.marks_earned ?? 0;
-    const isImprovement = newScore > current.first_attempt_score;
     const isFullMarks = newScore >= current.total_marks;
 
-    // Always record attempt to streak
+    // Always record attempt for streak
     await recordAttempt(current.topic, newScore, { total_marks: current.total_marks, question_id: current.question_id });
 
-    // Signal review gate that an attempt was completed
+    // Signal review gate
     sessionStorage.setItem("review_gate_attempt", "1");
 
-    if (isImprovement && isFullMarks) {
-      await removeFromReviewBank(current.question_id);
+    // Update bank — persistent misunderstanding detection happens here
+    const { removed, isPersistent } = await updateReviewBankEntry(current.question_id, answer, isFullMarks);
+
+    if (isFullMarks) {
       await incrementReviewBankClears();
       const remainingBank = await getReviewBank();
       navigate("/review-affirmation", {
         state: {
           bankEmpty: remainingBank.length === 0,
           nextIndex: currentIndex,
-          updatedBank: remainingBank
-        }
+          updatedBank: remainingBank,
+        },
       });
     } else {
-      // Reset the lock for another 24-hour wait
-      await resetReviewBankLock(current.question_id);
       navigate("/feedback", {
         state: {
           feedback: result,
           answer,
           isReview: true,
+          isPersistentMisunderstanding: isPersistent,
           reviewQuestionId: current.question_id,
           reviewBank: bank,
-          reviewIndex: currentIndex
-        }
+          reviewIndex: currentIndex,
+        },
       });
     }
   };
@@ -139,11 +152,23 @@ Analyse the student's answer against the mark scheme. Respond in the following J
             <p className="text-xs text-foreground/60 leading-relaxed">
               <span className="text-amber-400/80 font-medium">{current.first_attempt_score}/{current.total_marks} marks</span>
               {" · "}
-              {current.first_attempt_score === 0
-                ? "You did not get this last time. Trust what you have learned since then."
-                : "You were close last time. One more piece and this is yours."}
+              {current.persistent_misunderstanding
+                ? "⚠ Persistent misunderstanding detected on last review — focus on what's different this time."
+                : current.first_attempt_score === 0
+                  ? "You did not get this last time. Trust what you have learned since then."
+                  : "You were close last time. One more piece and this is yours."}
             </p>
           </div>
+
+          {/* Persistent misunderstanding warning before submit */}
+          {isPersistentAttempt && answer.trim().length > 10 && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-300/90 leading-relaxed">
+                Your answer looks very similar to what you wrote before. Make sure you're not repeating the same mistake — review the mark scheme keywords before submitting.
+              </p>
+            </div>
+          )}
 
           {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
@@ -161,6 +186,13 @@ Analyse the student's answer against the mark scheme. Respond in the following J
               <span className="font-mono text-xs text-muted-foreground">[{current.total_marks} mark{current.total_marks !== 1 ? "s" : ""}]</span>
             </div>
           </div>
+
+          {/* Notes */}
+          <QuestionNoteWidget
+            questionId={current.question_id}
+            topic={current.topic}
+            questionText={current.question_text}
+          />
 
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />

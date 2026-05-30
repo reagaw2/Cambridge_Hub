@@ -1,17 +1,14 @@
-/**
- * CS Review Session — serves questions from the CS review bank.
- * All reads/writes go to cs_data, never Physics data.
- */
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import QuestionMedia from "@/components/QuestionMedia";
+import QuestionNoteWidget from "@/components/QuestionNoteWidget";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
-import { csGetReviewBank, csRemoveFromReviewBank, csResetReviewBankLock } from "@/lib/csTopicStore";
+import { csGetReviewBank, csRemoveFromReviewBank, csResetReviewBankLock, csUpdateReviewBankEntry } from "@/lib/csTopicStore";
+import { isSimilarAnswer } from "@/lib/topicStore";
 
-// All CS question banks keyed by question ID for lookup
 import { OS_QUESTIONS } from "@/lib/csOSBank";
 import { LT_QUESTIONS } from "@/lib/csLTBank";
 import { DATA_REP_QUESTIONS } from "@/lib/csDataRepBank";
@@ -86,18 +83,19 @@ export default function CSReviewSession() {
     );
   }
 
+  const isPersistentAttempt = isSimilarAnswer(
+    answer,
+    reviewEntry.last_wrong_answer ?? reviewEntry.first_attempt_answer ?? ""
+  );
+
   const handleSubmit = async () => {
     const fb = await submit(question, answer);
     if (!fb) return;
 
     const marksEarned = fb.marks_earned ?? 0;
-    const fullMarks = marksEarned >= question.total_marks;
+    const isFullMarks = marksEarned >= question.total_marks;
 
-    if (fullMarks) {
-      await csRemoveFromReviewBank(question.id);
-    } else {
-      await csResetReviewBankLock(question.id);
-    }
+    const { isPersistent } = await csUpdateReviewBankEntry(question.id, answer, isFullMarks);
 
     navigate("/cs/feedback", {
       state: {
@@ -110,7 +108,8 @@ export default function CSReviewSession() {
         dashRoute: "/cs",
         paperRef: question.paper_ref,
         isReview: true,
-        fullMarks,
+        isPersistentMisunderstanding: isPersistent,
+        fullMarks: isFullMarks,
         remainingCount: bank.length - 1,
       },
     });
@@ -132,7 +131,9 @@ export default function CSReviewSession() {
         {/* Past attempt context banner */}
         <div className="mx-4 mt-4 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
           <p className="text-xs text-amber-400/80 font-medium">
-            Review question — you scored {reviewEntry.first_attempt_score}/{reviewEntry.total_marks} on your first attempt.
+            {reviewEntry.persistent_misunderstanding
+              ? "⚠ Persistent misunderstanding detected last time — try a fundamentally different approach."
+              : `Review question — you scored ${reviewEntry.first_attempt_score}/${reviewEntry.total_marks} on your first attempt.`}
           </p>
         </div>
 
@@ -157,6 +158,23 @@ export default function CSReviewSession() {
               </span>
             </div>
           </div>
+
+          {/* Notes */}
+          <QuestionNoteWidget
+            questionId={question.id}
+            topic={question.topic}
+            questionText={question.text}
+          />
+
+          {/* Persistent warning before submit */}
+          {isPersistentAttempt && answer.trim().length > 10 && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-300/90 leading-relaxed">
+                This looks similar to your previous answer. Make sure you're addressing what you got wrong before.
+              </p>
+            </div>
+          )}
 
           <AnswerInput value={answer} onChange={setAnswer} />
           <button

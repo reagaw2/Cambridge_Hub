@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, Download, ChevronDown, X } from "lucide-react";
-import { getReviewBank, getGuessReviewBank, getMistakeDna } from "@/lib/topicStore";
+import { ArrowLeft, Lock, AlertTriangle, Download } from "lucide-react";
+import { getReviewBank, getGuessReviewBank } from "@/lib/topicStore";
 import { generateReviewBankPdf } from "@/lib/generatePdf";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -21,7 +21,6 @@ function formatCountdown(ms) {
 }
 
 const QUESTION_ROUTES = {
-  "9702-22-W19-Q1a": "/physicalquantities/question",
   "9702-41-W19-Q2a": "/thermal/question",
   "9702-42-W19-Q2aii": "/thermal/question",
   "9702-43-S21-Q2b": "/thermal/question",
@@ -66,212 +65,92 @@ const QUESTION_ROUTES = {
   "9702-42-W21-Q1b-ii": "/circularmotion/question",
   "9702-42-W21-Q1d": "/circularmotion/question",
   "9702-43-S23-Q2a": "/circularmotion/question",
-  "9702-22-ON17-Q4a": "/waves/question",
   "9702-23-S17-Q3a": "/electric/question",
-  "9702-23-S17-Q3c": "/electric/question",
-  "9702-23-W19-Q3a-i": "/electric/question",
-  "9702-23-W19-Q3a-ii": "/electric/question",
   "9702-23-W18-Q6a": "/electric/question",
-  "9702-21-S18-Q7c": "/electric/question",
-  "9702-23-W17-Q5a": "/electric/question",
-  "9702-23-W21-Q4f-ii": "/electric/question",
-  "9702-22-W17-Q5a": "/electric/question",
-  "9702-22-S19-Q6a": "/electric/question",
-  "9702-22-S19-Q6b": "/electric/question",
   "9702-21-W18-Q5a": "/electric/question",
-  "9702-21-W17-Q6a": "/electric/question",
-  "9702-21-W19-Q6a": "/electric/question",
-  "9702-22-M19-Q4a": "/electric/question",
   "9702-23-W21-Q4f-iii": "/nuclear/question",
-  "9702-21-W18-Q5c-ii": "/nuclear/question",
   "9702-22-ON19-Q2a": "/kinematics/question",
-  "9702-22-ON19-Q2bi": "/forces/question",
-  "q1": "/question",
-  "q2": "/similar-question",
-  "q3": "/familiarity-check",
   "w25_44_Q8a": "/nuclear/question",
-  "w25_44_Q8bii": "/nuclear/similar-question",
-  "w25_44_Q8ci": "/nuclear/familiarity-check",
-  "w25_44_Q1a": "/gravitational/q1a",
+  "w25_44_Q1a": "/gravitational/question",
   "w25_44_Q2ai": "/thermal/question",
-  "w25_44_Q3a": "/thermal/q3a",
+  "w25_44_Q3a": "/thermal/question",
   "w25_44_Q4a": "/oscillations/question",
-  "w25_44_Q4biv": "/oscillations/similar-question",
   "w25_44_Q5a": "/electric/question",
   "w25_44_Q6ai": "/capacitance/question",
-  "w25_44_Q6aii": "/capacitance/similar-question",
   "w25_44_Q7a": "/eminduction/question",
   "w25_44_Q9a": "/quantum/question",
   "w25_44_Q10a": "/astrophysics/question",
-  "w25_44_Q10b": "/astrophysics/similar-question",
-  "9702-41-ALA26-Q1a": "/gravitational/q1a",
-  "9702-41-ALA26-Q1bi": "/gravitational/q1bi",
-  "9702-41-ALA26-Q2a": "/thermal/q2a",
-  "9702-41-ALA26-Q2bi": "/thermal/q2bi",
-  "9702-41-ALA26-Q2bii": "/thermal/q2bii",
-  "9702-41-ALA26-Q3a": "/thermal/q3a",
-  "9702-41-ALA26-Q3bii": "/thermal/q3bii",
-  "9702-41-ALA26-Q4a": "/oscillations/q4a",
-  "9702-41-ALA26-Q4bii": "/oscillations/q4bii",
-  "9702-41-ALA26-Q5a": "/electric/q5a",
-  "9702-41-ALA26-Q5b": "/electric/q5b",
-  "9702-41-ALA26-Q6a": "/capacitance/q6a",
-  "9702-41-ALA26-Q8ai": "/astrophysics/q8ai",
-  "9702-41-ALA26-Q11a": "/astrophysics/q11a",
-  "9702-41-ALA26-Q9a": "/nuclear/q9a",
-  "9702-41-ALA26-Q9cii": "/nuclear/q9cii",
 };
 
-const DNA_CATEGORY_STYLE = {
-  "Precision Phrasing Flaw":      { pill: "bg-amber-500/15 border-amber-500/30 text-amber-300",  dot: "bg-amber-400" },
-  "Missing Keyword":              { pill: "bg-red-500/15 border-red-500/30 text-red-300",         dot: "bg-red-400" },
-  "Conceptual Misunderstanding":  { pill: "bg-purple-500/15 border-purple-500/30 text-purple-300", dot: "bg-purple-400" },
-  "Incomplete Definition":        { pill: "bg-orange-500/15 border-orange-500/30 text-orange-300", dot: "bg-orange-400" },
-  "Wrong Direction / Sign":       { pill: "bg-rose-500/15 border-rose-500/30 text-rose-300",      dot: "bg-rose-400" },
-  "Unit / Notation Error":        { pill: "bg-blue-500/15 border-blue-500/30 text-blue-300",      dot: "bg-blue-400" },
-  "Omitted Qualifying Condition": { pill: "bg-cyan-500/15 border-cyan-500/30 text-cyan-300",      dot: "bg-cyan-400" },
-  "Logical Gap":                  { pill: "bg-slate-500/15 border-slate-500/30 text-slate-300",   dot: "bg-slate-400" },
-};
-
-function DnaTag({ category }) {
-  const style = DNA_CATEGORY_STYLE[category] ?? { pill: "bg-white/8 border-white/15 text-white/50", dot: "bg-white/40" };
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border rounded-full px-2 py-0.5 leading-none ${style.pill}`}>
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
-      {category}
-    </span>
-  );
-}
-
-/**
- * Resolves the single best "last attempt" text for a question card.
- *
- * Priority:
- *   1. `first_attempt_answer` saved directly on the review bank entry
- *      (written by Feedback.jsx / CSQuestionAttempt.jsx)
- *   2. `student_response` from the *latest* mistake_dna entry for this question_id
- *      (written by buildMistakeDna — the new structured field)
- *
- * Multiple DNA entries for the same question_id are deduplicated: only the
- * most-recently-dated one is used so the card never shows duplicate blocks.
- */
-function resolveLastAttempt(q, dnaEntries) {
-  // Priority 1 — review bank's own field (most reliable, set at submission time)
-  if (q.first_attempt_answer?.trim()) {
-    return q.first_attempt_answer.trim();
-  }
-
-  // Priority 2 — latest mistake_dna entry with a student_response for this question
-  const matching = dnaEntries
-    .filter(e => e.question_id === q.question_id && e.student_response?.trim())
-    .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime());
-
-  return matching[0]?.student_response?.trim() ?? null;
-}
-
-// ── "Your Last Attempt" strip ──────────────────────────────────────────────
-function LastAttemptStrip({ text }) {
-  if (!text) return null;
-  const display = text.length > 120 ? text.slice(0, 117) + "…" : text;
-  return (
-    <div className="border-l-2 border-white/10 pl-2.5 py-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 mb-0.5">
-        Your last attempt
-      </p>
-      <p className="text-[11px] text-muted-foreground/50 italic leading-relaxed break-words">
-        "{display}"
-      </p>
-    </div>
-  );
-}
-
-function QuestionCard({ q, dnaEntries, now, navigate }) {
+function QuestionCard({ q, now, navigate }) {
   const { locked, msRemaining } = getLockStatus(q.locked_until, now);
-  const preview = q.question_text?.slice(0, 80) + (q.question_text?.length > 80 ? "…" : "");
+  const preview = (q.question_text ?? "").slice(0, 90) + ((q.question_text ?? "").length > 90 ? "…" : "");
   const [lockedMsg, setLockedMsg] = useState(false);
+  const hasPersistentIssue = !!q.persistent_misunderstanding;
 
-  const dnaForQuestion = dnaEntries.filter(e => e.question_id === q.question_id);
-  const uniqueCategories = [...new Set(dnaForQuestion.map(e => e.error_category))].filter(Boolean);
-
-  // Resolve the single best last-attempt text — deduped, latest wins
-  const lastAttemptText = resolveLastAttempt(q, dnaEntries);
-
-  if (!locked) {
-    const route = QUESTION_ROUTES[q.question_id] ?? "/review";
-    return (
-      <div className="bg-card border border-l-4 border-border border-l-green-500/70 rounded-xl p-4 space-y-2.5">
-        {/* Topic + score */}
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-green-400/80 bg-green-500/10 px-2 py-0.5 rounded-full">
-            {q.topic}
-          </span>
+  const content = (
+    <>
+      {/* Topic + score */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+          locked ? "text-amber-400/80 bg-amber-500/10" : "text-green-400/80 bg-green-500/10"
+        }`}>
+          {q.topic}
+        </span>
+        <div className="flex items-center gap-2">
+          {hasPersistentIssue && (
+            <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/15 border border-red-500/30 px-2 py-0.5 rounded-full">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              Persistent mistake
+            </span>
+          )}
           <span className="text-[11px] text-muted-foreground shrink-0">
             {q.first_attempt_score}/{q.total_marks} marks
           </span>
         </div>
+      </div>
 
-        {/* DNA error tags */}
-        {uniqueCategories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
+      {/* Question preview */}
+      <p className={`text-sm leading-relaxed ${locked ? "text-muted-foreground/60" : "text-foreground/80"}`}>{preview}</p>
+
+      {/* Lock / attempt */}
+      <div className="flex items-center justify-between">
+        {locked ? (
+          <div className="flex items-center gap-1.5 text-amber-400/80">
+            <Lock className="w-3 h-3" />
+            <span className="text-[11px] font-medium">{formatCountdown(msRemaining)}</span>
           </div>
+        ) : (
+          <span className="text-[11px] text-muted-foreground/50">
+            {hasPersistentIssue ? "Try a different approach this time" : "Ready to attempt"}
+          </span>
         )}
-
-        {/* Question preview */}
-        <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
-
-        {/* Last attempt — single resolved text, never duplicated */}
-        <LastAttemptStrip text={lastAttemptText} />
-
-        <div className="flex justify-end">
+        {!locked && (
           <button
-            onClick={() => navigate(route)}
+            onClick={() => navigate(QUESTION_ROUTES[q.question_id] ?? "/review")}
             className="text-xs font-semibold text-green-400 hover:brightness-110 transition-all"
           >
             Attempt now →
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="bg-card border border-l-4 border-border border-l-amber-500/60 rounded-xl p-4 space-y-2.5 opacity-50 cursor-pointer"
-      onClick={() => { setLockedMsg(true); setTimeout(() => setLockedMsg(false), 3000); }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-full">
-          {q.topic}
-        </span>
-        <span className="text-[11px] text-muted-foreground shrink-0">
-          {q.first_attempt_score}/{q.total_marks} marks
-        </span>
-      </div>
-
-      {uniqueCategories.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
-        </div>
-      )}
-
-      <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview}</p>
-
-      {/* Last attempt — single resolved text, never duplicated */}
-      <LastAttemptStrip text={lastAttemptText} />
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-amber-400/80">
-          <Lock className="w-3 h-3" />
-          <span className="text-[11px] font-medium">{formatCountdown(msRemaining)}</span>
-        </div>
+        )}
       </div>
 
       {lockedMsg && (
         <p className="text-[11px] text-amber-400/70 italic">
-          Unlocks in {formatCountdown(msRemaining)}. Spaced repetition helps you remember for longer.
+          {formatCountdown(msRemaining)}. Spaced repetition helps you remember for longer.
         </p>
       )}
+    </>
+  );
+
+  return (
+    <div
+      className={`bg-card border border-l-4 border-border ${
+        hasPersistentIssue ? "border-l-red-500/70" : locked ? "border-l-amber-500/60" : "border-l-green-500/70"
+      } rounded-xl p-4 space-y-2.5 ${locked ? "cursor-pointer opacity-60" : ""}`}
+      onClick={locked ? () => { setLockedMsg(l => !l); } : undefined}
+    >
+      {content}
     </div>
   );
 }
@@ -281,12 +160,9 @@ export default function ReviewBankScreen() {
   const { user } = useAuth();
   const [bank, setBank] = useState([]);
   const [mcqBank, setMcqBank] = useState([]);
-  const [dnaEntries, setDnaEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [exporting, setExporting] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [filterOpen, setFilterOpen] = useState(false);
 
   const handleExportPdf = async () => {
     if (bank.length === 0) return;
@@ -296,10 +172,9 @@ export default function ReviewBankScreen() {
   };
 
   useEffect(() => {
-    Promise.all([getReviewBank(), getGuessReviewBank(), getMistakeDna()]).then(([rb, grb, dna]) => {
+    Promise.all([getReviewBank(), getGuessReviewBank()]).then(([rb, grb]) => {
       setBank(rb);
       setMcqBank(grb);
-      setDnaEntries(Array.isArray(dna) ? dna : []);
       setLoading(false);
     });
   }, []);
@@ -317,19 +192,10 @@ export default function ReviewBankScreen() {
     );
   }
 
-  const presentCategories = [...new Set(dnaEntries.map(e => e.error_category).filter(Boolean))].sort();
-
-  function questionMatchesFilter(q) {
-    if (activeFilter === "all") return true;
-    return dnaEntries.some(e => e.question_id === q.question_id && e.error_category === activeFilter);
-  }
-
-  const unlocked = bank.filter(q => !getLockStatus(q.locked_until, now).locked && questionMatchesFilter(q));
-  const locked = bank.filter(q => getLockStatus(q.locked_until, now).locked && questionMatchesFilter(q));
+  const unlocked = bank.filter(q => !getLockStatus(q.locked_until, now).locked);
+  const locked = bank.filter(q => getLockStatus(q.locked_until, now).locked);
   const sortedLocked = [...locked].sort((a, b) => new Date(a.locked_until) - new Date(b.locked_until));
-  const nextUnlock = sortedLocked[0];
-  const filteredTotal = unlocked.length + locked.length;
-  const filterLabel = activeFilter === "all" ? "All error types" : activeFilter;
+  const persistentCount = bank.filter(q => q.persistent_misunderstanding).length;
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -357,9 +223,9 @@ export default function ReviewBankScreen() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col gap-4 p-4">
+        <div className="flex-1 flex flex-col gap-5 p-4">
 
-          {/* Bank summary cards */}
+          {/* Summary cards */}
           {(bank.length > 0 || mcqBank.length > 0) && (
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -370,6 +236,11 @@ export default function ReviewBankScreen() {
                 <div className="text-lg mb-1">📝</div>
                 <p className="text-xs font-semibold text-foreground">{bank.length > 0 ? `${bank.length} waiting` : "All clear ✓"}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Written</p>
+                {persistentCount > 0 && (
+                  <p className="text-[10px] text-red-400 mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-2.5 h-2.5" /> {persistentCount} persistent mistake{persistentCount !== 1 ? "s" : ""}
+                  </p>
+                )}
               </button>
               <button
                 onClick={() => navigate("/guess-review-bank")}
@@ -383,89 +254,6 @@ export default function ReviewBankScreen() {
             </div>
           )}
 
-          {/* DNA Filter Row */}
-          {bank.length > 0 && presentCategories.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Filter by error type
-                </p>
-                {activeFilter !== "all" && (
-                  <button
-                    onClick={() => setActiveFilter("all")}
-                    className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="w-3 h-3" /> Clear filter
-                  </button>
-                )}
-              </div>
-
-              <div className="relative">
-                <button
-                  onClick={() => setFilterOpen(o => !o)}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                    activeFilter !== "all"
-                      ? `${DNA_CATEGORY_STYLE[activeFilter]?.pill ?? "bg-white/8 border-white/15 text-white/50"}`
-                      : "bg-card border-border text-foreground hover:brightness-110"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {activeFilter !== "all" && (
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${DNA_CATEGORY_STYLE[activeFilter]?.dot ?? "bg-white/40"}`} />
-                    )}
-                    <span className="truncate">{filterLabel}</span>
-                    {activeFilter !== "all" && filteredTotal > 0 && (
-                      <span className="font-mono text-[10px] opacity-70 shrink-0">({filteredTotal})</span>
-                    )}
-                  </div>
-                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
-                </button>
-
-                {filterOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-2xl z-20 overflow-hidden">
-                    <button
-                      onClick={() => { setActiveFilter("all"); setFilterOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-secondary transition-all border-b border-border/50 ${
-                        activeFilter === "all" ? "text-foreground font-semibold" : "text-muted-foreground"
-                      }`}
-                    >
-                      <span className="w-2 h-2 rounded-full bg-muted-foreground/30 shrink-0" />
-                      All error types
-                      <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">{bank.length}</span>
-                    </button>
-                    {presentCategories.map(cat => {
-                      const style = DNA_CATEGORY_STYLE[cat] ?? { dot: "bg-white/40" };
-                      const count = bank.filter(q =>
-                        dnaEntries.some(e => e.question_id === q.question_id && e.error_category === cat)
-                      ).length;
-                      if (count === 0) return null;
-                      return (
-                        <button
-                          key={cat}
-                          onClick={() => { setActiveFilter(cat); setFilterOpen(false); }}
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-secondary transition-all border-b border-border/30 last:border-0 ${
-                            activeFilter === cat ? "text-foreground font-semibold" : "text-muted-foreground"
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
-                          {cat}
-                          <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">{count}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {activeFilter !== "all" && (
-                <p className="text-[11px] text-muted-foreground/60 px-1">
-                  Showing {filteredTotal} question{filteredTotal !== 1 ? "s" : ""} with <span className="text-foreground/80 font-medium">{activeFilter}</span> errors
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Empty states */}
           {bank.length === 0 && mcqBank.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-4">
               <p className="text-lg font-semibold text-foreground leading-relaxed">
@@ -477,28 +265,12 @@ export default function ReviewBankScreen() {
             </div>
           )}
 
-          {bank.length > 0 && unlocked.length === 0 && locked.length === 0 && activeFilter !== "all" && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-3">
-              <p className="text-base font-semibold text-foreground leading-relaxed">
-                No questions match this filter.
-              </p>
-              <button onClick={() => setActiveFilter("all")} className="text-sm text-primary hover:brightness-110">
-                Show all questions
-              </button>
-            </div>
-          )}
-
           {bank.length > 0 && unlocked.length === 0 && locked.length > 0 && (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-4">
               <Lock className="w-8 h-8 text-amber-400/60" />
               <p className="text-base font-semibold text-foreground leading-relaxed max-w-xs">
                 All questions are waiting. Come back when they unlock.
               </p>
-              {nextUnlock && (
-                <p className="text-sm text-amber-400 font-medium">
-                  {formatCountdown(getLockStatus(nextUnlock.locked_until, now).msRemaining)}
-                </p>
-              )}
             </div>
           )}
 
@@ -506,7 +278,7 @@ export default function ReviewBankScreen() {
             <div className="space-y-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-green-400">Ready to attempt</p>
               {unlocked.map(q => (
-                <QuestionCard key={q.question_id} q={q} dnaEntries={dnaEntries} now={now} navigate={navigate} />
+                <QuestionCard key={q.question_id} q={q} now={now} navigate={navigate} />
               ))}
             </div>
           )}
@@ -515,18 +287,13 @@ export default function ReviewBankScreen() {
             <div className="space-y-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-400">Waiting — Spaced Repetition Active</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">These questions are locked to help your brain consolidate the material.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Locked to help your brain consolidate the material.</p>
               </div>
               {sortedLocked.map(q => (
-                <QuestionCard key={q.question_id} q={q} dnaEntries={dnaEntries} now={now} navigate={navigate} />
+                <QuestionCard key={q.question_id} q={q} now={now} navigate={navigate} />
               ))}
             </div>
           )}
-
-          {filterOpen && (
-            <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
-          )}
-
         </div>
       </div>
     </div>

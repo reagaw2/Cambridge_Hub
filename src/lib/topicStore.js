@@ -19,6 +19,22 @@ export function normaliseTopicKey(name) {
     .replace(/^_|_$/g, "");
 }
 
+// ── Word-overlap similarity (for persistent misunderstanding detection) ────────
+function _wordOverlap(a, b) {
+  if (!a || !b || a.length < 15 || b.length < 15) return 0;
+  const stop = new Set(["the", "is", "it", "and", "or", "in", "of", "to", "a", "an", "are", "was", "be", "has"]);
+  const words = s => s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stop.has(w));
+  const wa = new Set(words(a));
+  const wb = words(b);
+  if (wa.size === 0 || wb.length === 0) return 0;
+  const common = wb.filter(w => wa.has(w)).length;
+  return common / Math.max(wa.size, wb.length);
+}
+
+export function isSimilarAnswer(a, b) {
+  return _wordOverlap(a ?? "", b ?? "") >= 0.65;
+}
+
 const DEFAULT_DATA = () => ({
   topics: {},
   written_review_bank: [],
@@ -53,7 +69,6 @@ function clearAllLocalKeys(email) {
 }
 
 async function loadFromSupabase(userId) {
-  console.log('[topicStore] → fetching from Supabase...');
   const { data: rows, error } = await supabaseClient.from('StudentData').select('*').eq('user_id', userId);
   if (error) { console.error('[topicStore] ✗ fetch failed:', error.message); return null; }
   if (rows && rows.length > 0) {
@@ -75,12 +90,11 @@ async function loadFromSupabase(userId) {
       },
     };
   }
-  console.log('[topicStore] no row found, creating new...');
   const { data: inserted, error: ie } = await supabaseClient
     .from('StudentData')
     .insert([{ user_id: userId, user_email: _userEmail, ...DEFAULT_DATA() }])
     .select();
-  if (ie || !inserted?.[0]) { console.error('[topicStore] ✗ insert failed:', ie?.message); return { id: null, data: DEFAULT_DATA() }; }
+  if (ie || !inserted?.[0]) { return { id: null, data: DEFAULT_DATA() }; }
   return { id: inserted[0].id, data: DEFAULT_DATA() };
 }
 
@@ -246,10 +260,6 @@ export async function getTopicData(topicKey) {
   return { trend, streak: currentStreak, lastLabel, attempts };
 }
 
-/**
- * writeMistakeDna
- * Now accepts `studentResponse` — the raw text the student typed.
- */
 export async function writeMistakeDna(feedback, questionId, topic, marksEarned, totalMarks, studentResponse = "") {
   if (!feedback || marksEarned >= totalMarks) return;
   const data = await ensureLoaded();
@@ -277,7 +287,13 @@ export async function addToReviewBank({
   first_attempt_answer = "",
 }) {
   const data = await ensureLoaded();
-  if (data.written_review_bank.find(q => q.question_id === question_id)) return;
+  const existing = data.written_review_bank.find(q => q.question_id === question_id);
+  if (existing) {
+    // Already in bank — update last_wrong_answer so persistence tracking is accurate
+    existing.last_wrong_answer = (first_attempt_answer ?? "").slice(0, 600);
+    saveToDB(data);
+    return;
+  }
   data.written_review_bank.push({
     question_id,
     topic,
@@ -287,11 +303,41 @@ export async function addToReviewBank({
     first_attempt_score,
     first_attempt_feedback,
     first_attempt_answer: (first_attempt_answer ?? "").slice(0, 600),
+    last_wrong_answer: (first_attempt_answer ?? "").slice(0, 600), // for persistence detection
+    persistent_misunderstanding: false,
     date_added: toDateString(new Date()),
     priority: first_attempt_score === 0 ? 1 : 2,
     locked_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   });
   saveToDB(data);
+}
+
+/**
+ * updateReviewBankEntry — call after every review attempt.
+ * Detects persistent misunderstandings. Removes from bank only when correct.
+ * Returns { removed, isPersistent }
+ */
+export async function updateReviewBankEntry(question_id, newAnswer, isCorrect) {
+  const data = await ensureLoaded();
+
+  if (isCorrect) {
+    data.written_review_bank = data.written_review_bank.filter(q => q.question_id !== question_id);
+    saveToDB(data);
+    return { removed: true, isPersistent: false };
+  }
+
+  const entry = data.written_review_bank.find(q => q.question_id === question_id);
+  if (!entry) return { removed: false, isPersistent: false };
+
+  const prevAnswer = entry.last_wrong_answer ?? entry.first_attempt_answer ?? "";
+  const isPersistent = isSimilarAnswer(newAnswer, prevAnswer);
+
+  entry.last_wrong_answer = (newAnswer ?? "").slice(0, 600);
+  entry.persistent_misunderstanding = isPersistent;
+  entry.locked_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  saveToDB(data);
+  return { removed: false, isPersistent };
 }
 
 export async function resetReviewBankLock(question_id) {

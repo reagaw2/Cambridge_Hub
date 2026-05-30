@@ -1,7 +1,6 @@
 /**
- * p1SyncAll.js — one-shot migration of all local P1 progress to Supabase.
- * Reads every known paper's sessions, notes, and stars from localStorage
- * and writes them to the p1_sessions, p1_notes, and p1_stars columns.
+ * p1SyncAll.js — one-shot push of ALL local progress to Supabase.
+ * Covers: P1 sessions/notes/stars, written stars (Physics + CS), topical workings.
  */
 
 import { supabaseClient } from "@/api/base44Client";
@@ -22,14 +21,14 @@ function readLocal(key) {
 }
 
 /**
- * Push all local P1 data (sessions, notes, stars) to Supabase.
- * Safe to call multiple times — it merges, not overwrites.
- * Returns a summary of what was pushed.
+ * Push all local data to Supabase.
+ * Safe to call multiple times — merges, not overwrites.
  */
 export async function forceSyncAllLocalToSupabase() {
   const row = await getStudentRow();
   if (!row) throw new Error("No student record found. Make sure you are logged in.");
 
+  // ── P1 paper sessions / notes / stars ────────────────────────────────────
   const sessions = {};
   const notes = {};
   const stars = {};
@@ -47,12 +46,31 @@ export async function forceSyncAllLocalToSupabase() {
     if (starsData) stars[paperKey] = starsData;
   }
 
+  // ── Written stars (topical physics + CS) ─────────────────────────────────
+  const writtenStars = {
+    physics: readLocal("written_starred_physics_v1") ?? {},
+    cs: readLocal("written_starred_cs_v1") ?? {},
+  };
+
+  // ── Topical workings (canvas drawings) ───────────────────────────────────
+  const topicalWorkings = readLocal("topical_workings_v1") ?? {};
+
+  // ── Question notes (cross-topic) ─────────────────────────────────────────
+  const questionNotes = readLocal("hub_question_notes_v1") ?? {};
+
+  // ── Exam countdown events ─────────────────────────────────────────────────
+  const examCountdown = readLocal("exam_countdown_events_v3") ?? [];
+
   const { error } = await supabaseClient
     .from("StudentData")
     .update({
       p1_sessions: sessions,
       p1_notes: notes,
       p1_stars: stars,
+      written_stars: writtenStars,
+      topical_workings: topicalWorkings,
+      question_notes: questionNotes,
+      exam_countdown_events: examCountdown,
     })
     .eq("id", row.id);
 
@@ -63,5 +81,9 @@ export async function forceSyncAllLocalToSupabase() {
     sessionsSync: Object.keys(sessions).length,
     notesSync: Object.keys(notes).length,
     starsSync: Object.keys(stars).length,
+    writtenStarsPhysics: Object.keys(writtenStars.physics).length,
+    writtenStarsCS: Object.keys(writtenStars.cs).length,
+    topicalWorkings: Object.keys(topicalWorkings).length,
+    questionNotes: Object.keys(questionNotes).length,
   };
 }

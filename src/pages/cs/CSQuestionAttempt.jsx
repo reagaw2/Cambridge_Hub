@@ -10,7 +10,8 @@ import QuestionMedia from "@/components/QuestionMedia";
 import ScratchpadPanel from "@/components/ScratchpadPanel";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import { loadWorkings as loadTopicWorkings, saveWorking as saveTopicWorking } from "@/lib/p1WorkingsStore";
-import { isStarred, starQuestion, unstarQuestion, getAllStarred } from "@/lib/writtenStarStore";
+import { isStarred, starQuestion, unstarQuestion, getAllStarred, loadAllStarredFromCloud } from "@/lib/writtenStarStore";
+import { loadTopicalWorkingsFromCloud } from "@/lib/topicalWorkingsStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
@@ -44,11 +45,14 @@ export default function CSQuestionAttempt({ question, idx, total, allQuestions =
   const submittedRef = useRef(false);
 
   const topicKey = question?.topic_key ?? "unknown";
-
-  // IDs in this chapter — used to scope notes + starred badge count
   const sessionQuestionIds = new Set(allQuestions.map(q => q.id));
 
-  useEffect(() => { loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {})); }, [topicKey]);
+  // Load from cloud on mount
+  useEffect(() => {
+    loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {}));
+    loadTopicalWorkingsFromCloud().catch(() => {});
+    loadAllStarredFromCloud(SUBJECT).catch(() => {});
+  }, [topicKey]);
 
   useEffect(() => {
     setCurrentStarred(question ? isStarred(question.id, SUBJECT) : false);
@@ -57,7 +61,6 @@ export default function CSQuestionAttempt({ question, idx, total, allQuestions =
   useEffect(() => {
     const allNotes = getAllNotes();
     const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
-    // Only count starred for this chapter
     const starredCount = getAllStarred(SUBJECT).filter(e => sessionQuestionIds.has(e.questionId)).length;
     setPanelItemCount(notesCount + starredCount);
   });

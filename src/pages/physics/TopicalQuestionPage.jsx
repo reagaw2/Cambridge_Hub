@@ -11,7 +11,8 @@ import ScientificCalculator from "@/components/ScientificCalculator";
 import ScratchpadPanel from "@/components/ScratchpadPanel";
 import { recordAttempt, addToReviewBank, writeMistakeDna } from "@/lib/topicStore";
 import { loadWorkings as loadTopicWorkings, saveWorking as saveTopicWorking } from "@/lib/p1WorkingsStore";
-import { isStarred, starQuestion, unstarQuestion, getAllStarred } from "@/lib/writtenStarStore";
+import { isStarred, starQuestion, unstarQuestion, getAllStarred, loadAllStarredFromCloud } from "@/lib/writtenStarStore";
+import { loadTopicalWorkingsFromCloud } from "@/lib/topicalWorkingsStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
@@ -63,15 +64,18 @@ export default function TopicalQuestionPage({ getNext, advance, allQuestions = [
 
   const { submit, loading, error, setError } = useNodeAwareSubmit();
 
-  // The IDs in this chapter — used to scope notes and starred counts
   const sessionQuestionIds = new Set(allQuestions.map(q => q.id));
 
-  useEffect(() => { loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {})); }, [topicKey]);
+  // Load from cloud on mount — refreshes localStorage cache
+  useEffect(() => {
+    loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {}));
+    loadTopicalWorkingsFromCloud().catch(() => {});
+    loadAllStarredFromCloud(SUBJECT).catch(() => {});
+  }, [topicKey]);
 
   useEffect(() => {
     const allNotes = getAllNotes();
     const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
-    // Only count starred questions that belong to THIS chapter
     const starredCount = getAllStarred(SUBJECT).filter(e => sessionQuestionIds.has(e.questionId)).length;
     setPanelItemCount(notesCount + starredCount);
   });

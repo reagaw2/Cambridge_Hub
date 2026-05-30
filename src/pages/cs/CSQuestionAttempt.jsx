@@ -5,12 +5,14 @@ import AnswerInput from "@/components/AnswerInput";
 import QuestionAnnotator from "@/components/QuestionAnnotator";
 import QuestionNoteWidget from "@/components/QuestionNoteWidget";
 import QuestionSessionHeader from "@/components/QuestionSessionHeader";
+import SessionNotesPanel from "@/components/SessionNotesPanel";
 import QuestionMedia from "@/components/QuestionMedia";
 import { csRecordAttempt, csAddToReviewBank, csWriteMistakeDna } from "@/lib/csTopicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
+import { useAuth } from "@/lib/AuthContext";
 
 const TOPIC_ROUTES = {
   operating_systems: "/cs/operating-systems/question",
@@ -37,13 +39,14 @@ export default function CSQuestionAttempt({
   onOverride,
 }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [answer, setAnswer] = useState("");
   const [showTeachMe, setShowTeachMe] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+  const [notesPanelOpen, setNotesPanelOpen] = useState(false);
   const { submit, loading, error, setError } = useNodeAwareSubmit();
   const submittedRef = useRef(false);
 
-  // Count notes for badge
+  // Notes badge count
   const allNotes = getAllNotes();
   const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
 
@@ -104,7 +107,7 @@ export default function CSQuestionAttempt({
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* ── P1-style header ─────────────────────────────────────────────── */}
+        {/* ── P1-style header (no calculator/formula for CS) ───────────── */}
         <QuestionSessionHeader
           paperRef={question.paper_ref}
           subject="Computer Science"
@@ -115,12 +118,13 @@ export default function CSQuestionAttempt({
           onBack={() => navigate("/cs")}
           onJumpTo={onJumpTo}
           notesCount={notesCount}
-          onNotesToggle={() => setShowNotes(v => !v)}
+          onNotesPanel={() => setNotesPanelOpen(true)}
+          showCalculator={false}
         />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* ── Question card with annotation toolbar ────────────────────── */}
+          {/* Question card with annotation toolbar */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
@@ -130,24 +134,12 @@ export default function CSQuestionAttempt({
                 <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
                   {question.topic}
                 </span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  [{question.total_marks}m]
-                </span>
+                <span className="font-mono text-xs text-muted-foreground">[{question.total_marks}m]</span>
               </div>
             </div>
             <QuestionMedia question={question} />
-            {/* Annotation toolbar */}
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
-
-          {/* Notes (toggled via header icon) */}
-          {showNotes && (
-            <QuestionNoteWidget
-              questionId={question.id}
-              topic={question.topic}
-              questionText={question.text}
-            />
-          )}
 
           {showTeachMe ? (
             <TeachMeHow onClose={() => setShowTeachMe(false)} />
@@ -182,6 +174,18 @@ export default function CSQuestionAttempt({
           )}
         </div>
       </div>
+
+      {/* Notes / Workings panel */}
+      <SessionNotesPanel
+        open={notesPanelOpen}
+        onClose={() => setNotesPanelOpen(false)}
+        allQuestions={allQuestions}
+        currentIdx={idx}
+        onJumpTo={(i) => { onJumpTo?.(i); setNotesPanelOpen(false); }}
+        subject="cs"
+        userEmail={user?.email ?? ""}
+      />
+
       {loading && <SubmittingOverlay />}
     </div>
   );

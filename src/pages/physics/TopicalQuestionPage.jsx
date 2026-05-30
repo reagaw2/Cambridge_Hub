@@ -1,24 +1,48 @@
 import { useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { X } from "lucide-react";
 import { getAllNotes } from "@/lib/questionNotesStore";
 import AnswerInput from "@/components/AnswerInput";
 import QuestionAnnotator from "@/components/QuestionAnnotator";
 import QuestionNoteWidget from "@/components/QuestionNoteWidget";
 import QuestionSessionHeader from "@/components/QuestionSessionHeader";
+import SessionNotesPanel from "@/components/SessionNotesPanel";
 import QuestionMedia from "@/components/QuestionMedia";
+import ScientificCalculator from "@/components/ScientificCalculator";
 import { recordAttempt, addToReviewBank, writeMistakeDna } from "@/lib/topicStore";
 import DevQuestionJumper from "@/components/DevQuestionJumper";
 import TeachMeHow from "@/components/TeachMeHow";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
 import { useNodeAwareSubmit } from "@/hooks/useNodeAwareSubmit";
+import { useAuth } from "@/lib/AuthContext";
+import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 
-// Session answers are tracked in sessionStorage so they survive /feedback → back navigation
+// Session answers tracked in sessionStorage
 function sessionKey(topicKey) { return `q_session_answers_${topicKey}`; }
 function loadSessionAnswers(topicKey) {
   try { return JSON.parse(sessionStorage.getItem(sessionKey(topicKey)) ?? "{}"); } catch { return {}; }
 }
 function saveSessionAnswers(topicKey, answers) {
   sessionStorage.setItem(sessionKey(topicKey), JSON.stringify(answers));
+}
+
+// Formula sheet modal
+function FormulaSheetModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
+      <div className="w-full max-w-[700px] bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50 sticky top-0 bg-card z-10">
+          <p className="font-bold text-foreground">Data / Formula Sheet</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="p-2">
+          <img src={FORMULA_SHEET_URL} alt="Formula sheet" className="w-full rounded-lg" style={{ background: "#fff" }} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function TopicalQuestionPage({
@@ -29,16 +53,18 @@ export default function TopicalQuestionPage({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   const topicKey = allQuestions[0]?.topic_key ?? "unknown";
 
-  // currentBankIdx drives which question we show
   const [currentBankIdx, setCurrentBankIdx] = useState(() => getNext().idx);
   const [answer, setAnswer] = useState("");
   const [showTeachMe, setShowTeachMe] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);  // inline note widget toggle
+  const [notesPanelOpen, setNotesPanelOpen] = useState(false);
+  const [calcActive, setCalcActive] = useState(false);
+  const [formulaSheetOpen, setFormulaSheetOpen] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState(() => loadSessionAnswers(topicKey));
-  const [overviewOpen, setOverviewOpen] = useState(false);
 
   const { submit, loading, error, setError } = useNodeAwareSubmit();
 
@@ -46,7 +72,7 @@ export default function TopicalQuestionPage({
   const total = allQuestions.length || getNext().total;
   const thisRoute = location.pathname;
 
-  // Count notes for badge
+  // Notes badge = count of notes for questions in this session
   const allNotes = getAllNotes();
   const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
 
@@ -54,6 +80,7 @@ export default function TopicalQuestionPage({
     setCurrentBankIdx(idx);
     setAnswer("");
     setShowTeachMe(false);
+    setShowNotes(false);
     setError(null);
   }
 
@@ -64,7 +91,6 @@ export default function TopicalQuestionPage({
     const marksEarned = fb.marks_earned ?? 0;
     const isCorrect = marksEarned >= question.total_marks;
 
-    // Update session answers for dots
     const updated = { ...sessionAnswers, [question.id]: isCorrect ? "correct" : "wrong" };
     setSessionAnswers(updated);
     saveSessionAnswers(topicKey, updated);
@@ -99,7 +125,7 @@ export default function TopicalQuestionPage({
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* ── Shared header with dots ─────────────────────────────────────── */}
+        {/* ── P1-style header with ALL icons ──────────────────────────── */}
         <QuestionSessionHeader
           paperRef={question.paper_ref}
           subject="Physics"
@@ -110,42 +136,24 @@ export default function TopicalQuestionPage({
           onBack={() => navigate(backRoute)}
           onJumpTo={jumpToQuestion}
           notesCount={notesCount}
-          onNotesToggle={() => setShowNotes(v => !v)}
-          onOverview={() => setOverviewOpen(v => !v)}
+          onNotesPanel={() => setNotesPanelOpen(true)}
+          showCalculator={true}
+          calcActive={calcActive}
+          onCalcToggle={() => setCalcActive(a => !a)}
+          onFormulaSheet={() => setFormulaSheetOpen(true)}
+          onOverview={undefined}
         />
-
-        {/* ── Overview panel ──────────────────────────────────────────────── */}
-        {overviewOpen && (
-          <div className="bg-card border-b border-border px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                {Object.keys(sessionAnswers).length}/{total} answered this session
-              </p>
-              <button onClick={() => setOverviewOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground">Close</button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {allQuestions.map((q, i) => {
-                const status = sessionAnswers[q.id];
-                const isCurrent = i === currentBankIdx;
-                return (
-                  <button key={q.id} onClick={() => { jumpToQuestion(i); setOverviewOpen(false); }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
-                      isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary"
-                      : status === "correct" ? "bg-green-500/20 border-green-500/40 text-green-400"
-                      : status === "wrong" ? "bg-red-500/20 border-red-500/40 text-red-400"
-                      : "bg-secondary border-border text-muted-foreground"
-                    }`}>
-                    Q{i + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         <div className="flex-1 flex flex-col gap-4 p-4">
 
-          {/* ── Question card with annotation toolbar ───────────────────────── */}
+          {/* Calculator overlay */}
+          {calcActive && (
+            <div className="relative z-10">
+              <ScientificCalculator onClose={() => setCalcActive(false)} />
+            </div>
+          )}
+
+          {/* Question card with annotation toolbar */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">
@@ -155,20 +163,14 @@ export default function TopicalQuestionPage({
                 <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
                   {question.topic}
                 </span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  [{question.total_marks}m]
-                </span>
+                <span className="font-mono text-xs text-muted-foreground">[{question.total_marks}m]</span>
               </div>
             </div>
-
-            {/* Media (images/graphs) */}
             <QuestionMedia question={question} />
-
-            {/* Question text with annotation toolbar */}
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
-          {/* ── Notes (toggled via header icon) ─────────────────────────────── */}
+          {/* Inline note widget (toggled separately from the panel) */}
           {showNotes && (
             <QuestionNoteWidget
               questionId={question.id}
@@ -177,7 +179,7 @@ export default function TopicalQuestionPage({
             />
           )}
 
-          {/* ── Answer area ─────────────────────────────────────────────────── */}
+          {/* Answer area */}
           {showTeachMe ? (
             <TeachMeHow onClose={() => setShowTeachMe(false)} />
           ) : (
@@ -213,6 +215,21 @@ export default function TopicalQuestionPage({
           />
         </div>
       </div>
+
+      {/* Notes / Workings panel */}
+      <SessionNotesPanel
+        open={notesPanelOpen}
+        onClose={() => setNotesPanelOpen(false)}
+        allQuestions={allQuestions}
+        currentIdx={currentBankIdx}
+        onJumpTo={(i) => { jumpToQuestion(i); setNotesPanelOpen(false); }}
+        subject="physics"
+        userEmail={user?.email ?? ""}
+      />
+
+      {/* Formula sheet modal */}
+      {formulaSheetOpen && <FormulaSheetModal onClose={() => setFormulaSheetOpen(false)} />}
+
       {loading && <SubmittingOverlay />}
     </div>
   );

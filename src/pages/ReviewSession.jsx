@@ -1,24 +1,49 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { AlertTriangle, Flame } from "lucide-react";
+import { AlertTriangle, Flame, X } from "lucide-react";
 import AnswerInput from "../components/AnswerInput";
 import QuestionMedia from "../components/QuestionMedia";
 import QuestionAnnotator from "../components/QuestionAnnotator";
-import QuestionNoteWidget from "../components/QuestionNoteWidget";
 import QuestionSessionHeader from "../components/QuestionSessionHeader";
+import SessionNotesPanel from "../components/SessionNotesPanel";
+import ScientificCalculator from "../components/ScientificCalculator";
 import SubmitButton from "../components/SubmitButton";
 import { getReviewBank, recordAttempt, updateReviewBankEntry, incrementReviewBankClears, isSimilarAnswer } from "../lib/topicStore";
+import { getAllNotes } from "@/lib/questionNotesStore";
+import { useAuth } from "@/lib/AuthContext";
+import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
+
+function FormulaSheetModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
+      <div className="w-full max-w-[700px] bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/50 sticky top-0 bg-card z-10">
+          <p className="font-bold text-foreground">Data / Formula Sheet</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="p-2">
+          <img src={FORMULA_SHEET_URL} alt="Formula sheet" className="w-full rounded-lg" style={{ background: "#fff" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ReviewSession() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [bank, setBank] = useState([]);
   const [bankLoading, setBankLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showNotes, setShowNotes] = useState(false);
+  const [notesPanelOpen, setNotesPanelOpen] = useState(false);
+  const [calcActive, setCalcActive] = useState(false);
+  const [formulaSheetOpen, setFormulaSheetOpen] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState({});
 
   useEffect(() => {
@@ -53,13 +78,14 @@ export default function ReviewSession() {
     current.last_wrong_answer ?? current.first_attempt_answer ?? ""
   );
 
-  // Build a fake question object with the fields QuestionAnnotator needs
-  const questionForAnnotator = {
-    id: current.question_id,
-    text: current.question_text,
-    topic: current.topic,
-    ...current,
-  };
+  // Notes badge
+  const allNotes = getAllNotes();
+  const allBankQuestions = bank.map(q => ({
+    id: q.question_id,
+    topic: q.topic,
+    text: q.question_text,
+  }));
+  const notesCount = allBankQuestions.filter(q => allNotes[q.id]?.text).length;
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -82,7 +108,7 @@ Respond in JSON only:
   "marks_earned": [number out of ${current.total_marks}],
   "mark_1": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence" },
   "mark_2": { "earned": true or false, "keyword": "key phrase", "found": true or false, "feedback": "one sentence" },
-  "cambridge_insight": "two sentences on what Cambridge expects${persistenceContext ? " — address the persistent misunderstanding" : ""}",
+  "cambridge_insight": "two sentences on what Cambridge expects",
   "pulse_layer_1": "The reusable exam rule in ≤12 words.",
   "next_step": "one sentence on what to focus on next"
 }`,
@@ -107,7 +133,6 @@ Respond in JSON only:
     const newScore = result.marks_earned ?? 0;
     const isFullMarks = newScore >= current.total_marks;
 
-    // Update session answers for dots
     setSessionAnswers(prev => ({
       ...prev,
       [current.question_id]: isFullMarks ? "correct" : "wrong",
@@ -140,18 +165,11 @@ Respond in JSON only:
     }
   };
 
-  // Build the question list for the dots row
-  const allBankQuestions = bank.map(q => ({
-    id: q.question_id,
-    topic: q.topic,
-    label: q.topic,
-  }));
-
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* ── Shared P1-style header ─────────────────────────────────────── */}
+        {/* ── P1-style header with all icons ──────────────────────────── */}
         <QuestionSessionHeader
           paperRef="Written Review Bank"
           subject="Physics"
@@ -160,11 +178,23 @@ Respond in JSON only:
           allQuestions={allBankQuestions}
           sessionAnswers={sessionAnswers}
           onBack={() => navigate("/review-bank")}
-          onJumpTo={(i) => { setCurrentIndex(i); setAnswer(""); setError(null); setShowNotes(false); }}
-          onNotesToggle={() => setShowNotes(v => !v)}
+          onJumpTo={(i) => { setCurrentIndex(i); setAnswer(""); setError(null); }}
+          notesCount={notesCount}
+          onNotesPanel={() => setNotesPanelOpen(true)}
+          showCalculator={true}
+          calcActive={calcActive}
+          onCalcToggle={() => setCalcActive(a => !a)}
+          onFormulaSheet={() => setFormulaSheetOpen(true)}
         />
 
         <div className="flex-1 flex flex-col gap-4 p-4">
+
+          {/* Calculator */}
+          {calcActive && (
+            <div className="relative z-10">
+              <ScientificCalculator onClose={() => setCalcActive(false)} />
+            </div>
+          )}
 
           {/* Context banner */}
           <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
@@ -189,7 +219,7 @@ Respond in JSON only:
             </div>
           )}
 
-          {/* ── Question card with annotation toolbar ────────────────────── */}
+          {/* Question card with annotation toolbar */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md">
@@ -200,21 +230,11 @@ Respond in JSON only:
               </span>
             </div>
             <QuestionMedia question={current} />
-            {/* Annotation toolbar on question text */}
             <QuestionAnnotator text={current.question_text} questionId={current.question_id} />
             <div className="flex justify-end">
               <span className="font-mono text-xs text-muted-foreground">[{current.total_marks} mark{current.total_marks !== 1 ? "s" : ""}]</span>
             </div>
           </div>
-
-          {/* Notes (toggled via header icon) */}
-          {showNotes && (
-            <QuestionNoteWidget
-              questionId={current.question_id}
-              topic={current.topic}
-              questionText={current.question_text}
-            />
-          )}
 
           <AnswerInput value={answer} onChange={setAnswer} />
           <SubmitButton disabled={answer.trim().length === 0 || loading} loading={loading} onClick={handleSubmit} />
@@ -226,6 +246,19 @@ Respond in JSON only:
           </div>
         </div>
       </div>
+
+      {/* Notes / Workings panel */}
+      <SessionNotesPanel
+        open={notesPanelOpen}
+        onClose={() => setNotesPanelOpen(false)}
+        allQuestions={allBankQuestions}
+        currentIdx={currentIndex}
+        onJumpTo={(i) => { setCurrentIndex(i); setNotesPanelOpen(false); }}
+        subject="physics"
+        userEmail={user?.email ?? ""}
+      />
+
+      {formulaSheetOpen && <FormulaSheetModal onClose={() => setFormulaSheetOpen(false)} />}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { getStarredQuestions, starQuestion, unstarQuestion, saveTeacherQuestion 
 import { generateStarredPdf } from "@/lib/p1StarPdf";
 import { getNotes, saveNote } from "@/lib/p1NotesStore";
 import { generateNotesPdf } from "@/lib/p1NotesPdf";
+import { loadScratchpadForPaper } from "@/lib/p1ScratchpadStore";
 import PaperPdfButton from "@/components/PaperPdfButton";
 import QuestionAnnotator from "@/components/QuestionAnnotator";
 import ScratchpadPanel from "@/components/ScratchpadPanel";
@@ -30,7 +31,6 @@ function CorrectBanner() {
 function Layer1Feedback({ feedback, isCorrect, isGuess }) {
   const accentBg = isGuess ? "bg-amber-500/10 border-amber-500/25" : "bg-red-500/10 border-red-500/25";
   const accent = isGuess ? "text-amber-400" : "text-red-400";
-
   return (
     <div className="space-y-3">
       <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${accentBg}`}>
@@ -44,7 +44,6 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
           )}
         </div>
       </div>
-
       {feedback.pulse_layer_1 && (
         <div className="relative rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-transparent p-4 overflow-hidden">
           <div className="pointer-events-none absolute -top-4 -right-4 w-20 h-20 rounded-full bg-emerald-400/10 blur-xl" />
@@ -57,7 +56,6 @@ function Layer1Feedback({ feedback, isCorrect, isGuess }) {
           <p className="text-sm font-bold text-white leading-snug">{feedback.pulse_layer_1}</p>
         </div>
       )}
-
       {feedback.cambridge_insight && (
         <div className="bg-card border border-border rounded-xl px-4 py-3 space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cambridge Insight</p>
@@ -74,7 +72,6 @@ function Layer2Feedback({ feedback }) {
     { number: "2", color: { bg: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-400" }, label: "Phrase-by-Phrase Breakdown", content: feedback.step2_phrase_breakdown },
     { number: "3", color: { bg: "bg-amber-500/20", border: "border-amber-500/30", text: "text-amber-400" }, label: "The Tipping Point", content: feedback.step3_tipping_point },
   ];
-
   return (
     <div className="rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden">
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-white/5">
@@ -145,7 +142,6 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
-
         <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground pb-1 border-b border-border/40">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-500/60 inline-block border border-green-500/40" />Correct</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/60 inline-block border border-red-500/40" />Incorrect</span>
@@ -153,7 +149,6 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-secondary inline-block border border-border" />Not answered</span>
           <span>⭐ Starred · 📝 Note</span>
         </div>
-
         <div className="flex flex-wrap gap-2">
           {questions.map((q, i) => {
             const a = answers[q.id];
@@ -177,7 +172,6 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
             );
           })}
         </div>
-
         <div className="space-y-2 pt-1 border-t border-border/40">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">By topic</p>
           {topics.map(topic => {
@@ -199,7 +193,6 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
             );
           })}
         </div>
-
         <button onClick={onClear} className="w-full py-2.5 rounded-xl border border-red-500/25 text-red-400/70 text-xs font-semibold hover:bg-red-500/10 hover:text-red-400 transition-all">
           Clear progress & restart
         </button>
@@ -221,8 +214,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
 
   async function handleDownloadStarred() { setDownloading(true); await generateStarredPdf({ paperId, paperLabel, starredQuestions, userEmail }); setDownloading(false); }
   async function handleDownloadNotes() { setDownloadingNotes(true); await generateNotesPdf({ paperId, paperLabel, session: paper.session, variant: paper.id?.split("/")?.[1] ?? "", notes, starredQuestions, questions, userEmail }); setDownloadingNotes(false); }
-  function handleTeacherInputChange(questionId, value) { setTeacherInputs(prev => ({ ...prev, [questionId]: value })); }
-  function handleTeacherInputSave(questionId) { onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? ""); }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
@@ -237,7 +228,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
-
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {starred.length === 0 && noteCount === 0 && (
             <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
@@ -245,7 +235,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
               <p className="text-sm text-muted-foreground">Nothing here yet.</p>
             </div>
           )}
-
           {starred.map(([questionId, entry]) => (
             <div key={questionId} className="bg-secondary/40 border border-border rounded-xl overflow-hidden">
               <div className="flex items-start justify-between gap-2 p-4 pb-2">
@@ -259,21 +248,18 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                 </div>
                 <button onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>
               </div>
-
               {entry.feedback?.pulse_layer_1 && (
                 <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
                   <p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.pulse_layer_1}</p>
                 </div>
               )}
-
               {notes[questionId]?.text && (
                 <div className="mx-4 mb-2 bg-green-500/8 border border-green-500/20 rounded-lg px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 mb-0.5">📝 My Note</p>
                   <p className="text-[11px] text-foreground/70 leading-relaxed">{notes[questionId].text}</p>
                 </div>
               )}
-
               <div className="px-4 pb-4 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
                   <MessageCircleQuestion className="w-3 h-3" /> Question for teacher
@@ -283,19 +269,30 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                     <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-3 py-2">
                       <p className="text-[11px] text-foreground/80 leading-relaxed">{entry.teacherQuestion}</p>
                     </div>
-                    <button onClick={() => { handleTeacherInputChange(questionId, entry.teacherQuestion); onTeacherQuestionSave(questionId, ""); }} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">Edit question</button>
+                    <button onClick={() => { onTeacherQuestionSave(questionId, ""); }} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors">Edit question</button>
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <textarea value={teacherInputs[questionId] ?? ""} onChange={e => handleTeacherInputChange(questionId, e.target.value)} placeholder="What would you like to ask your teacher about this question?" rows={2} className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all" />
-                    <button onClick={() => handleTeacherInputSave(questionId)} disabled={!teacherInputs[questionId]?.trim()} className="text-xs font-semibold text-amber-400 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Save question →</button>
+                    <textarea
+                      value={teacherInputs[questionId] ?? ""}
+                      onChange={e => setTeacherInputs(p => ({ ...p, [questionId]: e.target.value }))}
+                      placeholder="What would you like to ask your teacher about this question?"
+                      rows={2}
+                      className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all"
+                    />
+                    <button
+                      onClick={() => onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? "")}
+                      disabled={!teacherInputs[questionId]?.trim()}
+                      className="text-xs font-semibold text-amber-400 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Save question →
+                    </button>
                   </div>
                 )}
               </div>
             </div>
           ))}
         </div>
-
         <div className="shrink-0 px-4 py-4 border-t border-border/50 space-y-2">
           <button onClick={handleDownloadNotes} disabled={(starred.length === 0 && noteCount === 0) || downloadingNotes} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             {downloadingNotes ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Generating…</> : <><NotebookPen className="w-4 h-4" /> Download My Notes (PDF)</>}
@@ -435,7 +432,6 @@ export default function P1Session() {
   const [showCorrectBanner, setShowCorrectBanner] = useState(false);
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
-  const [scratchpadOpen, setScratchpadOpen] = useState(false);
 
   const [starredQuestions, setStarredQuestions] = useState(() => getStarredQuestions(paperId));
   const [notes, setNotes] = useState(() => getNotes(paperId));
@@ -443,11 +439,16 @@ export default function P1Session() {
 
   const autoAdvanceTimer = useRef(null);
 
+  // Load session + scratchpad data on mount
   useEffect(() => {
     setSessionLoading(true);
     setStarredQuestions(getStarredQuestions(paperId));
     setNotes(getNotes(paperId));
-    loadP1Session(paperId).then(session => {
+
+    Promise.all([
+      loadP1Session(paperId),
+      loadScratchpadForPaper(paperId).catch(() => {}), // non-blocking
+    ]).then(([session]) => {
       setAnswers(session.answers ?? {});
       setCurrentIdx(session.currentIdx ?? 0);
       setSessionLoading(false);
@@ -813,8 +814,8 @@ Respond ONLY in JSON:
         </div>
       </div>
 
-      {/* ── Scratchpad in the right dark sidebar space ── */}
-      <ScratchpadPanel isOpen={scratchpadOpen} onToggle={() => setScratchpadOpen(o => !o)} />
+      {/* ── Dual scratchpads — only render when there's room (≥130px each side) ── */}
+      <ScratchpadPanel questionId={question?.id} paperId={paperId} />
 
       {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
       {showOverview && <OverviewPanel questions={questions} answers={answers} currentIdx={currentIdx} onJump={setCurrentIdx} onClose={() => setShowOverview(false)} onClear={handleClear} starredIds={starredIds} notedIds={notedIds} />}

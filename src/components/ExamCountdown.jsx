@@ -14,50 +14,43 @@ import {
 const CATEGORIES = ["Exam", "Test", "Quiz", "Assignment"];
 
 const TYPE_CONFIG = {
-  Exam:       { color: "border-cyan-500/50",   bg: "bg-cyan-500/10",   text: "text-cyan-400",   dot: "bg-cyan-400"   },
-  Test:       { color: "border-violet-500/50", bg: "bg-violet-500/10", text: "text-violet-400", dot: "bg-violet-400" },
-  Quiz:       { color: "border-green-500/50",  bg: "bg-green-500/10",  text: "text-green-400",  dot: "bg-green-400"  },
-  Assignment: { color: "border-amber-500/50",  bg: "bg-amber-500/10",  text: "text-amber-400",  dot: "bg-amber-400"  },
+  Exam:       { accent: "#22d3ee", border: "border-l-cyan-400",   bg: "bg-cyan-500/10",   text: "text-cyan-300",   badge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"   },
+  Test:       { accent: "#a78bfa", border: "border-l-violet-400", bg: "bg-violet-500/10", text: "text-violet-300", badge: "bg-violet-500/20 text-violet-300 border-violet-500/40" },
+  Quiz:       { accent: "#4ade80", border: "border-l-green-400",  bg: "bg-green-500/10",  text: "text-green-300",  badge: "bg-green-500/20 text-green-300 border-green-500/40"  },
+  Assignment: { accent: "#fbbf24", border: "border-l-amber-400",  bg: "bg-amber-500/10",  text: "text-amber-300",  badge: "bg-amber-500/20 text-amber-300 border-amber-500/40"  },
 };
 
-// Psychological colours for overdue status
 const STATUS_CONFIG = {
   submitted_late: {
     label: "Submitted Late",
     emoji: "⏰",
     sectionBorder: "border-amber-500/40",
     sectionBg: "bg-amber-500/8",
-    cardBorder: "border-l-amber-500",
+    cardBorderL: "border-l-amber-400",
     badge: "bg-amber-500/20 text-amber-300 border-amber-500/40",
-    dot: "bg-amber-400",
-    desc: "You submitted this late.",
   },
   failed_to_submit: {
     label: "Failed to Submit",
     emoji: "❌",
     sectionBorder: "border-red-800/50",
     sectionBg: "bg-red-900/10",
-    cardBorder: "border-l-red-800",
+    cardBorderL: "border-l-red-700",
     badge: "bg-red-800/20 text-red-400 border-red-800/40",
-    dot: "bg-red-700",
-    desc: "You didn't submit this.",
   },
   forgot_to_complete: {
     label: "Forgot to Mark Complete",
     emoji: "🔵",
     sectionBorder: "border-blue-400/40",
     sectionBg: "bg-blue-500/8",
-    cardBorder: "border-l-blue-400",
+    cardBorderL: "border-l-blue-400",
     badge: "bg-blue-500/15 text-blue-300 border-blue-400/40",
-    dot: "bg-blue-400",
-    desc: "You probably did this — just forgot to tick it.",
   },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function getMonthKey(isoDate) {
-  if (!isoDate) return "9999-12"; // unknown at end
+  if (!isoDate) return "9999-12";
   const d = new Date(isoDate);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -72,12 +65,6 @@ function getMonthLabel(key) {
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-}
-
-function fmtTime(iso) {
-  if (!iso) return "";
-  const t = new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return t === "00:00" ? "" : t;
 }
 
 // ── Event Modal ────────────────────────────────────────────────────────────────
@@ -111,27 +98,30 @@ function EventModal({ onClose, onSave, editingEvent }) {
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Title</label>
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. Physics Paper 4"
-              required
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-white/20"
-            />
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Physics Paper 4" required
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-white/20" />
           </div>
+
+          {/* Category selector — prominent pills */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Type</label>
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Category</label>
             <div className="grid grid-cols-2 gap-2">
-              {CATEGORIES.map(t => (
-                <button key={t} type="button" onClick={() => setType(t)}
-                  className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${
-                    type === t ? "bg-white/15 border-white/30 text-white" : "bg-white/5 border-white/8 text-white/40 hover:bg-white/10"
-                  }`}>
-                  {t}
-                </button>
-              ))}
+              {CATEGORIES.map(t => {
+                const cfg = TYPE_CONFIG[t];
+                return (
+                  <button key={t} type="button" onClick={() => setType(t)}
+                    className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
+                      type === t
+                        ? `${cfg.badge} border-opacity-80 scale-[1.03] shadow-sm`
+                        : "bg-white/5 border-white/10 text-white/40 hover:bg-white/8"
+                    }`}>
+                    {t}
+                  </button>
+                );
+              })}
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Date</label>
@@ -154,123 +144,131 @@ function EventModal({ onClose, onSave, editingEvent }) {
   );
 }
 
-// ── Active Card ────────────────────────────────────────────────────────────────
+// ── Horizontal Active Card ─────────────────────────────────────────────────────
 
 function ActiveCard({ event, onComplete, onDelete, onEdit }) {
   const days = daysUntil(event.due_date);
   const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG["Assignment"];
   const isToday = days === 0;
   const isUrgent = days !== null && days >= 0 && days <= 3;
-  const countColor = isToday ? "text-red-400" : isUrgent ? "text-orange-400" : cfg.text;
+
+  const countColor = isToday
+    ? "text-red-400"
+    : isUrgent
+      ? "text-orange-400"
+      : cfg.text;
+
+  const countLabel = isToday
+    ? "Today"
+    : days === 1
+      ? "Tomorrow"
+      : days !== null && days > 0
+        ? `${days}d`
+        : null;
 
   return (
-    <div className={`group relative rounded-xl border-l-4 border border-white/8 ${cfg.color} p-4 space-y-2 transition-all hover:brightness-105`}>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${cfg.text} opacity-70`}>{event.type}</span>
-          </div>
-          <p className="text-sm font-bold text-white leading-snug">{event.title}</p>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button onClick={() => onEdit(event)}
-            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-white/10 transition-all">
-            <Pencil className="w-3 h-3 text-white/40" />
-          </button>
-          <button onClick={() => onDelete(event.id)}
-            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/20 transition-all">
-            <Trash2 className="w-3 h-3 text-white/40 hover:text-red-400" />
-          </button>
-          {/* Complete button */}
-          <button onClick={() => onComplete(event.id)}
-            title="Mark as complete"
-            className={`flex items-center justify-center w-8 h-8 rounded-xl border-2 transition-all hover:scale-105 ${cfg.color} hover:bg-green-500/20 hover:border-green-500/60`}>
-            <Check className="w-4 h-4 text-white/30 hover:text-green-400" />
-          </button>
-        </div>
+    <div className={`group flex items-center gap-3 rounded-xl border-l-4 border border-white/8 ${cfg.border} bg-white/[0.03] hover:bg-white/[0.05] px-4 py-3 transition-all`}>
+
+      {/* Category badge */}
+      <span className={`shrink-0 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border ${cfg.badge}`}>
+        {event.type}
+      </span>
+
+      {/* Title + date */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-white leading-snug truncate">{event.title}</p>
+        <p className="text-[10px] text-white/30 mt-0.5 flex items-center gap-1">
+          <Clock className="w-2.5 h-2.5 shrink-0" />
+          {fmtDate(event.due_date)}
+        </p>
       </div>
 
       {/* Countdown */}
-      {days !== null && (
-        <div className="flex items-center gap-2">
-          {isToday ? (
-            <p className="text-base font-black text-red-400">Due Today!</p>
-          ) : (
-            <div className="flex items-end gap-1">
-              <span className={`text-2xl font-black tabular-nums leading-none ${countColor}`}>{days}</span>
-              <span className="text-[10px] text-white/30 font-semibold mb-0.5">days left</span>
-            </div>
-          )}
+      {countLabel && (
+        <div className={`shrink-0 text-right`}>
+          <p className={`text-sm font-black tabular-nums ${countColor}`}>{countLabel}</p>
         </div>
       )}
 
-      {/* Date/time */}
-      <p className="text-[10px] text-white/35 flex items-center gap-1">
-        <Clock className="w-2.5 h-2.5 shrink-0" />
-        {fmtDate(event.due_date)} {fmtTime(event.due_date)}
-      </p>
+      {/* Actions — visible on hover */}
+      <div className="shrink-0 flex items-center gap-1">
+        <button onClick={() => onEdit(event)}
+          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 transition-all">
+          <Pencil className="w-3 h-3 text-white/40" />
+        </button>
+        <button onClick={() => onDelete(event.id)}
+          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/20 transition-all">
+          <Trash2 className="w-3 h-3 text-white/40 hover:text-red-400" />
+        </button>
+        <button onClick={() => onComplete(event.id)} title="Mark complete"
+          className="p-1.5 rounded-lg border border-white/10 hover:bg-green-500/20 hover:border-green-500/40 transition-all">
+          <Check className="w-3.5 h-3.5 text-white/25 hover:text-green-400" />
+        </button>
+      </div>
     </div>
   );
 }
 
-// ── Overdue Card ───────────────────────────────────────────────────────────────
+// ── Horizontal Overdue Card (awaiting status) ──────────────────────────────────
 
 function OverdueCard({ event, onSetStatus, onDelete, onComplete }) {
   const days = daysUntil(event.due_date);
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl border border-l-4 border-red-500/40 border-l-red-500 bg-red-500/8 p-4 space-y-3">
-      <div className="flex items-start justify-between gap-2">
+    <div className="rounded-xl border-l-4 border border-red-500/40 border-l-red-500 bg-red-500/8 overflow-hidden">
+      {/* Horizontal summary row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border bg-red-500/20 text-red-300 border-red-500/40">
+          {event.type}
+        </span>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-0.5">{event.type}</p>
-          <p className="text-sm font-bold text-white/90">{event.title}</p>
-          <p className="text-[10px] text-red-400/70 mt-0.5">
-            {Math.abs(days ?? 0)} day{Math.abs(days ?? 0) !== 1 ? "s" : ""} overdue · {fmtDate(event.due_date)}
-          </p>
+          <p className="text-sm font-semibold text-white/90 truncate">{event.title}</p>
+          <p className="text-[10px] text-red-400/70 mt-0.5">{Math.abs(days ?? 0)}d overdue · {fmtDate(event.due_date)}</p>
         </div>
-        <button onClick={() => onDelete(event.id)} className="p-1 rounded-lg hover:bg-red-500/20 transition-all shrink-0">
+        <button onClick={() => setExpanded(e => !e)}
+          className="shrink-0 text-[11px] font-semibold text-red-400/70 hover:text-red-400 border border-red-500/30 rounded-lg px-2 py-1 transition-all">
+          {expanded ? "▲" : "What happened?"}
+        </button>
+        <button onClick={() => onDelete(event.id)} className="shrink-0 p-1.5 rounded-lg hover:bg-red-500/20 transition-all">
           <Trash2 className="w-3 h-3 text-red-400/50" />
         </button>
       </div>
 
-      <p className="text-[11px] text-white/50">What happened?</p>
-      <div className="grid grid-cols-1 gap-2">
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-          <button key={key} onClick={() => onSetStatus(event.id, key)}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs font-semibold text-left transition-all hover:brightness-110 active:scale-[0.98] ${cfg.badge}`}>
-            <span className="text-base shrink-0">{cfg.emoji}</span>
-            {cfg.label}
+      {/* Expandable status picker */}
+      {expanded && (
+        <div className="px-4 pb-4 space-y-2 border-t border-red-500/20 pt-3">
+          {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+            <button key={key} onClick={() => onSetStatus(event.id, key)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs font-semibold text-left transition-all hover:brightness-110 active:scale-[0.99] ${cfg.badge}`}>
+              <span className="text-base shrink-0">{cfg.emoji}</span>
+              {cfg.label}
+            </button>
+          ))}
+          <button onClick={() => onComplete(event.id)}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-green-500/30 bg-green-500/10 text-green-300 text-xs font-semibold text-left transition-all hover:brightness-110">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            Mark complete (done on time)
           </button>
-        ))}
-        {/* Also allow marking complete in case they just forgot */}
-        <button onClick={() => onComplete(event.id)}
-          className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-green-500/30 bg-green-500/10 text-green-300 text-xs font-semibold text-left transition-all hover:brightness-110 active:scale-[0.98]">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          Mark as complete (done on time)
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Status Card (overdue with a status set) ────────────────────────────────────
+// ── Horizontal Status Card ─────────────────────────────────────────────────────
 
 function StatusCard({ event, statusKey, onSetStatus, onDelete }) {
   const cfg = STATUS_CONFIG[statusKey];
-  const days = daysUntil(event.due_date);
-
   return (
-    <div className={`group rounded-xl border border-l-4 border-white/8 ${cfg.cardBorder} p-3 flex items-center gap-3 transition-all hover:brightness-105`}>
+    <div className={`group flex items-center gap-3 rounded-xl border-l-4 border border-white/8 ${cfg.cardBorderL} bg-white/[0.02] px-4 py-3 transition-all hover:brightness-105`}>
       <span className="text-base shrink-0">{cfg.emoji}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-white/80 truncate">{event.title}</p>
-        <p className="text-[10px] text-white/35">{fmtDate(event.due_date)}</p>
+        <p className="text-xs font-semibold text-white/70 truncate">{event.title}</p>
+        <p className="text-[10px] text-white/30 mt-0.5">{fmtDate(event.due_date)}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {/* Allow changing status */}
-        <button onClick={() => onSetStatus(event.id, null)}
-          title="Change status"
+        <button onClick={() => onSetStatus(event.id, null)} title="Change status"
           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10 transition-all">
           <RotateCcw className="w-3 h-3 text-white/30" />
         </button>
@@ -283,19 +281,18 @@ function StatusCard({ event, statusKey, onSetStatus, onDelete }) {
   );
 }
 
-// ── Complete Card ──────────────────────────────────────────────────────────────
+// ── Horizontal Complete Card ───────────────────────────────────────────────────
 
 function CompleteCard({ event, onUncomplete, onDelete }) {
   return (
-    <div className="group rounded-xl border border-l-4 border-green-500/25 border-l-green-500/60 bg-green-500/5 p-3 flex items-center gap-3 opacity-60 hover:opacity-80 transition-all">
-      <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+    <div className="group flex items-center gap-3 rounded-xl border-l-4 border-l-green-500/60 border border-white/5 bg-white/[0.015] px-4 py-2.5 opacity-55 hover:opacity-75 transition-all">
+      <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-white/70 line-through truncate">{event.title}</p>
-        <p className="text-[10px] text-white/30">{fmtDate(event.due_date)}</p>
+        <p className="text-xs font-semibold text-white/60 line-through truncate">{event.title}</p>
+        <p className="text-[10px] text-white/25 mt-0.5">{fmtDate(event.due_date)}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <button onClick={() => onUncomplete(event.id)}
-          title="Undo complete"
+        <button onClick={() => onUncomplete(event.id)} title="Undo"
           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10 transition-all">
           <RotateCcw className="w-3 h-3 text-white/40" />
         </button>
@@ -325,21 +322,20 @@ function MonthSection({ monthKey, events, handlers }) {
   if (events.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      {/* Month header */}
-      <div className="flex items-center gap-3">
+    <div className="space-y-2">
+      {/* Month divider */}
+      <div className="flex items-center gap-3 pt-1">
         <div className="flex-1 h-px bg-white/8" />
-        <p className="text-[11px] font-black uppercase tracking-widest text-white/40 shrink-0">{label}</p>
+        <p className="text-[11px] font-black uppercase tracking-widest text-white/35 shrink-0">{label}</p>
         <div className="flex-1 h-px bg-white/8" />
       </div>
 
-      {/* ── Active / Upcoming ── */}
+      {/* Upcoming */}
       {active.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 pl-0.5">Upcoming</p>
+        <div className="space-y-1.5">
           {active.map(e => (
             <ActiveCard key={e.id} event={e}
-              onComplete={(id) => handlers.onComplete(id)}
+              onComplete={handlers.onComplete}
               onDelete={handlers.onDelete}
               onEdit={handlers.onEdit}
             />
@@ -347,24 +343,24 @@ function MonthSection({ monthKey, events, handlers }) {
         </div>
       )}
 
-      {/* ── Overdue ── */}
+      {/* Overdue collapsible section */}
       {overdue.length > 0 && (
-        <div className={`rounded-2xl border ${overdueOpen ? "border-red-500/30 bg-red-500/5" : "border-white/8 bg-white/[0.02]"} overflow-hidden`}>
+        <div className={`rounded-xl border ${overdueOpen ? "border-red-500/30" : "border-white/8"} overflow-hidden`}>
           <button onClick={() => setOverdueOpen(o => !o)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-all">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-              <p className="text-sm font-bold text-red-400">Overdue</p>
-              <span className="font-mono text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">{overdue.length}</span>
+            className={`w-full flex items-center justify-between px-4 py-2.5 transition-all ${overdueOpen ? "bg-red-500/8" : "bg-white/[0.02] hover:bg-white/[0.04]"}`}>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <p className="text-xs font-bold text-red-400">Overdue</p>
+              <span className="font-mono text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">{overdue.length}</span>
             </div>
-            <span className="text-[10px] text-white/30">{overdueOpen ? "▲" : "▼"}</span>
+            <span className="text-[10px] text-white/25">{overdueOpen ? "▲" : "▼"}</span>
           </button>
 
           {overdueOpen && (
-            <div className="px-4 pb-4 space-y-4">
-              {/* Awaiting status */}
+            <div className="px-3 pb-3 pt-2 space-y-3 bg-red-500/5">
+              {/* Awaiting a status */}
               {overdueAwaiting.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {overdueAwaiting.map(e => (
                     <OverdueCard key={e.id} event={e}
                       onSetStatus={handlers.onSetStatus}
@@ -375,18 +371,18 @@ function MonthSection({ monthKey, events, handlers }) {
                 </div>
               )}
 
-              {/* Sub-sections by status */}
+              {/* Status sub-sections */}
               {Object.entries(STATUS_CONFIG).map(([statusKey, cfg]) => {
                 const group = overdueWithStatus.filter(e => e.overdueStatus === statusKey);
                 if (group.length === 0) return null;
                 return (
-                  <div key={statusKey} className={`rounded-xl border ${cfg.sectionBorder} ${cfg.sectionBg} p-3 space-y-2`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-base">{cfg.emoji}</span>
-                      <p className={`text-[11px] font-bold uppercase tracking-widest ${cfg.badge.split(" ").find(c => c.startsWith("text-"))} opacity-80`}>
+                  <div key={statusKey} className={`rounded-xl border ${cfg.sectionBorder} ${cfg.sectionBg} p-3 space-y-1.5`}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-sm">{cfg.emoji}</span>
+                      <p className={`text-[10px] font-black uppercase tracking-widest opacity-80 ${cfg.badge.split(" ").find(c => c.startsWith("text-"))}`}>
                         {cfg.label}
                       </p>
-                      <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.badge}`}>{group.length}</span>
+                      <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-full border ${cfg.badge}`}>{group.length}</span>
                     </div>
                     {group.map(e => (
                       <StatusCard key={e.id} event={e} statusKey={statusKey}
@@ -402,21 +398,21 @@ function MonthSection({ monthKey, events, handlers }) {
         </div>
       )}
 
-      {/* ── Complete ── */}
+      {/* Complete collapsible section */}
       {complete.length > 0 && (
-        <div className={`rounded-2xl border ${completeOpen ? "border-green-500/25 bg-green-500/5" : "border-white/8 bg-white/[0.02]"} overflow-hidden`}>
+        <div className={`rounded-xl border ${completeOpen ? "border-green-500/25" : "border-white/8"} overflow-hidden`}>
           <button onClick={() => setCompleteOpen(o => !o)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-all">
-            <div className="flex items-center gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
-              <p className="text-sm font-bold text-green-400">Complete</p>
-              <span className="font-mono text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">{complete.length}</span>
+            className={`w-full flex items-center justify-between px-4 py-2.5 transition-all ${completeOpen ? "bg-green-500/5" : "bg-white/[0.02] hover:bg-white/[0.04]"}`}>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
+              <p className="text-xs font-bold text-green-400">Complete</p>
+              <span className="font-mono text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">{complete.length}</span>
             </div>
-            <span className="text-[10px] text-white/30">{completeOpen ? "▲" : "▼"}</span>
+            <span className="text-[10px] text-white/25">{completeOpen ? "▲" : "▼"}</span>
           </button>
 
           {completeOpen && (
-            <div className="px-4 pb-4 space-y-2">
+            <div className="px-3 pb-3 pt-2 space-y-1.5 bg-green-500/5">
               {complete.map(e => (
                 <CompleteCard key={e.id} event={e}
                   onUncomplete={handlers.onUncomplete}
@@ -442,7 +438,6 @@ export default function ExamCountdown() {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
 
-  // Load from Supabase on mount
   useEffect(() => {
     loadEvents().then(remote => { setEvents(remote); setSyncing(false); }).catch(() => setSyncing(false));
   }, []);
@@ -454,39 +449,19 @@ export default function ExamCountdown() {
     setTimeout(() => setSyncStatus(null), 2500);
   }
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   function handleAdd({ title, type, due_date, id }) {
-    let updated;
-    if (id) {
-      updated = updateManualEvent(id, { title, type, due_date });
-    } else {
-      updated = addManualEvent({ title, type, due_date });
-    }
+    const updated = id
+      ? updateManualEvent(id, { title, type, due_date })
+      : addManualEvent({ title, type, due_date });
     setEvents(updated);
   }
 
-  function handleDelete(id) {
-    setEvents(deleteManualEvent(id));
-  }
+  function handleDelete(id) { setEvents(deleteManualEvent(id)); }
+  function handleEdit(event) { setEditingEvent(event); setShowModal(true); }
+  function handleComplete(id) { setEvents(markEventComplete(id)); }
+  function handleUncomplete(id) { setEvents(unmarkEventComplete(id)); }
+  function handleSetStatus(id, status) { setEvents(setOverdueStatus(id, status)); }
 
-  function handleEdit(event) {
-    setEditingEvent(event);
-    setShowModal(true);
-  }
-
-  function handleComplete(id) {
-    setEvents(markEventComplete(id));
-  }
-
-  function handleUncomplete(id) {
-    setEvents(unmarkEventComplete(id));
-  }
-
-  function handleSetStatus(id, status) {
-    setEvents(setOverdueStatus(id, status));
-  }
-
-  // ── Month grouping ─────────────────────────────────────────────────────────
   const monthGroups = useMemo(() => {
     const sorted = [...events].sort(
       (a, b) => new Date(a.due_date ?? "9999-12-31").getTime() - new Date(b.due_date ?? "9999-12-31").getTime()
@@ -501,7 +476,6 @@ export default function ExamCountdown() {
   }, [events]);
 
   const monthKeys = Object.keys(monthGroups).sort();
-
   const handlers = { onComplete: handleComplete, onUncomplete: handleUncomplete, onSetStatus: handleSetStatus, onDelete: handleDelete, onEdit: handleEdit };
 
   const totalEvents = events.length;
@@ -509,69 +483,55 @@ export default function ExamCountdown() {
   const overdueCount = events.filter(e => !e.completed && (daysUntil(e.due_date) ?? 0) < 0).length;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between px-0.5">
-        <div className="space-y-0.5">
+    <div className="space-y-3">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div>
           <p className="text-xs font-bold uppercase tracking-widest text-white/30">My Schedule</p>
           {totalEvents > 0 && (
-            <p className="text-[10px] text-white/20">
+            <p className="text-[10px] text-white/20 mt-0.5">
               {completedCount}/{totalEvents} complete
               {overdueCount > 0 && <span className="text-red-400/70 ml-2">· {overdueCount} overdue</span>}
             </p>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Sync button */}
           <button onClick={handleForceSync} disabled={syncStatus === "syncing"}
-            className={`flex items-center gap-1.5 text-[11px] font-semibold border rounded-lg px-2.5 py-1 transition-all ${
+            className={`flex items-center gap-1.5 text-[11px] font-semibold border rounded-lg px-2.5 py-1.5 transition-all ${
               syncStatus === "done" ? "border-green-500/40 text-green-400 bg-green-500/10"
               : syncStatus === "error" ? "border-red-500/40 text-red-400 bg-red-500/10"
-              : "border-white/10 text-white/40 hover:text-white/70 hover:bg-white/5"
+              : "border-white/10 text-white/35 hover:text-white/60 hover:bg-white/5"
             } disabled:opacity-50`}>
-            {syncStatus === "syncing"
-              ? <><Loader2 className="w-3 h-3 animate-spin" />Syncing…</>
-              : syncStatus === "done"
-                ? <><Check className="w-3 h-3" />Synced</>
-                : syncStatus === "error"
-                  ? <>⚠ Failed</>
-                  : <><RefreshCw className="w-3 h-3" />Sync</>}
+            {syncStatus === "syncing" ? <><Loader2 className="w-3 h-3 animate-spin" />Syncing…</>
+              : syncStatus === "done" ? <><Check className="w-3 h-3" />Synced</>
+              : syncStatus === "error" ? <>⚠ Failed</>
+              : <><RefreshCw className="w-3 h-3" />Sync</>}
           </button>
-
-          {/* Add event */}
           <button onClick={() => { setEditingEvent(null); setShowModal(true); }}
-            className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 border border-white/10 rounded-lg px-2.5 py-1 hover:bg-white/5 transition-all">
+            className="flex items-center gap-1.5 text-[11px] text-white/35 hover:text-white/60 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/5 transition-all">
             <Plus className="w-3 h-3" /> Add
           </button>
         </div>
       </div>
 
-      {/* Empty state */}
-      {totalEvents === 0 && !syncing && (
-        <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-          <p className="text-sm text-white/30">No events yet.</p>
-          <p className="text-xs text-white/20">Add exams, tests, quizzes and assignments to track them here.</p>
-        </div>
-      )}
-
       {syncing && (
-        <div className="flex items-center justify-center gap-2 py-4">
+        <div className="flex items-center justify-center gap-2 py-6">
           <Loader2 className="w-4 h-4 text-white/30 animate-spin" />
           <p className="text-xs text-white/30">Loading your schedule…</p>
         </div>
       )}
 
-      {/* Month sections */}
+      {!syncing && totalEvents === 0 && (
+        <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+          <p className="text-sm text-white/30">No events yet.</p>
+          <p className="text-xs text-white/20">Add exams, tests, quizzes and assignments to track them here.</p>
+        </div>
+      )}
+
       {!syncing && monthKeys.map(key => (
-        <MonthSection
-          key={key}
-          monthKey={key}
-          events={monthGroups[key]}
-          handlers={handlers}
-        />
+        <MonthSection key={key} monthKey={key} events={monthGroups[key]} handlers={handlers} />
       ))}
 
-      {/* Modal */}
       {showModal && (
         <EventModal
           onClose={() => { setShowModal(false); setEditingEvent(null); }}

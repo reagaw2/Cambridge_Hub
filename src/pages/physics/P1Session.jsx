@@ -216,11 +216,9 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
   const noteCount = Object.keys(notes).length;
   const starredCount = starred.length;
 
-  // All notes (including those on starred questions)
-  const allNotes = Object.entries(notes).sort(([, a], [, b]) => {
-    const qa = questions.find(q => q.id === Object.keys(notes)[0]);
-    return new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0);
-  });
+  const allNotes = Object.entries(notes).sort(([, a], [, b]) =>
+    new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0)
+  );
 
   function getQuestion(questionId) {
     return questions.find(q => q.id === questionId);
@@ -240,8 +238,11 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center">
-      <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl max-h-[88vh] flex flex-col">
-
+      {/* Panel fills from near the very top to the bottom — inset-x-0 bottom-0, top set to 5% */}
+      <div
+        className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl flex flex-col"
+        style={{ height: "95vh" }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
           <p className="font-bold text-foreground">Notes & Starred</p>
@@ -286,8 +287,8 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           </button>
         </div>
 
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Scrollable content — flex-1 so it fills the space between tabs and footer */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
 
           {/* ── MY NOTES TAB ── */}
           {activeTab === "notes" && (
@@ -360,7 +361,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                     </button>
                   </div>
 
-                  {/* AI takeaway */}
                   {entry.feedback?.pulse_layer_1 && (
                     <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Takeaway</p>
@@ -368,7 +368,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                     </div>
                   )}
 
-                  {/* Note on this question (if any) */}
                   {notes[questionId]?.text && (
                     <div className="mx-4 mb-2 bg-green-500/8 border border-green-500/20 rounded-lg px-3 py-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 mb-0.5">📝 My Note</p>
@@ -376,7 +375,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                     </div>
                   )}
 
-                  {/* Teacher question */}
                   <div className="px-4 pb-4 space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
                       <MessageCircleQuestion className="w-3 h-3" /> Question for teacher
@@ -413,7 +411,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           )}
         </div>
 
-        {/* Footer — tab-specific download button */}
+        {/* Footer — always pinned to the bottom, never scrolled away */}
         <div className="shrink-0 px-4 py-4 border-t border-border/50">
           {activeTab === "notes" && (
             <button

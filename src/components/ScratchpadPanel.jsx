@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Trash2, Undo2, Eraser, PenLine, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, Undo2, Eraser, PenLine, ChevronLeft, ChevronRight, Save, CheckCircle2 } from "lucide-react";
 import { getStrokesForQuestion, saveStrokes } from "@/lib/p1ScratchpadStore";
 
 const PEN_COLORS = [
@@ -11,7 +11,7 @@ const PEN_COLORS = [
 
 // ── Single pad ────────────────────────────────────────────────────────────────
 
-function DrawingPad({ side, questionId, paperId, width }) {
+function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedWorking }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -20,10 +20,9 @@ function DrawingPad({ side, questionId, paperId, width }) {
   const [penColor, setPenColor] = useState("#0f172a");
   const [penSize, setPenSize] = useState(2);
 
-  // Current strokes (what's drawn)
   const [strokes, setStrokes] = useState([]);
-  // Undo history — each entry is a full snapshot of strokes before a change
   const [history, setHistory] = useState([]);
+  const [saveFlash, setSaveFlash] = useState(false);
 
   const strokesRef = useRef([]);
   const historyRef = useRef([]);
@@ -34,6 +33,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
   const penSizeRef = useRef(2);
   const questionIdRef = useRef(questionId);
   const paperIdRef = useRef(paperId);
+  const eraseSnapshotRef = useRef(null);
 
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
   useEffect(() => { penColorRef.current = penColor; }, [penColor]);
@@ -41,24 +41,20 @@ function DrawingPad({ side, questionId, paperId, width }) {
   useEffect(() => { questionIdRef.current = questionId; }, [questionId]);
   useEffect(() => { paperIdRef.current = paperId; }, [paperId]);
 
-  // Load strokes when question changes
   useEffect(() => {
     const s = getStrokesForQuestion(paperId, questionId, side);
     setStrokes(s);
     strokesRef.current = s;
-    // Reset history when changing question
     setHistory([]);
     historyRef.current = [];
   }, [questionId, paperId, side]);
 
-  // Push current strokes onto the history stack before a change
   function pushHistory(currentStrokes) {
     const snapshot = [...currentStrokes];
     historyRef.current = [...historyRef.current, snapshot];
     setHistory([...historyRef.current]);
   }
 
-  // Apply a new stroke array, persist, and update state
   function applyStrokes(newStrokes) {
     strokesRef.current = newStrokes;
     setStrokes(newStrokes);
@@ -117,7 +113,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
     }
   }, []);
 
-  // Resize canvas
   useEffect(() => {
     if (collapsed) return;
     const canvas = canvasRef.current;
@@ -160,14 +155,9 @@ function DrawingPad({ side, questionId, paperId, width }) {
   function commitStroke(pts) {
     if (pts.length < 2) return;
     const newStroke = { points: pts, color: penColorRef.current, size: penSizeRef.current };
-    // Snapshot before adding the stroke
     pushHistory([...strokesRef.current]);
     applyStrokes([...strokesRef.current, newStroke]);
   }
-
-  // Erasing is done stroke-by-stroke during a drag. We snapshot before the
-  // erase drag begins (in onCanvasPointerDown) and commit the result on pointerup.
-  const eraseSnapshotRef = useRef(null);
 
   function eraseAt(pos) {
     const R = 0.05;
@@ -177,7 +167,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
     if (updated.length !== strokesRef.current.length) {
       strokesRef.current = updated;
       setStrokes(updated);
-      // Don't persist every intermediate erase — persist on pointerup
     }
   }
 
@@ -187,7 +176,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
       const src = e.touches ? e.touches[0] : e;
       const pos = getCanvasPos(src.clientX, src.clientY);
       if (!pos) return;
-
       if (activeToolRef.current === "pen") {
         currentStrokeRef.current.push(pos);
         redraw();
@@ -200,13 +188,11 @@ function DrawingPad({ side, questionId, paperId, width }) {
     function onUp() {
       if (!isDrawingRef.current) return;
       isDrawingRef.current = false;
-
       if (activeToolRef.current === "pen") {
         commitStroke([...currentStrokeRef.current]);
         currentStrokeRef.current = [];
         redraw();
       } else if (activeToolRef.current === "eraser") {
-        // Commit the erase result — push history if anything actually changed
         const current = strokesRef.current;
         if (eraseSnapshotRef.current && eraseSnapshotRef.current.length !== current.length) {
           pushHistory(eraseSnapshotRef.current);
@@ -237,11 +223,9 @@ function DrawingPad({ side, questionId, paperId, width }) {
     const src = e.touches ? e.touches[0] : e;
     const pos = getCanvasPos(src.clientX, src.clientY);
     if (!pos) return;
-
     if (activeToolRef.current === "pen") {
       currentStrokeRef.current = [pos];
     } else if (activeToolRef.current === "eraser") {
-      // Snapshot before the erase drag begins
       eraseSnapshotRef.current = [...strokesRef.current];
       eraseAt(pos);
       redraw(pos);
@@ -250,7 +234,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
   function handleUndo() {
     if (historyRef.current.length === 0) return;
-    // Pop the most recent snapshot
     const prev = [...historyRef.current];
     const snapshot = prev.pop();
     historyRef.current = prev;
@@ -260,9 +243,59 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
   function handleClear() {
     if (strokesRef.current.length === 0) return;
-    // Save entire current state to history before clearing
     pushHistory([...strokesRef.current]);
     applyStrokes([]);
+  }
+
+  /**
+   * Capture the canvas as a base64 PNG at a fixed width for clean PDF output.
+   * Renders paper background + all strokes.
+   */
+  function captureCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas || strokesRef.current.length === 0) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+
+    const MAX_W = 320;
+    const scale = MAX_W / rect.width;
+    const outW = MAX_W;
+    const outH = Math.max(1, Math.round(rect.height * scale));
+
+    const offscreen = document.createElement("canvas");
+    offscreen.width = outW;
+    offscreen.height = outH;
+    const ctx = offscreen.getContext("2d");
+
+    // Paper background
+    ctx.fillStyle = "#f6f1e4";
+    ctx.fillRect(0, 0, outW, outH);
+
+    // Draw lines from strokes directly at the target resolution
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const stroke of strokesRef.current) {
+      if (stroke.points.length < 2) continue;
+      ctx.beginPath();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.size * scale;
+      stroke.points.forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt.x * outW, pt.y * outH);
+        else ctx.lineTo(pt.x * outW, pt.y * outH);
+      });
+      ctx.stroke();
+    }
+
+    return offscreen.toDataURL("image/png");
+  }
+
+  function handleSaveWorking() {
+    const imageData = captureCanvas();
+    if (!imageData) return;
+    onSaveWorking?.(imageData);
+    setSaveFlash(true);
+    setTimeout(() => setSaveFlash(false), 2500);
   }
 
   const hasContent = strokes.length > 0;
@@ -314,7 +347,10 @@ function DrawingPad({ side, questionId, paperId, width }) {
             Workings
           </div>
           {hasContent && (
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#a89880" }} title="Contains notes" />
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#a89880" }} />
+          )}
+          {hasSavedWorking && (
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#16a34a" }} title="Working saved" />
           )}
         </div>
         <div className="pb-4">
@@ -353,7 +389,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
             </p>
           </div>
           <div className="flex items-center gap-0.5">
-            {/* Undo — works for strokes AND clears */}
             <button
               onClick={handleUndo}
               disabled={!canUndo}
@@ -362,7 +397,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
             >
               <Undo2 className="w-3 h-3" />
             </button>
-            {/* Clear all — undoable */}
             <button
               onClick={handleClear}
               disabled={!hasContent}
@@ -371,7 +405,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
             >
               <Trash2 className="w-3 h-3" />
             </button>
-            {/* Collapse button */}
             <button
               onClick={() => setCollapsed(true)}
               title="Collapse scratchpad"
@@ -384,7 +417,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
           </div>
         </div>
 
-        {/* Undo depth hint */}
+        {/* Undo hint */}
         <p className="text-[8.5px] text-stone-400 leading-none italic">
           {canUndo
             ? `${history.length} undo step${history.length !== 1 ? "s" : ""} available`
@@ -393,7 +426,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
         {/* Tool controls */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Colours */}
           <div className="flex gap-0.5 items-center">
             {PEN_COLORS.map(({ color, label }) => (
               <button
@@ -415,7 +447,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
           <div className="w-px h-3 bg-stone-300" />
 
-          {/* Sizes */}
           <div className="flex gap-0.5 items-center">
             {[{ s: 1.5, label: "Fine" }, { s: 3.5, label: "Thick" }].map(({ s, label }) => (
               <button
@@ -444,7 +475,6 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
           <div className="w-px h-3 bg-stone-300" />
 
-          {/* Eraser */}
           <button
             onClick={() => setActiveTool(t => t === "eraser" ? "pen" : "eraser")}
             title={activeTool === "eraser" ? "Switch to pen" : "Eraser"}
@@ -462,9 +492,29 @@ function DrawingPad({ side, questionId, paperId, width }) {
           </button>
         </div>
 
-        {/* Active tool hint */}
+        {/* Save working button */}
+        <button
+          onClick={handleSaveWorking}
+          disabled={!hasContent}
+          title="Save working for teacher submission / PDF export"
+          className="w-full flex items-center justify-center gap-1.5 rounded-lg border transition-all py-1.5 text-[10px] font-bold disabled:opacity-30"
+          style={{
+            background: saveFlash || hasSavedWorking ? "#dcfce7" : "#e5dece",
+            borderColor: saveFlash || hasSavedWorking ? "#86efac" : "#b8a888",
+            color: saveFlash || hasSavedWorking ? "#15803d" : "#78716c",
+          }}
+        >
+          {saveFlash ? (
+            <><CheckCircle2 className="w-3 h-3" /> Saved!</>
+          ) : hasSavedWorking ? (
+            <><CheckCircle2 className="w-3 h-3" /> Working saved</>
+          ) : (
+            <><Save className="w-3 h-3" /> Save working</>
+          )}
+        </button>
+
         <p className="text-[8px] text-stone-400 leading-none">
-          {activeTool === "eraser" ? "🧹 Eraser active — drag to erase" : "✏ Draw mode"}
+          {activeTool === "eraser" ? "🧹 Eraser active" : "✏ Draw mode"}
         </p>
       </div>
 
@@ -516,7 +566,7 @@ function DrawingPad({ side, questionId, paperId, width }) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export default function ScratchpadPanel({ questionId, paperId }) {
+export default function ScratchpadPanel({ questionId, paperId, workings, onSaveWorking }) {
   const [windowWidth, setWindowWidth] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth : 1200
   );
@@ -530,10 +580,26 @@ export default function ScratchpadPanel({ questionId, paperId }) {
   const sideWidth = Math.floor((windowWidth - 540) / 2);
   if (sideWidth < 130 || !questionId) return null;
 
+  const savedSides = workings?.[questionId]?.sides ?? {};
+
   return (
     <>
-      <DrawingPad side="left" questionId={questionId} paperId={paperId} width={sideWidth} />
-      <DrawingPad side="right" questionId={questionId} paperId={paperId} width={sideWidth} />
+      <DrawingPad
+        side="left"
+        questionId={questionId}
+        paperId={paperId}
+        width={sideWidth}
+        onSaveWorking={(imageData) => onSaveWorking?.("left", imageData)}
+        hasSavedWorking={!!savedSides.left}
+      />
+      <DrawingPad
+        side="right"
+        questionId={questionId}
+        paperId={paperId}
+        width={sideWidth}
+        onSaveWorking={(imageData) => onSaveWorking?.("right", imageData)}
+        hasSavedWorking={!!savedSides.right}
+      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download, Pencil, NotebookPen, MessageCircleQuestion } from "lucide-react";
+import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download, Pencil, NotebookPen, MessageCircleQuestion, PenLine, Trash2 } from "lucide-react";
 import { getP1Paper } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
@@ -11,6 +11,8 @@ import { generateStarredPdf } from "@/lib/p1StarPdf";
 import { loadNotes, saveNote } from "@/lib/p1NotesStore";
 import { generateNotesPdf } from "@/lib/p1NotesPdf";
 import { loadScratchpadForPaper } from "@/lib/p1ScratchpadStore";
+import { loadWorkings, saveWorking, deleteWorking } from "@/lib/p1WorkingsStore";
+import { generateWorkingsPdf } from "@/lib/p1WorkingsPdf";
 import PaperPdfButton from "@/components/PaperPdfButton";
 import QuestionAnnotator from "@/components/QuestionAnnotator";
 import ScratchpadPanel from "@/components/ScratchpadPanel";
@@ -115,7 +117,7 @@ function FormulaSheet({ onClose, imageUrl }) {
             <img src={imageUrl} alt="Formula sheet" className="w-full rounded-lg" style={{ background: "#fff" }} />
           ) : (
             <div className="p-8 text-center text-muted-foreground text-sm">
-              Formula sheet not available for this paper. Please refer to your Cambridge data booklet.
+              Formula sheet not available for this paper.
             </div>
           )}
         </div>
@@ -201,11 +203,12 @@ function OverviewPanel({ questions, answers, currentIdx, onJump, onClose, onClea
   );
 }
 
-// ── Starred & Notes panel ─────────────────────────────────────────────────────
-function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onClose, onJump, questions, userEmail, onTeacherQuestionSave }) {
+// ── Notes, Starred & Workings panel ──────────────────────────────────────────
+function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, workings, onClose, onJump, questions, userEmail, onTeacherQuestionSave, onDeleteWorking }) {
   const [activeTab, setActiveTab] = useState("notes");
   const [downloading, setDownloading] = useState(false);
   const [downloadingNotes, setDownloadingNotes] = useState(false);
+  const [downloadingWorkings, setDownloadingWorkings] = useState(false);
   const [teacherInputs, setTeacherInputs] = useState(() => {
     const init = {};
     Object.entries(starredQuestions).forEach(([id, entry]) => { init[id] = entry.teacherQuestion ?? ""; });
@@ -215,6 +218,15 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
   const starred = Object.entries(starredQuestions).sort((a, b) => a[1].questionNumber - b[1].questionNumber);
   const noteCount = Object.keys(notes).length;
   const starredCount = starred.length;
+
+  // Sort workings by question number
+  const workingEntries = Object.entries(workings)
+    .sort((a, b) => {
+      const qa = questions.find(q => q.id === a[0]);
+      const qb = questions.find(q => q.id === b[0]);
+      return (qa?.number ?? a[1].questionNumber ?? 0) - (qb?.number ?? b[1].questionNumber ?? 0);
+    });
+  const workingsCount = workingEntries.length;
 
   const allNotes = Object.entries(notes).sort(([, a], [, b]) =>
     new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0)
@@ -236,31 +248,34 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
     setDownloadingNotes(false);
   }
 
+  async function handleDownloadWorkings() {
+    setDownloadingWorkings(true);
+    await generateWorkingsPdf({ paperId, paperLabel, workings, questions, userEmail });
+    setDownloadingWorkings(false);
+  }
+
   return (
-    /* z-[60] ensures this panel covers the bottom nav bar (z-50) */
     <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex flex-col justify-end items-center">
       <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl flex flex-col" style={{ height: "92vh" }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
-          <p className="font-bold text-foreground">Notes & Starred</p>
+          <p className="font-bold text-foreground">Notes, Workings & Starred</p>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — three tabs now */}
         <div className="flex shrink-0 border-b border-border/50">
           <button
             onClick={() => setActiveTab("notes")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
-              activeTab === "notes"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${
+              activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Pencil className="w-3.5 h-3.5" />
-            My Notes
+            <Pencil className="w-3 h-3" />
+            Notes
             {noteCount > 0 && (
               <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
                 {noteCount}
@@ -268,15 +283,27 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
             )}
           </button>
           <button
-            onClick={() => setActiveTab("teacher")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${
-              activeTab === "teacher"
-                ? "border-amber-400 text-amber-400"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+            onClick={() => setActiveTab("workings")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${
+              activeTab === "workings" ? "border-blue-400 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Star className={`w-3.5 h-3.5 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} />
-            Teacher Review
+            <PenLine className="w-3 h-3" />
+            Workings
+            {workingsCount > 0 && (
+              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "workings" ? "bg-blue-500/20 text-blue-400" : "bg-secondary text-muted-foreground"}`}>
+                {workingsCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("teacher")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${
+              activeTab === "teacher" ? "border-amber-400 text-amber-400" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Star className={`w-3 h-3 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} />
+            Teacher
             {starredCount > 0 && (
               <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>
                 {starredCount}
@@ -285,7 +312,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           </button>
         </div>
 
-        {/* Scrollable content — flex-1 min-h-0 ensures it doesn't push the footer off screen */}
+        {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
 
           {/* ── MY NOTES TAB ── */}
@@ -308,9 +335,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-bold text-primary">Q{q.number}</span>
                             <span className="text-[11px] text-muted-foreground">{q.topic}</span>
-                            {starredQuestions[questionId] && (
-                              <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
-                            )}
+                            {starredQuestions[questionId] && <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />}
                           </div>
                         )}
                         <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">{note.text}</p>
@@ -323,6 +348,85 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                           Go to →
                         </button>
                       )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* ── MY WORKINGS TAB ── */}
+          {activeTab === "workings" && (
+            <>
+              {workingEntries.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                  <PenLine className="w-8 h-8 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">No workings saved yet.</p>
+                  <p className="text-xs text-muted-foreground/50 max-w-[240px] leading-relaxed">
+                    Use the scratchpad panels on the sides of the screen to write your workings, then tap "Save working" to store them here.
+                  </p>
+                </div>
+              )}
+
+              {workingEntries.length > 0 && (
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+                  Saved workings are synced across all your devices and can be downloaded as a PDF to submit to your teacher.
+                </p>
+              )}
+
+              {workingEntries.map(([questionId, entry]) => {
+                const q = getQuestion(questionId);
+                const qNumber = entry.questionNumber ?? q?.number ?? "?";
+                const qTopic = entry.topic ?? q?.topic ?? "";
+                const sides = entry.sides ?? {};
+                return (
+                  <div key={questionId} className="bg-blue-500/5 border border-blue-500/20 rounded-xl overflow-hidden">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-blue-500/10">
+                      <div className="flex items-center gap-2">
+                        <PenLine className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="font-mono text-xs font-bold text-primary">Q{qNumber}</span>
+                        <span className="text-[11px] text-muted-foreground">{qTopic}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {q && (
+                          <button
+                            onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }}
+                            className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all"
+                          >
+                            Go to →
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onDeleteWorking(questionId)}
+                          className="p-1 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                          title="Delete this working"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Images */}
+                    <div className="p-3 space-y-3">
+                      {Object.entries(sides).sort().map(([sideKey, imageData]) => (
+                        <div key={sideKey} className="space-y-1">
+                          {Object.keys(sides).length > 1 && (
+                            <p className="text-[10px] font-semibold text-blue-400/70 uppercase tracking-widest">
+                              {sideKey} side
+                            </p>
+                          )}
+                          <img
+                            src={imageData}
+                            alt={`Working for Q${qNumber}`}
+                            className="w-full rounded-lg border border-blue-500/20"
+                            style={{ background: "#f6f1e4", maxHeight: 200, objectFit: "contain" }}
+                          />
+                        </div>
+                      ))}
+                      <p className="text-[10px] text-muted-foreground/40">
+                        Saved {new Date(entry.savedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </p>
                     </div>
                   </div>
                 );
@@ -373,6 +477,15 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
                     </div>
                   )}
 
+                  {workings[questionId] && (
+                    <div className="mx-4 mb-2 bg-blue-500/8 border border-blue-500/20 rounded-lg px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400/60 mb-1">✏ Working saved</p>
+                      {Object.values(workings[questionId].sides ?? {}).slice(0, 1).map((img, i) => (
+                        <img key={i} src={img} alt="Working thumbnail" className="w-full rounded border border-blue-500/20 max-h-24 object-contain" style={{ background: "#f6f1e4" }} />
+                      ))}
+                    </div>
+                  )}
+
                   <div className="px-4 pb-4 space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5 mt-2">
                       <MessageCircleQuestion className="w-3 h-3" /> Question for teacher
@@ -409,7 +522,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
           )}
         </div>
 
-        {/* Footer — always pinned, never hidden by nav bar */}
+        {/* Footer — always pinned */}
         <div className="shrink-0 px-4 py-4 border-t border-border/50 bg-card">
           {activeTab === "notes" && (
             <button
@@ -420,6 +533,17 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, notes, onC
               {downloadingNotes
                 ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Generating…</>
                 : <><NotebookPen className="w-4 h-4" /> Download My Notes (PDF)</>}
+            </button>
+          )}
+          {activeTab === "workings" && (
+            <button
+              onClick={handleDownloadWorkings}
+              disabled={workingsCount === 0 || downloadingWorkings}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {downloadingWorkings
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating…</>
+                : <><Download className="w-4 h-4" /> Download My Workings (PDF)</>}
             </button>
           )}
           {activeTab === "teacher" && (
@@ -567,6 +691,7 @@ export default function P1Session() {
 
   const [starredQuestions, setStarredQuestions] = useState({});
   const [notes, setNotes] = useState({});
+  const [workings, setWorkings] = useState({});
   const [showTeacherPrompt, setShowTeacherPrompt] = useState(false);
 
   const autoAdvanceTimer = useRef(null);
@@ -577,12 +702,14 @@ export default function P1Session() {
       loadP1Session(paperId),
       loadNotes(paperId),
       loadStarredQuestions(paperId),
+      loadWorkings(paperId),
       loadScratchpadForPaper(paperId).catch(() => {}),
-    ]).then(([session, loadedNotes, loadedStars]) => {
+    ]).then(([session, loadedNotes, loadedStars, loadedWorkings]) => {
       setAnswers(session.answers ?? {});
       setCurrentIdx(session.currentIdx ?? 0);
       setNotes(loadedNotes ?? {});
       setStarredQuestions(loadedStars ?? {});
+      setWorkings(loadedWorkings ?? {});
       setSessionLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -624,6 +751,9 @@ export default function P1Session() {
   const notedIds = new Set(Object.keys(notes));
   const isCurrentStarred = question ? starredIds.has(question.id) : false;
 
+  // Count of things in the panel badge
+  const totalPanelItems = starredIds.size + notedIds.size + Object.keys(workings).length;
+
   function handleToggleCrossOut(key) {
     setCrossedOut(prev => {
       const next = new Set(prev);
@@ -662,6 +792,21 @@ export default function P1Session() {
   function handleTeacherQuestionSave(questionId, value) {
     const updated = saveTeacherQuestion(paperId, questionId, value);
     setStarredQuestions({ ...updated });
+  }
+
+  function handleSaveWorking(side, imageData) {
+    if (!question) return;
+    const updated = saveWorking(paperId, question.id, side, imageData, {
+      questionNumber: question.number,
+      topic: question.topic,
+      questionText: question.text,
+    });
+    setWorkings({ ...updated });
+  }
+
+  function handleDeleteWorking(questionId) {
+    const updated = deleteWorking(paperId, questionId);
+    setWorkings({ ...updated });
   }
 
   async function handleClear() {
@@ -749,7 +894,6 @@ Respond ONLY in JSON:
   if (!question) return null;
   const isFirst = currentIdx === 0;
   const isLast = currentIdx === questions.length - 1;
-  const totalStarredAndNoted = starredIds.size + notedIds.size;
   const showFeedbackPanel = submitted && layer1 !== null;
   const crossedCount = crossedOut.size;
 
@@ -778,9 +922,9 @@ Respond ONLY in JSON:
                 <span className="hidden sm:inline">Data</span>
               </button>
               <button onClick={() => setShowStarred(true)}
-                className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${totalStarredAndNoted > 0 ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}>
-                <NotebookPen className={`w-3.5 h-3.5 ${totalStarredAndNoted > 0 ? "text-amber-400" : ""}`} />
-                {totalStarredAndNoted > 0 && <span className="font-mono text-[10px]">{totalStarredAndNoted}</span>}
+                className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${totalPanelItems > 0 ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}>
+                <NotebookPen className={`w-3.5 h-3.5 ${totalPanelItems > 0 ? "text-amber-400" : ""}`} />
+                {totalPanelItems > 0 && <span className="font-mono text-[10px]">{totalPanelItems}</span>}
               </button>
               <button onClick={() => setShowOverview(true)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-all">
@@ -808,6 +952,7 @@ Respond ONLY in JSON:
             const isAnswered = !!a?.chosen;
             const isStarred = starredIds.has(q.id);
             const hasNote = notedIds.has(q.id);
+            const hasWorking = !!workings[q.id];
             return (
               <button key={q.id} onClick={() => setCurrentIdx(i)}
                 className={`relative shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${
@@ -819,7 +964,8 @@ Respond ONLY in JSON:
                 }`}>
                 {q.number}
                 {isStarred && <span className="absolute -top-1 -right-1 text-[7px] leading-none">⭐</span>}
-                {hasNote && !isStarred && <span className="absolute -top-1 -right-1 text-[7px] leading-none">📝</span>}
+                {!isStarred && hasNote && <span className="absolute -top-1 -right-1 text-[7px] leading-none">📝</span>}
+                {!isStarred && !hasNote && hasWorking && <span className="absolute -top-1 -right-1 text-[7px] leading-none">✏</span>}
               </button>
             );
           })}
@@ -939,7 +1085,12 @@ Respond ONLY in JSON:
         </div>
       </div>
 
-      <ScratchpadPanel questionId={question?.id} paperId={paperId} />
+      <ScratchpadPanel
+        questionId={question?.id}
+        paperId={paperId}
+        workings={workings}
+        onSaveWorking={handleSaveWorking}
+      />
 
       {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
       {showOverview && <OverviewPanel questions={questions} answers={answers} currentIdx={currentIdx} onJump={setCurrentIdx} onClose={() => setShowOverview(false)} onClear={handleClear} starredIds={starredIds} notedIds={notedIds} />}
@@ -950,11 +1101,13 @@ Respond ONLY in JSON:
           paper={paper}
           starredQuestions={starredQuestions}
           notes={notes}
+          workings={workings}
           onClose={() => setShowStarred(false)}
           onJump={setCurrentIdx}
           questions={questions}
           userEmail={user?.email}
           onTeacherQuestionSave={handleTeacherQuestionSave}
+          onDeleteWorking={handleDeleteWorking}
         />
       )}
     </div>

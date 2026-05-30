@@ -57,6 +57,14 @@ async function pushToSupabase(events) {
   return true;
 }
 
+export function daysUntilLabel(isoDate) {
+  const d = daysUntil(isoDate);
+  if (d === null) return null;
+  if (d === 0) return "Today";
+  if (d < 0) return `${Math.abs(d)} day${Math.abs(d) !== 1 ? "s" : ""} ago`;
+  return `${d} day${d !== 1 ? "s" : ""}`;
+}
+
 /** Load events from Supabase — refreshes local cache. Returns local cache on failure. */
 export async function loadEvents() {
   const { row } = await getUserAndRow();
@@ -90,6 +98,9 @@ export function addManualEvent({ title, type, due_date }) {
     title: title.trim(),
     type: type || "Assignment",
     due_date,
+    completed: false,
+    completedAt: null,
+    overdueStatus: null,
   };
   const updated = [...events, newEvent].sort(
     (a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
@@ -102,4 +113,44 @@ export function deleteManualEvent(id) {
   const events = readLocal().filter(e => e.id !== id);
   saveManualEvents(events);
   return events;
+}
+
+export function markEventComplete(id) {
+  const events = readLocal();
+  const updated = events.map(e =>
+    e.id === id
+      ? { ...e, completed: true, completedAt: new Date().toISOString(), overdueStatus: null }
+      : e
+  );
+  saveManualEvents(updated);
+  return updated;
+}
+
+export function unmarkEventComplete(id) {
+  const events = readLocal();
+  const updated = events.map(e =>
+    e.id === id
+      ? { ...e, completed: false, completedAt: null }
+      : e
+  );
+  saveManualEvents(updated);
+  return updated;
+}
+
+export function setOverdueStatus(id, status) {
+  const events = readLocal();
+  const updated = events.map(e =>
+    e.id === id ? { ...e, overdueStatus: status } : e
+  );
+  saveManualEvents(updated);
+  return updated;
+}
+
+export function updateManualEvent(id, { title, type, due_date }) {
+  const events = readLocal();
+  const updated = events
+    .map(e => e.id === id ? { ...e, title: title.trim(), type, due_date } : e)
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+  saveManualEvents(updated);
+  return updated;
 }

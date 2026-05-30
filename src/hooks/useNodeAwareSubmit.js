@@ -2,17 +2,13 @@ import { useCallback, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { getMarkNodes, buildNodeAwarePrompt, validateMandatoryChain } from "@/lib/schemeWhisperer";
 
+// Only request L1 + L2 fields — L3 is fetched on demand in PulseFeedback
 const PULSE_EXTENSION = `
-Also include these concise fields (1-2 sentences each):
-"step1_system": what concept is tested,
-"step2_phrase_breakdown": hidden meaning in key question words,
-"step3_tipping_point": the logical boundary that determines the answer,
-"step4_math_visual": key calculation or diagram description,
-"step5_edge_case": what changes if you flip the main variable,
-"step6_takeaway": reusable rule max 15 words,
-"pulse_layer_1": same as step6_takeaway,
-"pulse_layer_2_marks": array of {notation, description, earned:bool, examiner_note},
-"pulse_layer_3": one sentence combining steps 4 and 5.`;
+
+Also return these CONCISE additional fields:
+"pulse_layer_1": "Identify the single KEY WORD or phrase in the question whose hidden meaning unlocks all similar Cambridge questions. State what it really means to Cambridge in ≤15 words.",
+"cambridge_insight": "What Cambridge specifically expects to award full marks. Max 2 sentences.",
+"pulse_layer_2_marks": [{"notation":"B1/M1/A1","description":"exact mark criterion","earned":true or false,"examiner_note":"one sentence only"}]`;
 
 export function useNodeAwareSubmit() {
   const [loading, setLoading] = useState(false);
@@ -35,20 +31,14 @@ export function useNodeAwareSubmit() {
     const nodePrompt = nodes.length > 0 ? buildNodeAwarePrompt(basePrompt, nodes) : basePrompt;
     const prompt = nodePrompt + PULSE_EXTENSION;
 
-    // 3. Extend schema with pulse fields
+    // 3. Extend schema with only L1+L2 pulse fields
     const pulseSchema = {
       ...question.response_schema,
       properties: {
         ...(question.response_schema?.properties ?? {}),
-        step1_system: { type: "string" },
-        step2_phrase_breakdown: { type: "string" },
-        step3_tipping_point: { type: "string" },
-        step4_math_visual: { type: "string" },
-        step5_edge_case: { type: "string" },
-        step6_takeaway: { type: "string" },
         pulse_layer_1: { type: "string" },
+        cambridge_insight: { type: "string" },
         pulse_layer_2_marks: { type: "array", items: { type: "object" } },
-        pulse_layer_3: { type: "string" },
       },
     };
 

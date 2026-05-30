@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Calculator, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import AnswerInput from "@/components/AnswerInput";
 import SubmittingOverlay from "@/components/SubmittingOverlay";
-import ScientificCalculator from "@/components/ScientificCalculator";
 import PulseFeedback from "@/components/PulseFeedback";
 import RegisterInput from "@/components/cs/RegisterInput";
 import MatchingInput from "@/components/cs/MatchingInput";
@@ -38,17 +37,12 @@ Analyse the student's answer against the mark scheme. Award marks generously but
   "marks_earned": [number 0 to ${totalMarks}],
   "mark_1": { "earned": true or false, "keyword": "key phrase needed", "found": true or false, "feedback": "one sentence" },
   "mark_2": { "earned": true or false, "keyword": "second key phrase if applicable", "found": true or false, "feedback": "one sentence" },
-  "cambridge_insight": "two to three sentences explaining what Cambridge is looking for and why",
-  "next_step": "one sentence telling the student exactly what to focus on",
-  "pulse_layer_1": "single punchy sentence of max 20 words — the exam hack or key concept that unlocks this question type",
-  "pulse_layer_2_marks": [],
-  "pulse_layer_3": "optional 2-4 sentence deep-dive explanation of the underlying principle"
+  "cambridge_insight": "What Cambridge expects. 1-2 sentences.",
+  "pulse_layer_1": "The key word or concept in this question whose hidden meaning unlocks similar questions. Max 15 words.",
+  "pulse_layer_2_marks": []
 }`;
 }
 
-/**
- * Serialise interactive state into a readable answer string for Claude.
- */
 function serialiseInteractiveAnswer(diagramConfig, interactiveValue) {
   if (!diagramConfig || !interactiveValue) return null;
 
@@ -83,10 +77,6 @@ function serialiseInteractiveAnswer(diagramConfig, interactiveValue) {
   return null;
 }
 
-/**
- * Render the interactive component (matching / table_fill / register).
- * NOT used for static SVG references — those are rendered inline in the question card.
- */
 function InteractiveDiagram({ config, value, onChange }) {
   if (!config || config.type === "svg") return null;
 
@@ -112,7 +102,7 @@ function InteractiveDiagram({ config, value, onChange }) {
     return (
       <div className="bg-card border border-border rounded-xl p-4 space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Complete the table — click a blank cell to type your answer
+          Complete the table — click a blank cell to type
         </p>
         <TableFillInput
           headers={config.headers}
@@ -128,7 +118,7 @@ function InteractiveDiagram({ config, value, onChange }) {
     return (
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Fill in the register{config.registers?.length > 1 ? "s" : ""} — tap a cell to toggle 0 / 1
+          Fill in the register{config.registers?.length > 1 ? "s" : ""} — tap a cell to toggle 0/1
         </p>
         {(config.registers ?? []).map((reg, i) => (
           <RegisterInput
@@ -170,7 +160,6 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [feedback, setFeedback] = useState(null);
-  const [showCalc, setShowCalc] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -181,7 +170,6 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
       .order("id", { ascending: true })
       .then(({ data, error }) => {
         if (error || !data?.length) {
-          console.warn("[SupabaseCSQuestion] Supabase empty/failed, using fallback:", error?.message);
           setQuestions(PRELOADED_PAIRS.map(p => ({
             id: `local_${p.id}`,
             question_text: p.question,
@@ -211,9 +199,7 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
   const question = questions[clampedIdx] ?? null;
   const diagramConfig = question?._diagramConfig ?? null;
 
-  // Is this an interactive question (matching / table / register)?
   const isInteractive = diagramConfig && diagramConfig.type !== "svg";
-  // Is this a static reference SVG?
   const hasReferenceSvg = diagramConfig?.type === "svg";
 
   function goToQuestion(newIdx) {
@@ -224,7 +210,6 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
     setInteractiveValue(null);
     setFeedback(null);
     setSubmitError(null);
-    setShowCalc(false);
   }
 
   function handleNext() {
@@ -253,12 +238,10 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
         mark_1: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
         mark_2: { type: "object", properties: { earned: { type: "boolean" }, keyword: { type: "string" }, found: { type: "boolean" }, feedback: { type: "string" } } },
         cambridge_insight: { type: "string" },
-        next_step: { type: "string" },
         pulse_layer_1: { type: "string" },
         pulse_layer_2_marks: { type: "array", items: { type: "object" } },
-        pulse_layer_3: { type: "string" },
       },
-      required: ["marks_earned", "cambridge_insight", "next_step"],
+      required: ["marks_earned", "cambridge_insight"],
     };
 
     let fb = null;
@@ -302,7 +285,7 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
       });
     }
 
-    setFeedback({ fb, marksEarned, totalMarks });
+    setFeedback({ fb, marksEarned, totalMarks, questionText, finalAnswer });
     setSubmitting(false);
   }
 
@@ -329,14 +312,13 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
   const isLastQuestion = clampedIdx >= total - 1;
 
   const interactiveStr = serialiseInteractiveAnswer(diagramConfig, interactiveValue);
-  // Submit is enabled if: written answer OR interactive component has input
   const hasAnswer = answer.trim().length > 0 || (interactiveStr && interactiveStr.length > 0);
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        {/* Top bar */}
+        {/* Top bar — NO calculator for CS */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <button onClick={() => navigate("/cs")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -347,45 +329,27 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
               <span className="text-[9px] text-amber-400/60 font-mono">offline mode</span>
             )}
           </div>
-          <button
-            onClick={() => setShowCalc(c => !c)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
-              showCalc
-                ? "bg-primary/20 border-primary/50 text-primary"
-                : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:brightness-110"
-            }`}
-          >
-            <Calculator className="w-3.5 h-3.5" />
-            Calc
-          </button>
+          <div className="w-8" />
         </div>
 
         {/* Navigation */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 bg-card/50">
-          <button
-            onClick={() => goToQuestion(clampedIdx - 1)}
-            disabled={clampedIdx === 0}
-            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-secondary"
-          >
+          <button onClick={() => goToQuestion(clampedIdx - 1)} disabled={clampedIdx === 0}
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-secondary">
             <ChevronLeft className="w-4 h-4" /> Prev
           </button>
           <span className="text-xs font-bold text-foreground font-mono">
             Q{clampedIdx + 1} <span className="text-muted-foreground font-normal">of {total}</span>
           </span>
-          <button
-            onClick={() => goToQuestion(clampedIdx + 1)}
-            disabled={clampedIdx >= total - 1}
-            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-secondary"
-          >
+          <button onClick={() => goToQuestion(clampedIdx + 1)} disabled={clampedIdx >= total - 1}
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-2 py-1.5 rounded-lg hover:bg-secondary">
             Next <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
 
-          {showCalc && <ScientificCalculator onClose={() => setShowCalc(false)} />}
-
-          {/* Question card — includes static reference SVG inside if present */}
+          {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md">
@@ -398,63 +362,38 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
               )}
             </div>
 
-            {/* Static reference diagram — shown inside the question card */}
             {hasReferenceSvg && (
-              <div
-                className="rounded-xl p-3 border border-border/40 overflow-x-auto bg-white"
-                dangerouslySetInnerHTML={{ __html: diagramConfig.svgString }}
-              />
+              <div className="rounded-xl p-3 border border-border/40 overflow-x-auto bg-white"
+                dangerouslySetInnerHTML={{ __html: diagramConfig.svgString }} />
             )}
 
-            <p className="text-[15px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
-              {questionText}
-            </p>
+            <p className="text-[15px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{questionText}</p>
 
             <div className="flex justify-end">
               <span className="font-mono text-xs text-muted-foreground">[{totalMarks} marks]</span>
             </div>
           </div>
 
-          {/* Interactive component — shown separately below the question card */}
           {isInteractive && !feedback && (
-            <InteractiveDiagram
-              config={diagramConfig}
-              value={interactiveValue}
-              onChange={setInteractiveValue}
-            />
+            <InteractiveDiagram config={diagramConfig} value={interactiveValue} onChange={setInteractiveValue} />
           )}
 
-          {/* Answer input + submit — only before submission */}
           {!feedback && (
             <>
-              {/* For pure interactive questions without a written component, the
-                  AnswerInput is still shown so students can add extra explanation */}
-              <AnswerInput
-                value={answer}
-                onChange={setAnswer}
-              />
-              <button
-                onClick={handleSubmit}
-                disabled={!hasAnswer || submitting}
-                className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
+              <AnswerInput value={answer} onChange={setAnswer} />
+              <button onClick={handleSubmit} disabled={!hasAnswer || submitting}
+                className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 Submit Answer
               </button>
               {submitError && <p className="text-center text-sm text-red-400/80">{submitError}</p>}
             </>
           )}
 
-          {/* Post-submission: show interactive component (read-only context) + feedback */}
           {feedback && (
             <>
-              {/* Show interactive diagram again so student can see what they drew */}
               {isInteractive && (
                 <div className="opacity-60 pointer-events-none">
-                  <InteractiveDiagram
-                    config={diagramConfig}
-                    value={interactiveValue}
-                    onChange={() => {}}
-                  />
+                  <InteractiveDiagram config={diagramConfig} value={interactiveValue} onChange={() => {}} />
                 </div>
               )}
 
@@ -470,8 +409,8 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
                 subject="cs"
                 marksTotal={feedback.totalMarks}
                 questionId={String(question.id)}
-                questionText={questionText}
-                studentAnswer={answer}
+                questionText={feedback.questionText}
+                studentAnswer={feedback.finalAnswer}
               />
 
               {markScheme && (
@@ -481,15 +420,12 @@ export default function SupabaseCSQuestion({ topicKey, topicLabel }) {
                 </div>
               )}
 
-              <button
-                onClick={handleNext}
-                className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-              >
+              <button onClick={handleNext}
+                className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
                 {isLastQuestion ? "Back to CS dashboard →" : "Next question →"}
               </button>
             </>
           )}
-
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, AlertTriangle } from "lucide-react";
 import { csGetReviewBank, csGetMistakeDna } from "@/lib/csTopicStore";
 
 function getLockStatus(locked_until, now) {
@@ -18,91 +18,46 @@ function formatCountdown(ms) {
   return `Unlocks in ${minutes}m`;
 }
 
-const DNA_CATEGORY_STYLE = {
-  "Precision Phrasing Flaw":      { pill: "bg-amber-500/15 border-amber-500/30 text-amber-300",  dot: "bg-amber-400" },
-  "Missing Keyword":              { pill: "bg-red-500/15 border-red-500/30 text-red-300",         dot: "bg-red-400" },
-  "Conceptual Misunderstanding":  { pill: "bg-purple-500/15 border-purple-500/30 text-purple-300", dot: "bg-purple-400" },
-  "Incomplete Definition":        { pill: "bg-orange-500/15 border-orange-500/30 text-orange-300", dot: "bg-orange-400" },
-  "Wrong Direction / Sign":       { pill: "bg-rose-500/15 border-rose-500/30 text-rose-300",      dot: "bg-rose-400" },
-  "Unit / Notation Error":        { pill: "bg-blue-500/15 border-blue-500/30 text-blue-300",      dot: "bg-blue-400" },
-  "Omitted Qualifying Condition": { pill: "bg-cyan-500/15 border-cyan-500/30 text-cyan-300",      dot: "bg-cyan-400" },
-  "Logical Gap":                  { pill: "bg-slate-500/15 border-slate-500/30 text-slate-300",   dot: "bg-slate-400" },
-};
-
-function DnaTag({ category }) {
-  const style = DNA_CATEGORY_STYLE[category] ?? { pill: "bg-white/8 border-white/15 text-white/50", dot: "bg-white/40" };
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border rounded-full px-2 py-0.5 leading-none ${style.pill}`}>
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
-      {category}
-    </span>
-  );
-}
-
-function LastAttemptStrip({ text }) {
-  if (!text) return null;
-  const display = text.length > 120 ? text.slice(0, 117) + "…" : text;
-  return (
-    <div className="border-l-2 border-white/10 pl-2.5 py-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 mb-0.5">
-        Your last attempt
-      </p>
-      <p className="text-[11px] text-muted-foreground/50 italic leading-relaxed break-words">
-        "{display}"
-      </p>
-    </div>
-  );
-}
-
-function resolveLastAttempt(q, dnaEntries) {
-  if (q.first_attempt_answer?.trim()) {
-    return q.first_attempt_answer.trim();
-  }
-  const matching = dnaEntries
-    .filter(e => e.question_id === q.question_id && e.student_response?.trim())
-    .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime());
-  return matching[0]?.student_response?.trim() ?? null;
-}
-
-function QuestionCard({ q, dnaEntries, now, navigate }) {
+function QuestionCard({ q, now, navigate }) {
   const { locked, msRemaining } = getLockStatus(q.locked_until, now);
-  const preview = q.question_text?.slice(0, 80) + (q.question_text?.length > 80 ? "…" : "");
+  const preview = (q.question_text ?? "").slice(0, 80) + ((q.question_text ?? "").length > 80 ? "…" : "");
   const [lockedMsg, setLockedMsg] = useState(false);
-
-  // ── DIAGNOSTIC: log what DNA entries exist for this question ──────────
-  const dnaForQuestion = dnaEntries.filter(e => e.question_id === q.question_id);
-  console.log(
-    `[CSReviewBank] card="${q.question_id}" | dnaEntries total=${dnaEntries.length} | matches=${dnaForQuestion.length}`,
-    dnaForQuestion.length > 0 ? dnaForQuestion : "(none)"
-  );
-
-  const uniqueCategories = [...new Set(dnaForQuestion.map(e => e.error_category))].filter(Boolean);
-  const lastAttemptText = resolveLastAttempt(q, dnaEntries);
+  const hasPersistentIssue = !!q.persistent_misunderstanding;
 
   if (!locked) {
     return (
-      <div className="bg-card border border-l-4 border-border border-l-green-500/70 rounded-xl p-4 space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
+      <div className={`bg-card border border-l-4 border-border ${
+        hasPersistentIssue ? "border-l-red-500/70" : "border-l-green-500/70"
+      } rounded-xl p-4 space-y-2.5`}>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-green-400/80 bg-green-500/10 px-2 py-0.5 rounded-full">
             {q.topic}
           </span>
-          <span className="text-[11px] text-muted-foreground shrink-0">
-            {q.first_attempt_score}/{q.total_marks} marks
-          </span>
+          <div className="flex items-center gap-2">
+            {hasPersistentIssue && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/15 border border-red-500/30 px-2 py-0.5 rounded-full">
+                <AlertTriangle className="w-2.5 h-2.5" />
+                Persistent mistake
+              </span>
+            )}
+            <span className="text-[11px] text-muted-foreground shrink-0">
+              {q.first_attempt_score}/{q.total_marks} marks
+            </span>
+          </div>
         </div>
 
-        {/* DNA badges — rendered whenever dnaForQuestion has entries, no subject gate */}
-        {uniqueCategories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
-          </div>
+        <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
+
+        {hasPersistentIssue && (
+          <p className="text-[11px] text-red-400/70 leading-relaxed">
+            ⚠ You gave a similar wrong answer last time. Try a completely different approach.
+          </p>
         )}
 
-        <p className="text-sm text-foreground/80 leading-relaxed">{preview}</p>
-        <LastAttemptStrip text={lastAttemptText} />
-
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">You scored {q.first_attempt_score}/{q.total_marks}</span>
+          <span className="text-[11px] text-muted-foreground/50">
+            {hasPersistentIssue ? "Focus on what's different this time" : "Ready to attempt"}
+          </span>
           <button
             onClick={() => navigate("/cs/review-session", { state: { questionId: q.question_id } })}
             className="text-xs font-semibold text-green-400 hover:brightness-110 transition-all"
@@ -116,8 +71,8 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
 
   return (
     <div
-      className="bg-card border border-l-4 border-border border-l-amber-500/60 rounded-xl p-4 space-y-2.5 opacity-50 cursor-pointer"
-      onClick={() => { setLockedMsg(true); setTimeout(() => setLockedMsg(false), 3000); }}
+      className={`bg-card border border-l-4 border-border border-l-amber-500/60 rounded-xl p-4 space-y-2.5 opacity-60 cursor-pointer`}
+      onClick={() => { setLockedMsg(l => !l); }}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-full">
@@ -128,15 +83,7 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
         </span>
       </div>
 
-      {/* DNA badges — rendered whenever dnaForQuestion has entries, no subject gate */}
-      {uniqueCategories.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {uniqueCategories.map(cat => <DnaTag key={cat} category={cat} />)}
-        </div>
-      )}
-
       <p className="text-sm text-muted-foreground/60 leading-relaxed">{preview}</p>
-      <LastAttemptStrip text={lastAttemptText} />
 
       <div className="flex items-center justify-between">
         <span className="text-[11px] text-muted-foreground">You scored {q.first_attempt_score}/{q.total_marks}</span>
@@ -158,23 +105,14 @@ function QuestionCard({ q, dnaEntries, now, navigate }) {
 export default function CSReviewBank() {
   const navigate = useNavigate();
   const [bank, setBank] = useState([]);
-  const [dnaEntries, setDnaEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    async function load() {
-      const [rb, dna] = await Promise.all([csGetReviewBank(), csGetMistakeDna()]);
-
-      // ── DIAGNOSTIC: confirm what we got from the store ─────────────────
-      console.log("[CSReviewBank] review bank entries:", rb.length, rb.map(q => q.question_id));
-      console.log("[CSReviewBank] cs_mistake_dna entries:", dna.length, dna);
-
+    csGetReviewBank().then(rb => {
       setBank(rb);
-      setDnaEntries(Array.isArray(dna) ? dna : []);
       setLoading(false);
-    }
-    load();
+    });
   }, []);
 
   useEffect(() => {
@@ -226,7 +164,7 @@ export default function CSReviewBank() {
             <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-4">
               <Lock className="w-8 h-8 text-amber-400/60" />
               <p className="text-base font-semibold text-foreground leading-relaxed max-w-xs">
-                All questions are waiting. Come back when they unlock — your brain is consolidating the material.
+                All questions are waiting. Come back when they unlock.
               </p>
               {nextUnlock && (
                 <p className="text-sm text-amber-400 font-medium">
@@ -240,7 +178,7 @@ export default function CSReviewBank() {
             <div className="space-y-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-green-400">Ready to attempt</p>
               {unlocked.map(q => (
-                <QuestionCard key={q.question_id} q={q} dnaEntries={dnaEntries} now={now} navigate={navigate} />
+                <QuestionCard key={q.question_id} q={q} now={now} navigate={navigate} />
               ))}
             </div>
           )}
@@ -249,10 +187,10 @@ export default function CSReviewBank() {
             <div className="space-y-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-400">Waiting — Spaced Repetition Active</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">These questions are locked to help your brain consolidate the material.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Locked for 24 hours to consolidate memory.</p>
               </div>
               {sortedLocked.map(q => (
-                <QuestionCard key={q.question_id} q={q} dnaEntries={dnaEntries} now={now} navigate={navigate} />
+                <QuestionCard key={q.question_id} q={q} now={now} navigate={navigate} />
               ))}
             </div>
           )}

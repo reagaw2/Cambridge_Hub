@@ -14,7 +14,9 @@ const PEN_COLORS = [
 function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedWorking }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const [collapsed, setCollapsed] = useState(false);
+
+  // Start collapsed — stays expanded once opened until manually collapsed
+  const [collapsed, setCollapsed] = useState(true);
 
   const [activeTool, setActiveTool] = useState("pen");
   const [penColor, setPenColor] = useState("#0f172a");
@@ -68,6 +70,8 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     const dpr = window.devicePixelRatio || 1;
     const W = canvas.width / dpr;
     const H = canvas.height / dpr;
+    const qId = questionIdRef.current;
+    const tool = activeToolRef.current;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -247,10 +251,6 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     applyStrokes([]);
   }
 
-  /**
-   * Capture the canvas as a base64 PNG at a fixed width for clean PDF output.
-   * Renders paper background + all strokes.
-   */
   function captureCanvas() {
     const canvas = canvasRef.current;
     if (!canvas || strokesRef.current.length === 0) return null;
@@ -268,11 +268,9 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
     offscreen.height = outH;
     const ctx = offscreen.getContext("2d");
 
-    // Paper background
     ctx.fillStyle = "#f6f1e4";
     ctx.fillRect(0, 0, outW, outH);
 
-    // Draw lines from strokes directly at the target resolution
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     for (const stroke of strokesRef.current) {
@@ -417,7 +415,6 @@ function DrawingPad({ side, questionId, paperId, width, onSaveWorking, hasSavedW
           </div>
         </div>
 
-        {/* Undo hint */}
         <p className="text-[8.5px] text-stone-400 leading-none italic">
           {canUndo
             ? `${history.length} undo step${history.length !== 1 ? "s" : ""} available`

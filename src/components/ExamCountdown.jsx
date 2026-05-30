@@ -14,11 +14,15 @@ import {
 const CATEGORIES = ["Exam", "Test", "Quiz", "Assignment"];
 
 const TYPE_CONFIG = {
-  Exam:       { border: "border-l-cyan-400",   bg: "bg-cyan-500/10",   text: "text-cyan-300",   badge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"    },
-  Test:       { border: "border-l-violet-400", bg: "bg-violet-500/10", text: "text-violet-300", badge: "bg-violet-500/20 text-violet-300 border-violet-500/40" },
-  Quiz:       { border: "border-l-green-400",  bg: "bg-green-500/10",  text: "text-green-300",  badge: "bg-green-500/20 text-green-300 border-green-500/40"   },
-  Assignment: { border: "border-l-amber-400",  bg: "bg-amber-500/10",  text: "text-amber-300",  badge: "bg-amber-500/20 text-amber-300 border-amber-500/40"   },
+  Exam:       { border: "border-l-cyan-400",   badge: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",     text: "text-cyan-300"   },
+  Test:       { border: "border-l-violet-400", badge: "bg-violet-500/20 text-violet-300 border-violet-500/40", text: "text-violet-300" },
+  Quiz:       { border: "border-l-green-400",  badge: "bg-green-500/20 text-green-300 border-green-500/40",   text: "text-green-300"  },
+  Assignment: { border: "border-l-amber-400",  badge: "bg-amber-500/20 text-amber-300 border-amber-500/40",   text: "text-amber-300"  },
 };
+
+function getCfg(type) {
+  return TYPE_CONFIG[type] ?? TYPE_CONFIG["Assignment"];
+}
 
 const STATUS_CONFIG = {
   submitted_late: {
@@ -80,7 +84,7 @@ function EventModal({ onClose, onSave, editingEvent }) {
   const parsedTime = isEdit && editingEvent.due_date ? editingEvent.due_date.slice(11, 16) : "23:59";
 
   const [title, setTitle] = useState(isEdit ? editingEvent.title : "");
-  const [type, setType] = useState(isEdit ? editingEvent.type : "Assignment");
+  const [type, setType] = useState(isEdit ? (editingEvent.type ?? "Assignment") : "Assignment");
   const [date, setDate] = useState(parsedDate);
   const [time, setTime] = useState(parsedTime);
 
@@ -111,14 +115,17 @@ function EventModal({ onClose, onSave, editingEvent }) {
             <label className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Category</label>
             <div className="grid grid-cols-2 gap-2">
               {CATEGORIES.map(t => {
-                const cfg = TYPE_CONFIG[t];
+                const cfg = getCfg(t);
+                const isActive = type === t;
                 return (
-                  <button key={t} type="button" onClick={() => setType(t)}
-                    className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
-                      type === t
-                        ? `${cfg.badge} scale-[1.03]`
-                        : "bg-white/5 border-white/10 text-white/40 hover:bg-white/8"
-                    }`}>
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setType(t)}
+                    className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all select-none ${
+                      isActive ? `${cfg.badge} scale-[1.02]` : "bg-white/5 border-white/10 text-white/40 hover:bg-white/8"
+                    }`}
+                  >
                     {t}
                   </button>
                 );
@@ -153,7 +160,7 @@ function EventModal({ onClose, onSave, editingEvent }) {
 
 function ActiveCard({ event, onComplete, onDelete, onEdit }) {
   const days = daysUntil(event.due_date);
-  const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG["Assignment"];
+  const cfg = getCfg(event.type);
   const isToday = days === 0;
   const isUrgent = days !== null && days >= 0 && days <= 3;
 
@@ -165,9 +172,10 @@ function ActiveCard({ event, onComplete, onDelete, onEdit }) {
 
   return (
     <div className={`group flex items-center gap-3 rounded-xl border-l-4 border border-white/8 ${cfg.border} bg-white/[0.03] hover:bg-white/[0.05] px-4 py-3 transition-all`}>
-      {/* Category badge */}
+
+      {/* Category badge — always uses the event's own type */}
       <span className={`shrink-0 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border ${cfg.badge}`}>
-        {event.type}
+        {event.type ?? "Assignment"}
       </span>
 
       {/* Title + date */}
@@ -184,7 +192,7 @@ function ActiveCard({ event, onComplete, onDelete, onEdit }) {
         <p className={`shrink-0 text-sm font-black tabular-nums ${countColor}`}>{countLabel}</p>
       )}
 
-      {/* Actions */}
+      {/* Actions — visible on hover */}
       <div className="shrink-0 flex items-center gap-1">
         <button onClick={() => onEdit(event)}
           className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 transition-all">
@@ -213,7 +221,7 @@ function OverdueCard({ event, onSetStatus, onDelete, onComplete }) {
     <div className="rounded-xl border-l-4 border border-red-500/40 border-l-red-500 bg-red-500/8 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border bg-red-500/20 text-red-300 border-red-500/40">
-          {event.type}
+          {event.type ?? "Assignment"}
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white/90 truncate">{event.title}</p>
@@ -313,7 +321,7 @@ function PreviousMonthSection({ monthKey, events, handlers }) {
     <div className="rounded-xl border border-white/8 overflow-hidden">
       <button onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-4 py-3 bg-white/[0.02] hover:bg-white/[0.04] transition-all">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <p className="text-xs font-bold text-white/50">{label}</p>
           <span className="font-mono text-[10px] bg-white/8 text-white/30 px-1.5 py-0.5 rounded-full">{events.length}</span>
           {overdue.length > 0 && (
@@ -328,34 +336,22 @@ function PreviousMonthSection({ monthKey, events, handlers }) {
 
       {open && (
         <div className="px-3 pb-3 pt-2 space-y-3 border-t border-white/6">
+          {active.map(e => (
+            <ActiveCard key={e.id} event={e}
+              onComplete={handlers.onComplete}
+              onDelete={handlers.onDelete}
+              onEdit={handlers.onEdit}
+            />
+          ))}
 
-          {/* Still active (edge case: future event in a past month) */}
-          {active.length > 0 && (
-            <div className="space-y-1.5">
-              {active.map(e => (
-                <ActiveCard key={e.id} event={e}
-                  onComplete={handlers.onComplete}
-                  onDelete={handlers.onDelete}
-                  onEdit={handlers.onEdit}
-                />
-              ))}
-            </div>
-          )}
+          {overdueAwaiting.map(e => (
+            <OverdueCard key={e.id} event={e}
+              onSetStatus={handlers.onSetStatus}
+              onDelete={handlers.onDelete}
+              onComplete={handlers.onComplete}
+            />
+          ))}
 
-          {/* Overdue awaiting status */}
-          {overdueAwaiting.length > 0 && (
-            <div className="space-y-1.5">
-              {overdueAwaiting.map(e => (
-                <OverdueCard key={e.id} event={e}
-                  onSetStatus={handlers.onSetStatus}
-                  onDelete={handlers.onDelete}
-                  onComplete={handlers.onComplete}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Status sub-sections */}
           {Object.entries(STATUS_CONFIG).map(([statusKey, cfg]) => {
             const group = overdueWithStatus.filter(e => e.overdueStatus === statusKey);
             if (group.length === 0) return null;
@@ -378,7 +374,6 @@ function PreviousMonthSection({ monthKey, events, handlers }) {
             );
           })}
 
-          {/* Complete */}
           {complete.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/60 pl-0.5">Completed</p>
@@ -396,7 +391,7 @@ function PreviousMonthSection({ monthKey, events, handlers }) {
   );
 }
 
-// ── Current Month Overdue / Complete (inline collapsibles) ────────────────────
+// ── Current Month Overdue / Complete collapsibles ─────────────────────────────
 
 function CurrentMonthExtras({ overdue, complete, handlers }) {
   const [overdueOpen, setOverdueOpen] = useState(true);
@@ -418,7 +413,6 @@ function CurrentMonthExtras({ overdue, complete, handlers }) {
             </div>
             {overdueOpen ? <ChevronUp className="w-3.5 h-3.5 text-white/30" /> : <ChevronDown className="w-3.5 h-3.5 text-white/30" />}
           </button>
-
           {overdueOpen && (
             <div className="px-3 pb-3 pt-2 space-y-3 bg-red-500/5">
               {overdueAwaiting.map(e => (
@@ -438,7 +432,6 @@ function CurrentMonthExtras({ overdue, complete, handlers }) {
                       <p className={`text-[10px] font-black uppercase tracking-widest opacity-80 ${cfg.badge.split(" ").find(c => c.startsWith("text-"))}`}>
                         {cfg.label}
                       </p>
-                      <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-full border ${cfg.badge}`}>{group.length}</span>
                     </div>
                     {group.map(e => (
                       <StatusCard key={e.id} event={e} statusKey={statusKey}
@@ -465,7 +458,6 @@ function CurrentMonthExtras({ overdue, complete, handlers }) {
             </div>
             {completeOpen ? <ChevronUp className="w-3.5 h-3.5 text-white/30" /> : <ChevronDown className="w-3.5 h-3.5 text-white/30" />}
           </button>
-
           {completeOpen && (
             <div className="px-3 pb-3 pt-2 space-y-1.5 bg-green-500/5">
               {complete.map(e => (
@@ -485,53 +477,60 @@ function CurrentMonthExtras({ overdue, complete, handlers }) {
 // ── Main Export ────────────────────────────────────────────────────────────────
 
 export default function ExamCountdown() {
+  // Initialise directly from localStorage so cards render on first paint — no flicker
   const [events, setEvents] = useState(() => {
     try { return JSON.parse(localStorage.getItem("exam_countdown_events_v3") ?? "[]"); } catch { return []; }
   });
-  const [syncing, setSyncing] = useState(true);
+  const [syncing, setSyncing] = useState(false); // only used for the sync button indicator
   const [syncStatus, setSyncStatus] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [showPrevious, setShowPrevious] = useState(false);
 
+  // Background sync — update events if Supabase has newer data, but never hide cards while loading
   useEffect(() => {
-    loadEvents().then(remote => { setEvents(remote); setSyncing(false); }).catch(() => setSyncing(false));
+    loadEvents().then(remote => {
+      if (remote && remote.length >= 0) setEvents(remote);
+    }).catch(() => {});
   }, []);
 
   async function handleForceSync() {
+    setSyncing(true);
     setSyncStatus("syncing");
     const ok = await forceSyncToSupabase();
     setSyncStatus(ok ? "done" : "error");
+    setSyncing(false);
     setTimeout(() => setSyncStatus(null), 2500);
   }
 
   function handleAdd({ title, type, due_date, id }) {
-    const updated = id ? updateManualEvent(id, { title, type, due_date }) : addManualEvent({ title, type, due_date });
-    setEvents(updated);
+    const updated = id
+      ? updateManualEvent(id, { title, type, due_date })
+      : addManualEvent({ title, type, due_date });
+    setEvents([...updated]); // spread to guarantee new reference
   }
-  function handleDelete(id) { setEvents(deleteManualEvent(id)); }
+
+  function handleDelete(id) { setEvents([...deleteManualEvent(id)]); }
   function handleEdit(event) { setEditingEvent(event); setShowModal(true); }
-  function handleComplete(id) { setEvents(markEventComplete(id)); }
-  function handleUncomplete(id) { setEvents(unmarkEventComplete(id)); }
-  function handleSetStatus(id, status) { setEvents(setOverdueStatus(id, status)); }
+  function handleComplete(id) { setEvents([...markEventComplete(id)]); }
+  function handleUncomplete(id) { setEvents([...unmarkEventComplete(id)]); }
+  function handleSetStatus(id, status) { setEvents([...setOverdueStatus(id, status)]); }
 
   const handlers = { onComplete: handleComplete, onUncomplete: handleUncomplete, onSetStatus: handleSetStatus, onDelete: handleDelete, onEdit: handleEdit };
 
-  // ── Split events into "current/future" vs "previous months" ────────────────
   const thisMonth = currentMonthKey();
 
   const { upcomingByMonth, currentOverdue, currentComplete, previousByMonth } = useMemo(() => {
-    const upcomingByMonth = {};  // monthKey → active events with future due dates
-    const currentOverdue = [];   // overdue in current month
-    const currentComplete = [];  // complete in current month
-    const previousByMonth = {};  // monthKey → all events in past months
+    const upcomingByMonth = {};
+    const currentOverdue = [];
+    const currentComplete = [];
+    const previousByMonth = {};
 
     for (const e of events) {
       const mk = getMonthKey(e.due_date);
       const days = daysUntil(e.due_date);
 
       if (mk >= thisMonth) {
-        // Current or future month
         if (e.completed) {
           currentComplete.push(e);
         } else if (days !== null && days < 0) {
@@ -541,7 +540,6 @@ export default function ExamCountdown() {
           upcomingByMonth[mk].push(e);
         }
       } else {
-        // Past month
         if (!previousByMonth[mk]) previousByMonth[mk] = [];
         previousByMonth[mk].push(e);
       }
@@ -551,7 +549,7 @@ export default function ExamCountdown() {
   }, [events, thisMonth]);
 
   const upcomingMonthKeys = Object.keys(upcomingByMonth).sort();
-  const previousMonthKeys = Object.keys(previousByMonth).sort().reverse(); // most recent first
+  const previousMonthKeys = Object.keys(previousByMonth).sort().reverse();
   const totalUpcoming = upcomingMonthKeys.reduce((s, k) => s + upcomingByMonth[k].length, 0);
   const previousCount = Object.values(previousByMonth).reduce((s, arr) => s + arr.length, 0);
 
@@ -569,7 +567,7 @@ export default function ExamCountdown() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleForceSync} disabled={syncStatus === "syncing"}
+          <button onClick={handleForceSync} disabled={syncing}
             className={`flex items-center gap-1.5 text-[11px] font-semibold border rounded-lg px-2.5 py-1.5 transition-all ${
               syncStatus === "done" ? "border-green-500/40 text-green-400 bg-green-500/10"
               : syncStatus === "error" ? "border-red-500/40 text-red-400 bg-red-500/10"
@@ -587,24 +585,17 @@ export default function ExamCountdown() {
         </div>
       </div>
 
-      {syncing && (
-        <div className="flex items-center justify-center gap-2 py-4">
-          <Loader2 className="w-4 h-4 text-white/30 animate-spin" />
-          <p className="text-xs text-white/30">Loading your schedule…</p>
-        </div>
-      )}
-
-      {!syncing && events.length === 0 && (
+      {/* Empty state */}
+      {events.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
           <p className="text-sm text-white/30">No events yet.</p>
           <p className="text-xs text-white/20">Add exams, tests, quizzes and assignments to track them here.</p>
         </div>
       )}
 
-      {/* ── Upcoming cards — always visible ── */}
-      {!syncing && upcomingMonthKeys.map(mk => (
+      {/* ── Upcoming cards — shown immediately, no syncing gate ── */}
+      {upcomingMonthKeys.map(mk => (
         <div key={mk} className="space-y-1.5">
-          {/* Month label only if multiple months are showing */}
           {(upcomingMonthKeys.length > 1 || mk !== thisMonth) && (
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-white/8" />
@@ -622,13 +613,13 @@ export default function ExamCountdown() {
         </div>
       ))}
 
-      {/* ── Current month overdue + complete (collapsible) ── */}
-      {!syncing && (currentOverdue.length > 0 || currentComplete.length > 0) && (
+      {/* ── Current month overdue + complete ── */}
+      {(currentOverdue.length > 0 || currentComplete.length > 0) && (
         <CurrentMonthExtras overdue={currentOverdue} complete={currentComplete} handlers={handlers} />
       )}
 
       {/* ── Previous months toggle ── */}
-      {!syncing && previousMonthKeys.length > 0 && (
+      {previousMonthKeys.length > 0 && (
         <div className="space-y-2">
           <button onClick={() => setShowPrevious(p => !p)}
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-white/8 bg-white/[0.02] hover:bg-white/[0.04] transition-all">
@@ -642,12 +633,7 @@ export default function ExamCountdown() {
           {showPrevious && (
             <div className="space-y-2">
               {previousMonthKeys.map(mk => (
-                <PreviousMonthSection
-                  key={mk}
-                  monthKey={mk}
-                  events={previousByMonth[mk]}
-                  handlers={handlers}
-                />
+                <PreviousMonthSection key={mk} monthKey={mk} events={previousByMonth[mk]} handlers={handlers} />
               ))}
             </div>
           )}

@@ -20,16 +20,19 @@ function getAbsoluteOffset(container, targetNode, targetOffset) {
   return count + targetOffset;
 }
 
+// Split raw text into line segments respecting \n
+function inlineText(raw) {
+  return raw.split("\n").flatMap((line, i, arr) =>
+    i < arr.length - 1 ? [line, <br key={i} />] : [line]
+  );
+}
+
 // Render question text with annotation spans
+// Each annotated element gets userSelect:"text" so they remain selectable
 function AnnotatedText({ text, annotations, onRemoveAnn }) {
   if (!text) return null;
 
-  const inline = (raw) =>
-    raw.split("\n").flatMap((line, i, arr) =>
-      i < arr.length - 1 ? [line, <br key={i} />] : [line]
-    );
-
-  if (!annotations.length) return <>{inline(text)}</>;
+  if (!annotations.length) return <span style={{ userSelect: "text" }}>{inlineText(text)}</span>;
 
   const sorted = [...annotations].sort((a, b) => a.start - b.start);
   const segs = [];
@@ -48,8 +51,10 @@ function AnnotatedText({ text, annotations, onRemoveAnn }) {
   return (
     <>
       {segs.map((seg, i) => {
-        const content = inline(seg.text);
-        if (!seg.ann) return <span key={i}>{content}</span>;
+        const content = inlineText(seg.text);
+        if (!seg.ann) {
+          return <span key={i} style={{ userSelect: "text" }}>{content}</span>;
+        }
         if (seg.ann.type === "highlight") {
           return (
             <mark
@@ -60,6 +65,8 @@ function AnnotatedText({ text, annotations, onRemoveAnn }) {
                 borderRadius: 2,
                 padding: "1px 1px",
                 cursor: "pointer",
+                userSelect: "text",
+                WebkitUserSelect: "text",
               }}
             >
               {content}
@@ -75,13 +82,15 @@ function AnnotatedText({ text, annotations, onRemoveAnn }) {
                 textDecoration: `underline 2.5px ${seg.ann.color}`,
                 textUnderlineOffset: "3px",
                 cursor: "pointer",
+                userSelect: "text",
+                WebkitUserSelect: "text",
               }}
             >
               {content}
             </span>
           );
         }
-        return <span key={i}>{content}</span>;
+        return <span key={i} style={{ userSelect: "text" }}>{content}</span>;
       })}
     </>
   );
@@ -112,14 +121,14 @@ export default function QuestionAnnotator({ text, questionId }) {
 
   const textRef = useRef(null);
   const canvasRef = useRef(null);
-  const isDrawingRef = useRef(false);
-  const currentPtsRef = useRef([]);
-  const circleStartRef = useRef(null);
 
-  // Refs for use inside event handlers / RAF (avoids stale closures)
+  // Refs to avoid stale closures in document listeners
   const activeToolRef = useRef(null);
   const drawMapRef = useRef({});
   const questionIdRef = useRef(questionId);
+  const isDrawingRef = useRef(false);
+  const currentPtsRef = useRef([]);
+  const circleStartRef = useRef(null);
 
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
   useEffect(() => { drawMapRef.current = drawMap; }, [drawMap]);
@@ -147,7 +156,7 @@ export default function QuestionAnnotator({ text, questionId }) {
   const isEraserTool = activeTool === "eraser";
   const hasAnns = currentAnns.length > 0 || currentDraws.length > 0;
 
-  // ── Canvas ──────────────────────────────────────────────────────────────
+  // ── Canvas rendering ────────────────────────────────────────────────────
 
   const redrawCanvas = useCallback((previewEnd = null) => {
     const canvas = canvasRef.current;
@@ -164,8 +173,8 @@ export default function QuestionAnnotator({ text, questionId }) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
+    // Draw saved paths
     const paths = drawMapRef.current[qId] ?? [];
-
     for (const p of paths) {
       ctx.strokeStyle = p.color;
       ctx.lineWidth = p.width;
@@ -189,9 +198,9 @@ export default function QuestionAnnotator({ text, questionId }) {
       }
     }
 
-    // In-progress freehand
-    if (tool === "pen" && currentPtsRef.current.length > 1) {
-      ctx.strokeStyle = "#1a1f2e";
+    // In-progress freehand stroke
+    if ((tool === "pen") && currentPtsRef.current.length > 1) {
+      ctx.strokeStyle = "#111827";
       ctx.lineWidth = 2;
       ctx.beginPath();
       currentPtsRef.current.forEach((pt, i) => {
@@ -201,7 +210,7 @@ export default function QuestionAnnotator({ text, questionId }) {
       ctx.stroke();
     }
 
-    // Circle preview (dashed)
+    // Circle preview while dragging
     if (tool === "circle" && circleStartRef.current && previewEnd) {
       const s = circleStartRef.current;
       const cx = ((s.x + previewEnd.x) / 2) * W;
@@ -220,7 +229,7 @@ export default function QuestionAnnotator({ text, questionId }) {
     }
   }, []);
 
-  // Resize canvas to match text container
+  // Resize canvas to always match the text container
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = textRef.current;
@@ -246,90 +255,133 @@ export default function QuestionAnnotator({ text, questionId }) {
     return () => { obs.disconnect(); cancelAnimationFrame(raf); };
   }, [questionId, redrawCanvas]);
 
-  // Redraw whenever draw data changes
+  // Redraw whenever saved paths change
   useEffect(() => { redrawCanvas(); }, [currentDraws, questionId, redrawCanvas]);
 
-  // ── Canvas pointer events ──────────────────────────────────────────────
+  // ── Document-level pointer listeners for canvas drawing ─────────────────
+  // Using document-level listeners means drawing works even if the pointer
+  // drifts outside the canvas boundaries mid-stroke.
 
-  function getPos(e) {
+  function getCanvasPos(clientX, clientY) {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
     return {
-      x: (src.clientX - rect.left) / rect.width,
-      y: (src.clientY - rect.top) / rect.height,
+      x: (clientX - rect.left) / rect.width,
+      y: (clientY - rect.top) / rect.height,
     };
-  }
-
-  function onCanvasDown(e) {
-    if (!isDrawTool && !isEraserTool) return;
-    e.preventDefault();
-    isDrawingRef.current = true;
-    const pos = getPos(e);
-    if (activeTool === "pen") currentPtsRef.current = [pos];
-    else if (activeTool === "circle") circleStartRef.current = pos;
-    else if (activeTool === "eraser") eraseAt(pos);
-  }
-
-  function onCanvasMove(e) {
-    if (!isDrawingRef.current) return;
-    e.preventDefault();
-    const pos = getPos(e);
-    if (activeTool === "pen") {
-      currentPtsRef.current.push(pos);
-      redrawCanvas();
-    } else if (activeTool === "circle") {
-      redrawCanvas(pos);
-    } else if (activeTool === "eraser") {
-      eraseAt(pos);
-    }
-  }
-
-  function onCanvasUp(e) {
-    if (!isDrawingRef.current) return;
-    isDrawingRef.current = false;
-    const pos = getPos(e);
-
-    if (activeTool === "pen" && currentPtsRef.current.length > 1) {
-      updateDraws((prev) => [
-        ...prev,
-        { id: `p${Date.now()}`, type: "freehand", points: [...currentPtsRef.current], color: "#1a1f2e", width: 2 },
-      ]);
-    } else if (activeTool === "circle" && circleStartRef.current) {
-      const s = circleStartRef.current;
-      if (Math.hypot(pos.x - s.x, pos.y - s.y) > 0.02) {
-        updateDraws((prev) => [
-          ...prev,
-          { id: `c${Date.now()}`, type: "circle", x1: s.x, y1: s.y, x2: pos.x, y2: pos.y, color: "#ef4444", width: 2.5 },
-        ]);
-      }
-      circleStartRef.current = null;
-    }
-
-    currentPtsRef.current = [];
-    redrawCanvas();
   }
 
   function eraseAt(pos) {
     const T = 0.05;
-    updateDraws((prev) =>
-      prev.filter((p) => {
+    setDrawMap((prev) => {
+      const qId = questionIdRef.current;
+      const paths = prev[qId] ?? [];
+      const next = paths.filter((p) => {
         if (p.type === "freehand") return !p.points.some((pt) => Math.hypot(pt.x - pos.x, pt.y - pos.y) < T);
         if (p.type === "circle") {
           const cx = (p.x1 + p.x2) / 2, cy = (p.y1 + p.y2) / 2;
           return Math.hypot(cx - pos.x, cy - pos.y) > T * 2;
         }
         return true;
-      })
-    );
+      });
+      return { ...prev, [qId]: next };
+    });
   }
 
-  // ── Text selection ─────────────────────────────────────────────────────
+  // Attach document pointer listeners only while a draw/erase tool is active
+  useEffect(() => {
+    if (!isDrawTool && !isEraserTool) return;
 
-  function onTextMouseUp() {
+    function onPointerMove(e) {
+      if (!isDrawingRef.current) return;
+      const pos = getCanvasPos(e.clientX, e.clientY);
+
+      const tool = activeToolRef.current;
+      if (tool === "pen") {
+        currentPtsRef.current.push(pos);
+        redrawCanvas();
+      } else if (tool === "circle") {
+        redrawCanvas(pos);
+      } else if (tool === "eraser") {
+        eraseAt(pos);
+      }
+    }
+
+    function onPointerUp(e) {
+      if (!isDrawingRef.current) return;
+      isDrawingRef.current = false;
+      const pos = getCanvasPos(e.clientX, e.clientY);
+      const tool = activeToolRef.current;
+
+      if (tool === "pen" && currentPtsRef.current.length > 1) {
+        const pts = [...currentPtsRef.current];
+        currentPtsRef.current = [];
+        setDrawMap((prev) => {
+          const qId = questionIdRef.current;
+          return {
+            ...prev,
+            [qId]: [
+              ...(prev[qId] ?? []),
+              { id: `p${Date.now()}`, type: "freehand", points: pts, color: "#111827", width: 2 },
+            ],
+          };
+        });
+      } else if (tool === "circle" && circleStartRef.current) {
+        const s = circleStartRef.current;
+        circleStartRef.current = null;
+        if (Math.hypot(pos.x - s.x, pos.y - s.y) > 0.02) {
+          setDrawMap((prev) => {
+            const qId = questionIdRef.current;
+            return {
+              ...prev,
+              [qId]: [
+                ...(prev[qId] ?? []),
+                { id: `c${Date.now()}`, type: "circle", x1: s.x, y1: s.y, x2: pos.x, y2: pos.y, color: "#ef4444", width: 2.5 },
+              ],
+            };
+          });
+        } else {
+          redrawCanvas();
+        }
+      } else {
+        currentPtsRef.current = [];
+        circleStartRef.current = null;
+        redrawCanvas();
+      }
+    }
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+    return () => {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDrawTool, isEraserTool, redrawCanvas]);
+
+  function onCanvasPointerDown(e) {
+    if (!isDrawTool && !isEraserTool) return;
+    e.preventDefault();
+    isDrawingRef.current = true;
+    const pos = getCanvasPos(e.clientX, e.clientY);
+    const tool = activeToolRef.current;
+
+    if (tool === "pen") {
+      currentPtsRef.current = [pos];
+    } else if (tool === "circle") {
+      circleStartRef.current = pos;
+      currentPtsRef.current = [];
+    } else if (tool === "eraser") {
+      eraseAt(pos);
+    }
+  }
+
+  // ── Text selection handler ──────────────────────────────────────────────
+
+  function onTextPointerUp() {
     if (!isTextTool) return;
-    // Small timeout so selection is fully committed
+    // Timeout ensures the browser has finalised the selection
     setTimeout(() => {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
@@ -362,17 +414,17 @@ export default function QuestionAnnotator({ text, questionId }) {
     updateAnns((prev) => prev.filter((a) => a.id !== id));
   }
 
+  // Toggle tool: click same tool to keep it active, click again to deselect
   function selectTool(id) {
     setActiveTool((prev) => (prev === id ? null : id));
   }
 
-  // Hint messages
   const HINTS = {
-    highlight: "Select text to highlight it",
-    underline: "Select text to underline it",
-    pen: "Scribble freely on the question",
-    circle: "Drag to circle key words or diagrams",
-    eraser: "Click highlighted text or draw over pen marks",
+    highlight: "Select text to highlight it — select again to add more",
+    underline: "Select text to underline it — select again to add more",
+    pen: "Click and drag to scribble anywhere on the question",
+    circle: "Click and drag to draw a circle around key words",
+    eraser: "Click on highlights/underlines or drag over pen marks to erase",
   };
 
   return (
@@ -382,13 +434,20 @@ export default function QuestionAnnotator({ text, questionId }) {
         <div className="flex items-center gap-1 bg-[#111827]/80 backdrop-blur border border-white/10 rounded-xl px-2 py-1.5">
           {/* Text tools */}
           <ToolBtn active={activeTool === "highlight"} onClick={() => selectTool("highlight")} label="Highlight">
-            <Highlighter className="w-3.5 h-3.5" style={{ color: activeTool === "highlight" ? hlColor : undefined }} />
+            <Highlighter
+              className="w-3.5 h-3.5"
+              style={{ color: activeTool === "highlight" ? hlColor : undefined }}
+            />
           </ToolBtn>
 
           <ToolBtn active={activeTool === "underline"} onClick={() => selectTool("underline")} label="Underline">
             <span
               className="text-sm font-black leading-none"
-              style={{ textDecoration: "underline 2px #93C5FD", textUnderlineOffset: "2px" }}
+              style={{
+                textDecoration: "underline 2px #93C5FD",
+                textUnderlineOffset: "2px",
+                color: activeTool === "underline" ? "#93C5FD" : undefined,
+              }}
             >
               U
             </span>
@@ -431,7 +490,6 @@ export default function QuestionAnnotator({ text, questionId }) {
           )}
         </div>
 
-        {/* Annotation count badge */}
         {hasAnns && (
           <span className="text-[10px] text-white/25 font-mono">
             {currentAnns.length + currentDraws.length} mark{currentAnns.length + currentDraws.length !== 1 ? "s" : ""}
@@ -456,13 +514,13 @@ export default function QuestionAnnotator({ text, questionId }) {
               }}
             />
           ))}
-          <span className="text-[10px] text-white/25 ml-1">Choose colour</span>
+          <span className="text-[10px] text-white/25 ml-1">Colour</span>
         </div>
       )}
 
-      {/* Status hint */}
+      {/* Active tool hint */}
       {activeTool && (
-        <p className="text-[10px] text-white/30 px-0.5 -mt-0.5">
+        <p className="text-[10px] text-white/35 px-0.5 -mt-0.5">
           {HINTS[activeTool]}
         </p>
       )}
@@ -471,16 +529,22 @@ export default function QuestionAnnotator({ text, questionId }) {
       <div
         ref={textRef}
         className="relative"
-        onMouseUp={onTextMouseUp}
-        onTouchEnd={onTextMouseUp}
+        onMouseUp={onTextPointerUp}
+        onTouchEnd={onTextPointerUp}
       >
-        {/* Annotated question text */}
+        {/* Question text — userSelect controlled per tool */}
         <div
           className="text-[15px] leading-relaxed text-foreground/90 relative z-0"
           style={{
-            userSelect: isDrawTool ? "none" : "text",
-            WebkitUserSelect: isDrawTool ? "none" : "text",
-            cursor: isDrawTool ? "crosshair" : isEraserTool ? "cell" : isTextTool ? "text" : "auto",
+            userSelect: isDrawTool || isEraserTool ? "none" : "text",
+            WebkitUserSelect: isDrawTool || isEraserTool ? "none" : "text",
+            cursor: isDrawTool
+              ? "crosshair"
+              : isEraserTool
+                ? "cell"
+                : isTextTool
+                  ? "text"
+                  : "auto",
           }}
         >
           <AnnotatedText
@@ -490,7 +554,7 @@ export default function QuestionAnnotator({ text, questionId }) {
           />
         </div>
 
-        {/* Transparent canvas for freehand drawing */}
+        {/* Transparent canvas sits on top for freehand drawing */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 rounded"
@@ -500,13 +564,7 @@ export default function QuestionAnnotator({ text, questionId }) {
             touchAction: "none",
             cursor: isDrawTool ? "crosshair" : isEraserTool ? "cell" : "default",
           }}
-          onMouseDown={onCanvasDown}
-          onMouseMove={onCanvasMove}
-          onMouseUp={onCanvasUp}
-          onMouseLeave={onCanvasUp}
-          onTouchStart={onCanvasDown}
-          onTouchMove={onCanvasMove}
-          onTouchEnd={onCanvasUp}
+          onPointerDown={onCanvasPointerDown}
         />
       </div>
     </div>

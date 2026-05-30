@@ -63,12 +63,16 @@ export default function TopicalQuestionPage({ getNext, advance, allQuestions = [
 
   const { submit, loading, error, setError } = useNodeAwareSubmit();
 
+  // The IDs in this chapter — used to scope notes and starred counts
+  const sessionQuestionIds = new Set(allQuestions.map(q => q.id));
+
   useEffect(() => { loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {})); }, [topicKey]);
 
   useEffect(() => {
     const allNotes = getAllNotes();
     const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
-    const starredCount = getAllStarred(SUBJECT).length;
+    // Only count starred questions that belong to THIS chapter
+    const starredCount = getAllStarred(SUBJECT).filter(e => sessionQuestionIds.has(e.questionId)).length;
     setPanelItemCount(notesCount + starredCount);
   });
 

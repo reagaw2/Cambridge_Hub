@@ -45,6 +45,9 @@ export default function CSQuestionAttempt({ question, idx, total, allQuestions =
 
   const topicKey = question?.topic_key ?? "unknown";
 
+  // IDs in this chapter — used to scope notes + starred badge count
+  const sessionQuestionIds = new Set(allQuestions.map(q => q.id));
+
   useEffect(() => { loadTopicWorkings(topicKey).then(w => setWorkings(w ?? {})); }, [topicKey]);
 
   useEffect(() => {
@@ -54,7 +57,8 @@ export default function CSQuestionAttempt({ question, idx, total, allQuestions =
   useEffect(() => {
     const allNotes = getAllNotes();
     const notesCount = allQuestions.filter(q => allNotes[q.id]?.text).length;
-    const starredCount = getAllStarred(SUBJECT).length;
+    // Only count starred for this chapter
+    const starredCount = getAllStarred(SUBJECT).filter(e => sessionQuestionIds.has(e.questionId)).length;
     setPanelItemCount(notesCount + starredCount);
   });
 

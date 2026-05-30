@@ -138,17 +138,22 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
           </div>
         ) : (
           <div className="space-y-1.5">
-            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setSaved(false); }}
+            <textarea
+              value={teacherQ}
+              onChange={e => { setTeacherQ(e.target.value); setSaved(false); }}
               placeholder="What would you like to ask your teacher?"
               rows={2}
-              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
+              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
+            />
             <div className="flex items-center justify-between">
               {entry.teacherQuestion && (
                 <button onClick={() => setEditing(false)} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>
               )}
-              <button onClick={() => { onSaveTeacherQ(entry.questionId, teacherQ); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); }}
+              <button
+                onClick={() => { onSaveTeacherQ(entry.questionId, teacherQ); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); }}
                 disabled={!teacherQ.trim()}
-                className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">
+                className="ml-auto text-xs font-bold text-amber-400 hover:brightness-110 transition-all bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40"
+              >
                 {saved ? "Saved ✓" : "Save question →"}
               </button>
             </div>
@@ -170,28 +175,38 @@ export default function SessionNotesPanel({
   const [downloadingNotes, setDownloadingNotes] = useState(false);
   const [downloadingStarred, setDownloadingStarred] = useState(false);
 
+  // The set of question IDs that belong to this chapter/session
+  const sessionQuestionIds = new Set(allQuestions.map(q => q.id));
+
   useEffect(() => {
     if (!open) return;
     setNotesData(getAllNotes());
     const allW = getAllWorkings();
     setWorkingsCount(allQuestions.filter(q => allW[q.id]?.imageData).length);
-    // Only load starred for this subject
-    setStarredData(getAllStarred(subject));
+    // Only show starred questions that belong to this chapter's question set
+    const allStarred = getAllStarred(subject);
+    setStarredData(allStarred.filter(e => sessionQuestionIds.has(e.questionId)));
   }, [open, allQuestions, subject]);
 
   const currentQuestion = allQuestions[currentIdx] ?? null;
-  const sessionNotes = allQuestions.map((q, i) => ({ q, i, note: notesData[q.id] })).filter(({ note }) => note?.text?.trim());
+
+  // Only count notes for questions in this chapter
+  const sessionNotes = allQuestions
+    .map((q, i) => ({ q, i, note: notesData[q.id] }))
+    .filter(({ note }) => note?.text?.trim());
   const notesCount = sessionNotes.length;
   const starredCount = starredData.length;
 
+  function getQuestion(questionId) { return allQuestions.find(q => q.id === questionId); }
+
   function handleUnstar(questionId) {
     unstarQuestion(questionId, subject);
-    setStarredData(getAllStarred(subject));
+    setStarredData(prev => prev.filter(e => e.questionId !== questionId));
   }
 
   function handleSaveTeacherQ(questionId, teacherQuestion) {
     saveTeacherQuestion(questionId, teacherQuestion, subject);
-    setStarredData(getAllStarred(subject));
+    setStarredData(prev => prev.map(e => e.questionId === questionId ? { ...e, teacherQuestion } : e));
   }
 
   async function handleDownloadNotes() {
@@ -200,7 +215,9 @@ export default function SessionNotesPanel({
       const { generateNotesPdf } = await import("@/lib/p1NotesPdf");
       const notesMap = {};
       sessionNotes.forEach(({ q, note }) => { notesMap[q.id] = note; });
-      const questionsForPdf = allQuestions.map((q, i) => ({ id: q.id, question_text: q.text ?? q.question_text ?? "", topic: q.topic ?? "", number: i + 1, mark_scheme: q.mark_scheme ?? "" }));
+      const questionsForPdf = allQuestions.map((q, i) => ({
+        id: q.id, question_text: q.text ?? q.question_text ?? "", topic: q.topic ?? "", number: i + 1, mark_scheme: q.mark_scheme ?? ""
+      }));
       await generateNotesPdf({ paperId: "topical", paperLabel: subject === "physics" ? "Physics Practice" : "CS Practice", notes: notesMap, questions: questionsForPdf, userEmail });
     } catch (e) { console.error(e); }
     setDownloadingNotes(false);
@@ -214,7 +231,12 @@ export default function SessionNotesPanel({
       starredData.forEach((entry, i) => {
         starredForPdf[entry.questionId] = { ...entry, questionNumber: i + 1, correctAnswer: null, options: null };
       });
-      await generateStarredPdf({ paperId: "written", displayName: subject === "physics" ? "Physics Written Practice" : "CS Written Practice", userEmail, starredQuestions: starredForPdf });
+      await generateStarredPdf({
+        paperId: "written",
+        displayName: subject === "physics" ? "Physics Written Practice" : "CS Written Practice",
+        userEmail,
+        starredQuestions: starredForPdf,
+      });
     } catch (e) { console.error(e); }
     setDownloadingStarred(false);
   }
@@ -236,6 +258,7 @@ export default function SessionNotesPanel({
                 </button>
               </div>
 
+              {/* Tabs */}
               <div className="flex shrink-0 border-b border-border/50">
                 <button onClick={() => setActiveTab("notes")}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -254,33 +277,44 @@ export default function SessionNotesPanel({
                 </button>
               </div>
 
+              {/* Content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
 
+                {/* ── NOTES TAB ── */}
                 {activeTab === "notes" && (
                   <>
                     {sessionNotes.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                         <Pencil className="w-8 h-8 text-muted-foreground/30" />
-                        <p className="text-sm text-muted-foreground">No notes yet.</p>
-                        <p className="text-xs text-muted-foreground/50 max-w-[260px] leading-relaxed">Tap MY NOTE on the feedback page to take notes.</p>
+                        <p className="text-sm text-muted-foreground">No notes for this topic yet.</p>
+                        <p className="text-xs text-muted-foreground/50 max-w-[260px] leading-relaxed">Tap MY NOTE on the feedback page to take notes on a question.</p>
                       </div>
-                    ) : sessionNotes.map(({ q, i, note }) => (
-                      <div key={q.id} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="space-y-0.5 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-xs font-bold text-primary">Q{i + 1}</span>
-                              <span className="text-[11px] text-muted-foreground">{q.topic ?? ""}</span>
+                    ) : sessionNotes.map(({ q, i, note }) => {
+                      const qIdx = allQuestions.findIndex(aq => aq.id === q.id);
+                      return (
+                        <div key={q.id} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-0.5 flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-xs font-bold text-primary">Q{i + 1}</span>
+                                <span className="text-[11px] text-muted-foreground">{q.topic ?? ""}</span>
+                              </div>
+                              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{note.text}</p>
                             </div>
-                            <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                            {qIdx >= 0 && (
+                              <button onClick={() => { onJumpTo?.(qIdx); onClose(); }}
+                                className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">
+                                Go to →
+                              </button>
+                            )}
                           </div>
-                          <button onClick={() => { onJumpTo?.(i); onClose(); }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </>
                 )}
 
+                {/* ── WORKINGS TAB ── */}
                 {activeTab === "workings" && (
                   currentQuestion ? (
                     <>
@@ -299,11 +333,12 @@ export default function SessionNotesPanel({
                   )
                 )}
 
+                {/* ── STARRED TAB ── */}
                 {activeTab === "starred" && (
                   starredData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                       <Star className="w-8 h-8 text-muted-foreground/30" />
-                      <p className="text-sm text-muted-foreground">No starred questions yet.</p>
+                      <p className="text-sm text-muted-foreground">No starred questions for this topic yet.</p>
                       <p className="text-xs text-muted-foreground/50 max-w-[260px] leading-relaxed">Tap ☆ Star on the feedback page to flag questions for your teacher.</p>
                     </div>
                   ) : starredData.map((entry) => (
@@ -312,11 +347,14 @@ export default function SessionNotesPanel({
                 )}
               </div>
 
+              {/* Footer */}
               <div className="shrink-0 px-4 py-4 border-t border-border/50 bg-card">
                 {activeTab === "notes" && (
                   <button onClick={handleDownloadNotes} disabled={notesCount === 0 || downloadingNotes}
                     className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40">
-                    {downloadingNotes ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Generating…</> : <><Download className="w-4 h-4" />Download My Notes (PDF)</>}
+                    {downloadingNotes
+                      ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Generating…</>
+                      : <><Download className="w-4 h-4" />Download My Notes (PDF)</>}
                   </button>
                 )}
                 {activeTab === "workings" && (
@@ -325,10 +363,13 @@ export default function SessionNotesPanel({
                 {activeTab === "starred" && (
                   <button onClick={handleDownloadStarred} disabled={starredCount === 0 || downloadingStarred}
                     className="w-full flex items-center justify-center gap-2 bg-amber-500 text-black font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40">
-                    {downloadingStarred ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />Generating…</> : <><Download className="w-4 h-4" />Download Teacher Review (PDF)</>}
+                    {downloadingStarred
+                      ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />Generating…</>
+                      : <><Download className="w-4 h-4" />Download Teacher Review (PDF)</>}
                   </button>
                 )}
               </div>
+
             </div>
           </motion.div>
         </>

@@ -108,8 +108,8 @@ export default function TopicalQuestionPage({ getNext, advance, allQuestions = [
       await addToReviewBank({ question_id: question.id, topic: question.topic, question_text: question.text, mark_scheme: question.mark_scheme ?? "", total_marks: question.total_marks, first_attempt_score: marksEarned, first_attempt_feedback: fb.cambridge_insight ?? "", first_attempt_answer: answer });
     }
     advance();
-    navigate("/feedback", { state: { feedback: fb, answer, topicKey: question.topic_key, questionId: question.id, questionText: question.text, markScheme: question.mark_scheme ?? "", topicLabel: question.topic, nextFullRoute: thisRoute, nextRetryRoute: thisRoute, backRoute, paperRef: question.paper_ref } });
-  }, [question, answer, sessionAnswers, topicKey, submit, advance, navigate, thisRoute, backRoute]);
+    navigate("/feedback", { state: { feedback: fb, answer, topicKey: question.topic_key, questionId: question.id, questionText: question.text, markScheme: question.mark_scheme ?? "", topicLabel: question.topic, nextFullRoute: thisRoute, nextRetryRoute: thisRoute, backRoute: thisRoute, paperRef: question.paper_ref } });
+  }, [question, answer, sessionAnswers, topicKey, submit, advance, navigate, thisRoute]);
 
   const isEmpty = answer.trim().length === 0;
 
@@ -120,7 +120,8 @@ export default function TopicalQuestionPage({ getNext, advance, allQuestions = [
           paperRef={question.paper_ref} subject="Physics"
           currentIdx={currentBankIdx} total={total}
           allQuestions={allQuestions} sessionAnswers={sessionAnswers}
-          onBack={() => navigate(backRoute)} onJumpTo={jumpToQuestion}
+          onBack={() => navigate(-1)}
+          onJumpTo={jumpToQuestion}
           notesCount={panelItemCount} onNotesPanel={() => setNotesPanelOpen(true)}
           showCalculator={true} calcActive={calcActive}
           onCalcToggle={() => setCalcActive(a => !a)}

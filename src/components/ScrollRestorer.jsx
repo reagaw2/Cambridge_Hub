@@ -14,22 +14,24 @@ export default function ScrollRestorer() {
 
     if (navType === "POP") {
       const saved = scrollCache[key] ?? 0;
-      // Wait for content to fully render before restoring
-      const restore = () => {
-        if (keyRef.current !== key) return;
-        window.scrollTo({ top: saved, behavior: "instant" });
-      };
-      // Try immediately, then again after a tick, then after 100ms
-      restore();
-      requestAnimationFrame(restore);
-      const t = setTimeout(restore, 100);
-      return () => clearTimeout(t);
+      if (saved === 0) return; // nothing to restore
+
+      // Try restoring at multiple intervals to catch async/lazy content
+      const attempts = [0, 50, 150, 350, 700];
+      const timers = attempts.map(delay =>
+        setTimeout(() => {
+          if (keyRef.current !== key) return;
+          window.scrollTo({ top: saved, behavior: "instant" });
+        }, delay)
+      );
+      return () => timers.forEach(clearTimeout);
     } else {
+      // PUSH or REPLACE — scroll to top
       window.scrollTo({ top: 0, behavior: "instant" });
     }
   }, [location.key, navType]);
 
-  // Save scroll position on every scroll while on this page
+  // Save scroll position on every scroll event for this page
   useEffect(() => {
     const key = location.key;
     const onScroll = () => {

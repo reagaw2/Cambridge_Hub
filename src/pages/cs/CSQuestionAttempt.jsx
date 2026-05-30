@@ -63,7 +63,7 @@ export default function CSQuestionAttempt({ question, idx, total, allQuestions =
       <div className="min-h-screen bg-background flex justify-center">
         <div className="w-full max-w-[480px] flex flex-col items-center justify-center gap-4 p-8 text-center">
           <p className="text-lg font-semibold text-foreground">No questions available right now.</p>
-          <button onClick={() => navigate("/cs")} className="text-sm text-blue-400">Back to CS dashboard</button>
+          <button onClick={() => navigate(-1)} className="text-sm text-blue-400">Go back</button>
         </div>
       </div>
     );
@@ -105,7 +105,8 @@ export default function CSQuestionAttempt({ question, idx, total, allQuestions =
           paperRef={question.paper_ref} subject="Computer Science"
           currentIdx={idx} total={total}
           allQuestions={allQuestions} sessionAnswers={sessionAnswers}
-          onBack={() => navigate("/cs")} onJumpTo={onJumpTo}
+          onBack={() => navigate(-1)}
+          onJumpTo={onJumpTo}
           notesCount={panelItemCount} onNotesPanel={() => setNotesPanelOpen(true)}
           showCalculator={false}
         />

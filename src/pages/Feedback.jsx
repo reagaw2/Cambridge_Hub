@@ -44,26 +44,15 @@ function MyNoteWidget({ questionId, topic, questionText }) {
         )}
       </div>
       <div className="p-3 space-y-2">
-        <textarea
-          value={text}
-          onChange={e => { setText(e.target.value); setSaved(false); }}
+        <textarea value={text} onChange={e => { setText(e.target.value); setSaved(false); }}
           placeholder="Add a note — what clicked? What was the key idea?"
-          rows={3}
-          autoFocus={editing && !existing?.text}
-          className="w-full bg-secondary/40 border border-border/60 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all leading-relaxed"
-        />
+          rows={3} autoFocus={editing && !existing?.text}
+          className="w-full bg-secondary/40 border border-border/60 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all leading-relaxed" />
         <div className="flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground/30">Saved notes appear in the Notes panel</p>
-          <button
-            onClick={() => {
-              saveNote(questionId, text, { topic, questionText: (questionText ?? "").slice(0, 200) });
-              setSaved(true);
-              setEditing(false);
-              setTimeout(() => setSaved(false), 2000);
-            }}
+          <button onClick={() => { saveNote(questionId, text, { topic, questionText: (questionText ?? "").slice(0, 200) }); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); }}
             disabled={!text.trim()}
-            className="flex items-center gap-1 text-xs font-bold text-primary hover:brightness-110 bg-primary/15 px-3 py-1.5 rounded-lg border border-primary/30 disabled:opacity-40 transition-all"
-          >
+            className="flex items-center gap-1 text-xs font-bold text-primary hover:brightness-110 bg-primary/15 px-3 py-1.5 rounded-lg border border-primary/30 disabled:opacity-40 transition-all">
             {saved ? <><Check className="w-3 h-3" /> Saved</> : "Save note"}
           </button>
         </div>
@@ -75,7 +64,6 @@ function MyNoteWidget({ questionId, topic, questionText }) {
 function StarSection({ questionId, topic, questionText, markScheme, feedback, answer }) {
   const [starred, setStarred] = useState(() => isStarred(questionId ?? "", SUBJECT));
   const existingEntry = getAllStarred(SUBJECT).find(e => e.questionId === questionId);
-
   const [showTeacherQInput, setShowTeacherQInput] = useState(false);
   const [teacherQ, setTeacherQ] = useState(existingEntry?.teacherQuestion ?? "");
   const [teacherQSaved, setTeacherQSaved] = useState(!!existingEntry?.teacherQuestion);
@@ -84,16 +72,9 @@ function StarSection({ questionId, topic, questionText, markScheme, feedback, an
 
   function handleToggleStar() {
     if (!questionId) return;
-    if (starred) {
-      unstarQuestion(questionId, SUBJECT);
-      setStarred(false);
-      setShowTeacherQInput(false);
-    } else {
-      starQuestion(questionId, {
-        topic, questionText, markScheme,
-        feedback: { pulse_layer_1: feedback?.pulse_layer_1, cambridge_insight: feedback?.cambridge_insight },
-        answer: answer ?? "",
-      }, SUBJECT);
+    if (starred) { unstarQuestion(questionId, SUBJECT); setStarred(false); setShowTeacherQInput(false); }
+    else {
+      starQuestion(questionId, { topic, questionText, markScheme, feedback: { pulse_layer_1: feedback?.pulse_layer_1, cambridge_insight: feedback?.cambridge_insight }, answer: answer ?? "" }, SUBJECT);
       setStarred(true);
       setShowTeacherQInput(!existingEntry?.teacherQuestion);
     }
@@ -102,8 +83,7 @@ function StarSection({ questionId, topic, questionText, markScheme, feedback, an
   function handleSaveTeacherQ() {
     if (!teacherQ.trim()) return;
     saveTeacherQuestion(questionId, teacherQ, SUBJECT);
-    setTeacherQSaved(true);
-    setShowTeacherQInput(false);
+    setTeacherQSaved(true); setShowTeacherQInput(false);
     setTimeout(() => setTeacherQSaved(false), 2000);
   }
 
@@ -117,8 +97,7 @@ function StarSection({ questionId, topic, questionText, markScheme, feedback, an
     return (
       <button onClick={handleToggleStar}
         className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border font-semibold text-sm transition-all active:scale-[0.98] bg-card border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5">
-        <Star className="w-4 h-4" />
-        Star for teacher review
+        <Star className="w-4 h-4" /> Star for teacher review
       </button>
     );
   }
@@ -132,7 +111,6 @@ function StarSection({ questionId, topic, questionText, markScheme, feedback, an
         </div>
         <button onClick={handleToggleStar} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Remove</button>
       </div>
-
       <div className="px-4 py-3 space-y-1.5 border-b border-amber-500/10">
         <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5">
           <MessageCircleQuestion className="w-3 h-3" /> Your question for teacher
@@ -144,48 +122,28 @@ function StarSection({ questionId, topic, questionText, markScheme, feedback, an
           </div>
         ) : (
           <div className="space-y-1.5">
-            <textarea
-              value={teacherQ}
-              onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }}
-              placeholder="What would you like to ask your teacher about this question?"
-              rows={2}
-              autoFocus
-              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
-            />
+            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }}
+              placeholder="What would you like to ask your teacher about this question?" rows={2} autoFocus
+              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
             <div className="flex items-center justify-between">
-              {existingEntry?.teacherQuestion && (
-                <button onClick={() => { setShowTeacherQInput(false); setTeacherQ(existingEntry.teacherQuestion); }} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>
-              )}
-              <button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()}
-                className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">
-                Save question →
-              </button>
+              {existingEntry?.teacherQuestion && <button onClick={() => { setShowTeacherQInput(false); setTeacherQ(existingEntry.teacherQuestion); }} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>}
+              <button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()} className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">Save question →</button>
             </div>
           </div>
         )}
       </div>
-
       <div className="px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
           <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">What the teacher said</p>
         </div>
-        <p className="text-[10px] text-muted-foreground/50 leading-snug">
-          Fill this in after your teacher reviews the question — or leave blank to write in by hand when printed.
-        </p>
-        <textarea
-          value={teacherResponse}
-          onChange={e => { setTeacherResponse(e.target.value); setTeacherResponseSaved(false); }}
-          placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…"
-          rows={4}
-          className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all leading-relaxed"
-        />
+        <p className="text-[10px] text-muted-foreground/50 leading-snug">Fill this in after your teacher reviews — or leave blank to write in by hand when printed.</p>
+        <textarea value={teacherResponse} onChange={e => { setTeacherResponse(e.target.value); setTeacherResponseSaved(false); }}
+          placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…" rows={4}
+          className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all leading-relaxed" />
         <div className="flex items-center justify-between">
-          <p className="text-[10px] text-muted-foreground/40">
-            {teacherResponse.trim() ? "Saved response will appear as text in the PDF" : "Blank = 5 ruled lines appear in the PDF for handwriting"}
-          </p>
-          <button onClick={handleSaveTeacherResponse}
-            disabled={teacherResponse === (existingEntry?.teacherResponse ?? "")}
+          <p className="text-[10px] text-muted-foreground/40">{teacherResponse.trim() ? "Saved response will appear as text in the PDF" : "Blank = 5 ruled lines appear in the PDF for handwriting"}</p>
+          <button onClick={handleSaveTeacherResponse} disabled={teacherResponse === (existingEntry?.teacherResponse ?? "")}
             className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">
             {teacherResponseSaved ? <><Check className="w-3 h-3" /> Saved</> : "Save"}
           </button>
@@ -197,17 +155,12 @@ function StarSection({ questionId, topic, questionText, markScheme, feedback, an
 
 function DeeperBreakdown({ feedback }) {
   const [open, setOpen] = useState(false);
-  const markRows = Object.entries(feedback)
-    .filter(([k]) => /^mark_\d+$/.test(k))
-    .sort(([a], [b]) => parseInt(a.split("_")[1]) - parseInt(b.split("_")[1]))
-    .map(([, val], i) => ({ ...val, notation: val.notation ?? `B${i + 1}` }));
+  const markRows = Object.entries(feedback).filter(([k]) => /^mark_\d+$/.test(k)).sort(([a], [b]) => parseInt(a.split("_")[1]) - parseInt(b.split("_")[1])).map(([, val], i) => ({ ...val, notation: val.notation ?? `B${i + 1}` }));
   if (markRows.length === 0) return null;
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
-      <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-all">
-        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        {open ? "Hide" : "Show"} deeper breakdown
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-all">
+        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />} {open ? "Hide" : "Show"} deeper breakdown
       </button>
       {open && (
         <div className="px-4 pb-4 border-t border-border/30 pt-3 space-y-2.5">
@@ -229,15 +182,9 @@ function DeeperBreakdown({ feedback }) {
 export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const {
-    feedback, answer, isQ3, student_prediction, isReview,
-    isPersistentMisunderstanding,
-    topicKey, questionId, questionText, markScheme, topicLabel,
-    nextFullRoute, nextRetryRoute, backRoute, paperRef
-  } = state || {};
+  const { feedback, answer, isQ3, student_prediction, isReview, isPersistentMisunderstanding, topicKey, questionId, questionText, markScheme, topicLabel, nextFullRoute, nextRetryRoute, backRoute, paperRef } = state || {};
 
   const resolvedTopicKey = topicKey ?? "gravitational_fields";
-  const resolvedBack = backRoute ?? "/physics";
   const maxMarks = feedback ? Math.max(...Object.keys(feedback).filter(k => /^mark_\d+$/.test(k)).map(k => parseInt(k.split("_")[1])), 0) || (isQ3 ? 1 : 2) : 2;
   const marksEarned = feedback?.marks_earned ?? 0;
   const fullMarks = marksEarned >= maxMarks;
@@ -272,9 +219,8 @@ export default function Feedback() {
 
   function handleNext() {
     if (isReview) { navigate("/review"); return; }
-    const fmc = parseInt(sessionStorage.getItem("full_marks_count") ?? "0", 10) + (fullMarks ? 1 : 0);
-    sessionStorage.setItem("previous_score", String(marksEarned));
     if (fullMarks) {
+      const fmc = parseInt(sessionStorage.getItem("full_marks_count") ?? "0", 10) + 1;
       sessionStorage.setItem("full_marks_count", String(fmc));
       sessionStorage.setItem("consecutive_full_marks", String(parseInt(sessionStorage.getItem("consecutive_full_marks") ?? "0", 10) + 1));
       navigate(nextFullRoute ?? "/physics");
@@ -288,7 +234,7 @@ export default function Feedback() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate(resolvedBack === "/" ? "/physics" : resolvedBack)} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <button onClick={() => navigate(-1)} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
             <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
           <span className="text-base font-bold tracking-wide text-foreground">CAIE Physics</span>
@@ -340,7 +286,6 @@ export default function Feedback() {
           )}
 
           <MyNoteWidget questionId={questionId ?? "unknown"} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} />
-
           <StarSection questionId={questionId} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} markScheme={markScheme ?? ""} feedback={feedback} answer={answer ?? ""} />
 
           {isQ3 && student_prediction && feedback.prediction_feedback && (
@@ -354,9 +299,9 @@ export default function Feedback() {
           <DeeperBreakdown feedback={feedback} />
 
           <div className="grid grid-cols-2 gap-3 mt-1">
-            <button onClick={() => navigate(resolvedBack === "/" ? "/physics" : resolvedBack)} className="flex items-center justify-center gap-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">‹ Previous</button>
+            <button onClick={() => navigate(-1)} className="flex items-center justify-center gap-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">‹ Back</button>
             <button onClick={handleNext} className="bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
-              {isReview ? (fullMarks ? "Next review question →" : "Try again") : (fullMarks ? "Next question →" : "Try Again")}
+              {isReview ? (fullMarks ? "Next review →" : "Try again") : (fullMarks ? "Next question →" : "Try Again")}
             </button>
           </div>
         </div>

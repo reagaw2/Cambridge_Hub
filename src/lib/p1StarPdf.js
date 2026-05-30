@@ -36,8 +36,6 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
   const margin = 18;
   const contentW = pageW - margin * 2;  // 174 mm
   const LINE_H = 5.5;
-  const RULE_SPACING = 7;  // mm between ruled lines in teacher response box
-  const NUM_RULES = 5;     // number of ruled lines for teacher response
   const dateStr = new Date().toLocaleDateString("en-GB", {
     day: "2-digit", month: "short", year: "numeric",
   });
@@ -85,34 +83,52 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
   }
 
   /**
-   * Draw the "What the teacher said" box.
-   * Cream background + "TEACHER RESPONSE" label + NUM_RULES ruled lines.
+   * Draw the "What the teacher said" response box.
+   * Uses plain rect (more reliable in jsPDF than roundedRect with fill).
+   * 5 ruled lines for writing, cream background, amber border.
    */
   function drawTeacherResponseBox() {
-    const boxH = 12 + NUM_RULES * RULE_SPACING + 4; // label row + rules + bottom padding
-    checkSpace(boxH + 6);
+    const NUM_RULES = 5;
+    const RULE_SPACING = 8;
+    const labelH = 10;
+    const bottomPad = 6;
+    const boxH = labelH + NUM_RULES * RULE_SPACING + bottomPad; // ~56 mm
 
-    // Box background
-    doc.setFillColor(255, 253, 240);
-    doc.setDrawColor(180, 150, 40);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(margin, y, contentW, boxH, 3, 3, "FD");
+    checkSpace(boxH + 8);
 
-    // Label
+    // ── Fill background (cream) ─────────────────────────────────────────────
+    doc.setFillColor(255, 251, 230);
+    doc.rect(margin, y, contentW, boxH, "F");
+
+    // ── Border ─────────────────────────────────────────────────────────────
+    doc.setDrawColor(190, 150, 30);
+    doc.setLineWidth(0.8);
+    doc.rect(margin, y, contentW, boxH, "S");
+
+    // ── Left accent bar ─────────────────────────────────────────────────────
+    doc.setFillColor(190, 150, 30);
+    doc.rect(margin, y, 3, boxH, "F");
+
+    // ── Label ───────────────────────────────────────────────────────────────
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(130, 90, 0);
-    doc.text("TEACHER RESPONSE", margin + 5, y + 7);
+    doc.setFontSize(9);
+    doc.setTextColor(120, 80, 0);
+    doc.text("WHAT THE TEACHER SAID", margin + 7, y + 7);
 
-    // Ruled lines for writing
-    doc.setDrawColor(200, 180, 100);
+    // ── Separator line under label ──────────────────────────────────────────
+    doc.setDrawColor(210, 175, 90);
+    doc.setLineWidth(0.4);
+    doc.line(margin + 3, y + labelH, margin + contentW, y + labelH);
+
+    // ── Ruled writing lines ─────────────────────────────────────────────────
+    doc.setDrawColor(210, 190, 130);
     doc.setLineWidth(0.3);
     for (let i = 0; i < NUM_RULES; i++) {
-      const lineY = y + 12 + i * RULE_SPACING;
-      doc.line(margin + 5, lineY, margin + contentW - 5, lineY);
+      const lineY = y + labelH + 4 + i * RULE_SPACING;
+      doc.line(margin + 7, lineY, margin + contentW - 5, lineY);
     }
 
-    y += boxH + 8;
+    y += boxH + 10;
   }
 
   // ── Cover page ─────────────────────────────────────────────────────────────
@@ -153,27 +169,24 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
 
     // ── Question header card ────────────────────────────────────────────────
     const starredFmt = fmtDate(entry.starredAt);
-    // 3 rows: Question N / Topic / Starred on
     const headerH = starredFmt ? 30 : 22;
 
     doc.setFillColor(232, 240, 255);
     doc.setDrawColor(170, 200, 240);
     doc.setLineWidth(0.5);
-    doc.roundedRect(margin, y, contentW, headerH, 3, 3, "FD");
+    doc.rect(margin, y, contentW, headerH, "F");
+    doc.rect(margin, y, contentW, headerH, "S");
 
-    // "Question N"
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(15, 40, 100);
     doc.text(`Question ${entry.questionNumber}`, margin + 5, y + 9);
 
-    // Topic
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(60, 90, 150);
     doc.text(entry.topic ?? "", margin + 5, y + 17);
 
-    // Starred on date (plain text, no emoji — jsPDF doesn't support emoji)
     if (starredFmt) {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
@@ -293,7 +306,8 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
       doc.setFillColor(255, 252, 235);
       doc.setDrawColor(200, 160, 20);
       doc.setLineWidth(0.6);
-      doc.roundedRect(margin, y, contentW, tqBoxH, 3, 3, "FD");
+      doc.rect(margin, y, contentW, tqBoxH, "F");
+      doc.rect(margin, y, contentW, tqBoxH, "S");
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
@@ -309,7 +323,8 @@ export async function generateStarredPdf({ paperId, displayName, userEmail, star
       y += tqBoxH + 6;
     }
 
-    // ── Teacher Response box ─────────────────────────────────────────────────
+    // ── TEACHER RESPONSE BOX ────────────────────────────────────────────────
+    y += 2;
     drawTeacherResponseBox();
 
     // ── Divider ─────────────────────────────────────────────────────────────

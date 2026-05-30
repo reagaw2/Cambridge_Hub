@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { preloadStore } from '@/lib/topicStore';
 import { preloadCSStore } from '@/lib/csTopicStore';
+import { loadAllNotes } from '@/lib/questionNotesStore';
 
 function applyColorScheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
@@ -40,7 +41,6 @@ export const AuthProvider = ({ children }) => {
       console.log('[Auth] event:', event);
 
       if (event === 'USER_UPDATED' && session?.user) {
-        // Just refresh the user object — no need to reload progress
         const mappedUser = buildUser(session.user);
         if (mappedUser.preferred_name) {
           localStorage.setItem(
@@ -55,7 +55,6 @@ export const AuthProvider = ({ children }) => {
       if (session?.user) {
         const mappedUser = buildUser(session.user);
 
-        // Sync preferred_name to localStorage for instant access
         if (mappedUser.preferred_name) {
           localStorage.setItem(
             `cambridge_hub_preferred_name_${mappedUser.id}`,
@@ -77,6 +76,13 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
           console.warn('[Auth] progress load error (continuing anyway):', err);
         }
+
+        // Pull question notes from Supabase in the background — doesn't block login
+        loadAllNotes().then(notes => {
+          console.log('[Auth] ✓ notes synced from cloud:', Object.keys(notes).length, 'notes');
+        }).catch(e => {
+          console.warn('[Auth] notes sync failed (non-blocking):', e);
+        });
 
         setUser(mappedUser);
         setIsAuthenticated(true);

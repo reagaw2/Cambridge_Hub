@@ -1,5 +1,6 @@
 /**
  * p1NotesPdf.js — My Notes PDF.
+ * Shows: Question N header + note only (no question text).
  */
 
 const JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
@@ -49,7 +50,7 @@ export async function generateNotesPdf({ paperId, paperLabel, session, notes, qu
     }
   }
 
-  // IMPORTANT: always set font+size before calling splitTextToSize so metrics are correct
+  // Always set font+size before splitTextToSize so metrics are correct
   function wrapAt(text, fontSize, fontStyle, maxW) {
     doc.setFont("helvetica", fontStyle ?? "normal");
     doc.setFontSize(fontSize);
@@ -106,17 +107,16 @@ export async function generateNotesPdf({ paperId, paperLabel, session, notes, qu
   // ── Per-question notes ──────────────────────────────────────────────────────
   noteEntries.forEach(({ q, note }, entryIdx) => {
 
-    // Pre-calculate line counts with correct font sizes set first
-    const qTextLines = wrapAt(q.text ?? "", 10, "normal", contentW);
-    const noteLines  = wrapAt(note.text.trim(), 10, "normal", contentW - 10);
+    // Pre-calculate wrap with correct font set first
+    const noteLines = wrapAt(note.text.trim(), 10, "normal", contentW - 10);
 
     const headerH  = 22;
-    const qTextH   = qTextLines.length * LINE_H + 6;
     const noteBoxH = noteLines.length * LINE_H + 14;
+    const totalH   = headerH + 8 + noteBoxH + 14;
 
-    if (entryIdx > 0) checkSpace(Math.min(headerH + qTextH + noteBoxH + 20, 90));
+    if (entryIdx > 0) checkSpace(Math.min(totalH, 80));
 
-    // ── Header card ──────────────────────────────────────────────────────────
+    // ── Question header card ──────────────────────────────────────────────────
     doc.setFillColor(232, 248, 236);
     doc.setDrawColor(150, 200, 160);
     doc.setLineWidth(0.5);
@@ -133,20 +133,6 @@ export async function generateNotesPdf({ paperId, paperLabel, session, notes, qu
     doc.text(q.topic ?? "", margin + 5, y + 17);
 
     y += headerH + 6;
-
-    // ── Question text ─────────────────────────────────────────────────────────
-    if (qTextLines.length > 0) {
-      checkSpace(qTextH + 4);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.setTextColor(40, 40, 40);
-      qTextLines.forEach(line => {
-        checkSpace(LINE_H + 1);
-        doc.text(line, margin, y);
-        y += LINE_H;
-      });
-      y += 5;
-    }
 
     // ── Note box ──────────────────────────────────────────────────────────────
     checkSpace(noteBoxH + 4);

@@ -88,11 +88,12 @@ import NuclearQuestion9a from './pages/nuclear/Question9a';
 import NuclearQuestion9cii from './pages/nuclear/Question9cii';
 import SchemeWhispererAdmin from './pages/admin/SchemeWhispererAdmin';
 import BulkPaperIngestor from './pages/admin/BulkPaperIngestor';
+import FullPaperParser from './pages/admin/FullPaperParser';
 import P1Session from './pages/physics/P1Session';
 import P1Summary from './pages/physics/P1Summary';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, isLoadingProgress, authError, navigateToLogin, isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoadingAuth, isLoadingPublicSettings, isLoadingProgress, authError, navigateToLogin, user } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth || isLoadingProgress) {
     return (
@@ -222,6 +223,7 @@ const AuthenticatedApp = () => {
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/admin/scheme-whisperer" element={<SchemeWhispererAdmin />} />
         <Route path="/admin/bulk-ingestor" element={<BulkPaperIngestor />} />
+        <Route path="/admin/full-paper-parser" element={<FullPaperParser />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

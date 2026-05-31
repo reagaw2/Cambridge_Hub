@@ -405,12 +405,12 @@ export default function P1Session() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [crossedOut, setCrossedOut] = useState(new Set());
+  const [isGuess, setIsGuess] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showCorrectBanner, setShowCorrectBanner] = useState(false);
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
   const [loading, setLoading] = useState(false);
-  // Dedicated loading state for the "Show deeper breakdown" request
   const [loadingLayer2, setLoadingLayer2] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
@@ -460,6 +460,7 @@ export default function P1Session() {
     if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     setCurrentAnswer(existingAnswer?.chosen ?? "");
     setCrossedOut(new Set());
+    setIsGuess(false);
     setSubmitted(!!existingAnswer);
     setShowCorrectBanner(false);
     setLayer1(existingAnswer?.layer1 ?? null);
@@ -510,7 +511,7 @@ export default function P1Session() {
 
   async function handleClear() {
     await clearP1Session(paperId);
-    setAnswers({}); setCurrentIdx(0); setCurrentAnswer(""); setCrossedOut(new Set()); setSubmitted(false);
+    setAnswers({}); setCurrentIdx(0); setCurrentAnswer(""); setCrossedOut(new Set()); setIsGuess(false); setSubmitted(false);
     setShowCorrectBanner(false); setLayer1(null); setLayer2(null); setShowOverview(false);
   }
 
@@ -524,28 +525,46 @@ export default function P1Session() {
     if (!selected || loading || submitted) return;
     setLoading(true);
     const isCorrect = selected === question.correct;
-    await saveMCQAttempt({ question_id: question.id, topic: question.topic, source: paper.id, chosen_option: selected, correct_option: question.correct, correct: isCorrect, flagged_as_guess: false, reasoning: null });
-    if (isCorrect) {
+
+    // Always log to MCQ attempt store — with flagged_as_guess if applicable
+    await saveMCQAttempt({
+      question_id: question.id,
+      topic: question.topic,
+      source: paper.id,
+      chosen_option: selected,
+      correct_option: question.correct,
+      correct: isCorrect,
+      flagged_as_guess: isGuess,
+      reasoning: null,
+    });
+
+    // Auto-advance ONLY when correct AND not flagged as a guess
+    if (isCorrect && !isGuess) {
       const record = { chosen: selected, correct: true, flagged_as_guess: false, layer1: null, layer2: null };
       setAnswers(prev => ({ ...prev, [question.id]: record }));
       setSubmitted(true); setShowCorrectBanner(true); setLoading(false);
       autoAdvanceTimer.current = setTimeout(() => advanceQuestion(), 1500);
       return;
     }
+
+    // For wrong answers OR correct-but-guessed: fetch AI feedback and show it
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
-    const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${selected} — WRONG\nRespond ONLY in JSON:\n{ "marks_earned": 0, "cambridge_insight": "One sentence: why ${question.correct} is the right answer.", "pulse_layer_1": "The reusable exam rule. Max 12 words." }`;
+    const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${selected}${isGuess ? " — flagged as a GUESS" : " — WRONG"}\nRespond ONLY in JSON:\n{ "marks_earned": 0, "cambridge_insight": "One sentence: why ${question.correct} is the right answer.", "pulse_layer_1": "The reusable exam rule. Max 12 words." }`;
+
     let fb1 = null;
     try {
       const r = await base44.integrations.Core.InvokeLLM({ prompt: l1prompt, model: "claude_sonnet_4_6", response_json_schema: { type: "object", properties: { marks_earned: { type: "number" }, cambridge_insight: { type: "string" }, pulse_layer_1: { type: "string" } }, required: ["marks_earned", "cambridge_insight", "pulse_layer_1"] } });
       fb1 = r?.response ?? r;
-    } catch { fb1 = { marks_earned: 0, cambridge_insight: question.explanation, pulse_layer_1: question.explanation }; }
-    const record = { chosen: selected, correct: isCorrect, flagged_as_guess: false, layer1: fb1, layer2: null };
+    } catch {
+      fb1 = { marks_earned: 0, cambridge_insight: question.explanation ?? "", pulse_layer_1: question.explanation ?? "" };
+    }
+
+    const record = { chosen: selected, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
     setAnswers(prev => ({ ...prev, [question.id]: record }));
     setLayer1(fb1); setLayer2(null); setSubmitted(true); setLoading(false);
   }
 
   async function handleRequestLayer2() {
-    // Guard: don't run if already loading or already have layer2
     if (loadingLayer2 || layer2) return;
     setLoadingLayer2(true);
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
@@ -601,7 +620,7 @@ export default function P1Session() {
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
             return (
-              <button key={q.id} onClick={() => setCurrentIdx(i)} className={`relative shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110" : a?.chosen && a?.correct ? "bg-green-500/20 border-green-500/40 text-green-400" : a?.chosen && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-secondary/60 border-border/40 text-muted-foreground/50"}`}>{q.number}</button>
+              <button key={q.id} onClick={() => setCurrentIdx(i)} className={`relative shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110" : a?.chosen && a?.correct && !a?.flagged_as_guess ? "bg-green-500/20 border-green-500/40 text-green-400" : a?.chosen && a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : a?.chosen && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-secondary/60 border-border/40 text-muted-foreground/50"}`}>{q.number}</button>
             );
           })}
         </div>
@@ -642,10 +661,29 @@ export default function P1Session() {
             ))}
           </div>
 
+          {/* Submit row — "Just a guess" toggle + Submit button */}
           {!submitted && (
-            <button onClick={handleSubmit} disabled={!currentAnswer || loading} className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-              {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span> : "Submit Answer"}
-            </button>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setIsGuess(g => !g)}
+                className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-all shrink-0 ${
+                  isGuess
+                    ? "bg-amber-400 text-amber-900 border-amber-400"
+                    : "bg-secondary border-border text-muted-foreground hover:brightness-110"
+                }`}
+              >
+                🎲 {isGuess ? "Guess!" : "Just a guess"}
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!currentAnswer || loading}
+                className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loading
+                  ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span>
+                  : "Submit Answer"}
+              </button>
+            </div>
           )}
 
           {showCorrectBanner && <CorrectBanner />}
@@ -657,7 +695,6 @@ export default function P1Session() {
             </button>
           )}
 
-          {/* "Show deeper breakdown" button — shows spinner while loading, disabled to prevent double-tap */}
           {showFeedbackPanel && !layer2 && !showCorrectBanner && (
             <button
               onClick={handleRequestLayer2}
@@ -665,15 +702,9 @@ export default function P1Session() {
               className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-70"
             >
               {loadingLayer2 ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Loading deeper breakdown…
-                </>
+                <><Loader2 className="w-4 h-4 animate-spin" />Loading deeper breakdown…</>
               ) : (
-                <>
-                  <ChevronDown className="w-4 h-4" />
-                  Show deeper breakdown
-                </>
+                <><ChevronDown className="w-4 h-4" />Show deeper breakdown</>
               )}
             </button>
           )}

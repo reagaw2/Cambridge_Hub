@@ -7,47 +7,38 @@ import { supabaseClient } from "@/api/base44Client";
 
 const BUCKET = "paper-assets";
 
-// Registry of known papers — add new entries here as PDFs are uploaded
+// Registry of known papers — filename must match exactly what is in Supabase Storage
 const PAPER_FILES = {
   "9702/12/F/M/25": "9702_m25_qp_12.pdf",
   "9702/12/M/J/22": "9702_s22_qp_12.pdf",
   "9702/11/M/J/22": "9702_s22_qp_11.pdf",
 };
 
-function localCacheKey(paperId) {
-  return `p1_paper_url_${(paperId ?? "").replace(/\//g, "_")}`;
-}
-
 /**
  * Get the public URL for a specific paper PDF.
+ * Directly constructs the Supabase Storage public URL — no caching, no HEAD check.
+ * This ensures the latest uploaded file is always referenced correctly.
  */
-export async function getPaperPdfUrl(paperId) {
+export function getPaperPdfUrl(paperId) {
   const filename = PAPER_FILES[paperId];
-  if (!filename) return null;
+  if (!filename) return Promise.resolve(null);
 
-  const cacheKey = localCacheKey(paperId);
+  // Use supabaseClient to get the canonical public URL
+  const { data } = supabaseClient.storage
+    .from(BUCKET)
+    .getPublicUrl(filename);
 
-  // Check local cache first
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const { data } = supabaseClient.storage
-      .from(BUCKET)
-      .getPublicUrl(filename);
-
-    if (data?.publicUrl) {
-      const check = await fetch(data.publicUrl, { method: "HEAD" }).catch(() => null);
-      if (check?.ok) {
-        localStorage.setItem(cacheKey, data.publicUrl);
-        return data.publicUrl;
-      }
-    }
-  } catch {
-    // Storage not configured
+  if (data?.publicUrl) {
+    return Promise.resolve(data.publicUrl);
   }
 
-  return null;
+  // Fallback: construct from env var
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) return Promise.resolve(null);
+
+  return Promise.resolve(
+    `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${filename}`
+  );
 }
 
 /**
@@ -55,7 +46,6 @@ export async function getPaperPdfUrl(paperId) {
  */
 export async function uploadPaperPdf(file, paperId) {
   const filename = PAPER_FILES[paperId] ?? file.name;
-  const cacheKey = localCacheKey(paperId);
 
   try {
     const base64 = await new Promise((resolve, reject) => {
@@ -86,17 +76,8 @@ export async function uploadPaperPdf(file, paperId) {
     }
 
     const data = await res.json();
-    const url = data.url ?? null;
-    if (url) localStorage.setItem(cacheKey, url);
-    return { url, error: null };
+    return { url: data.url ?? null, error: null };
   } catch (e) {
     return { url: null, error: e.message };
   }
-}
-
-/**
- * Clear the local URL cache for a paper (forces a fresh check from Supabase).
- */
-export function clearPaperUrlCache(paperId) {
-  localStorage.removeItem(localCacheKey(paperId));
 }

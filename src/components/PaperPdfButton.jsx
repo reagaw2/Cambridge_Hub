@@ -5,11 +5,6 @@ import { useAuth } from "@/lib/AuthContext";
 
 const ADMIN_EMAIL = "reaganmungoma@gmail.com";
 
-/**
- * PaperPdfButton — shows a button to open/download the past paper PDF.
- * Pass `paperId` to specify which paper's PDF to load.
- * If the PDF hasn't been uploaded yet, admins see an upload prompt.
- */
 export default function PaperPdfButton({ label = "Question Paper PDF", paperId }) {
   const { user } = useAuth();
   const [url, setUrl] = useState(null);
@@ -26,6 +21,13 @@ export default function PaperPdfButton({ label = "Question Paper PDF", paperId }
     setUrl(null);
     setUploadSuccess(false);
     setUploadError(null);
+
+    // Clear any stale cached URLs from old implementation
+    try {
+      const cacheKey = `p1_paper_url_${(paperId ?? "").replace(/\//g, "_")}`;
+      localStorage.removeItem(cacheKey);
+    } catch {}
+
     getPaperPdfUrl(paperId).then(u => {
       setUrl(u);
       setLoading(false);

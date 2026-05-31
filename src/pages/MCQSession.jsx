@@ -18,8 +18,6 @@ const OPTION_KEYS = ["A", "B", "C", "D"];
 const SUBJECT = "physics";
 const PAPER_ID = "mcq_physics";
 
-// ── Formula sheet modal ───────────────────────────────────────────────────────
-
 function FormulaSheetModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
@@ -38,8 +36,6 @@ function FormulaSheetModal({ onClose }) {
   );
 }
 
-// ── Correct banner (auto-advances) ────────────────────────────────────────────
-
 function CorrectBanner() {
   return (
     <div className="rounded-xl border border-green-500/40 bg-green-500/10 px-5 py-5 flex flex-col items-center gap-2 text-center">
@@ -49,8 +45,6 @@ function CorrectBanner() {
     </div>
   );
 }
-
-// ── Layer 1: takeaway + insight ───────────────────────────────────────────────
 
 function Layer1Feedback({ feedback, isGuess }) {
   const accentBg = isGuess ? "bg-amber-500/10 border-amber-500/25" : "bg-red-500/10 border-red-500/25";
@@ -86,8 +80,6 @@ function Layer1Feedback({ feedback, isGuess }) {
     </div>
   );
 }
-
-// ── Layer 2: on-demand deeper breakdown ───────────────────────────────────────
 
 function Layer2OnDemand({ feedback, question, selectedOption, loadingL2, onLoad, layer2 }) {
   const [open, setOpen] = useState(false);
@@ -148,8 +140,6 @@ function Layer2OnDemand({ feedback, question, selectedOption, loadingL2, onLoad,
   );
 }
 
-// ── Options recap (after submission) ─────────────────────────────────────────
-
 function OptionsRecap({ question, selectedOption }) {
   const correct = question.correct;
   return (
@@ -175,8 +165,7 @@ function OptionsRecap({ question, selectedOption }) {
   );
 }
 
-// ── My Note widget ────────────────────────────────────────────────────────────
-
+// key prop on these ensures a fresh instance per question — no state bleed
 function MyNoteWidget({ questionId, topic, questionText }) {
   const existing = getAllNotes()[questionId];
   const [editing, setEditing] = useState(!existing?.text);
@@ -218,8 +207,6 @@ function MyNoteWidget({ questionId, topic, questionText }) {
     </div>
   );
 }
-
-// ── Star section ──────────────────────────────────────────────────────────────
 
 function StarSection({ questionId, topic, questionText, feedback }) {
   const [starred, setStarred] = useState(() => checkStarred(questionId ?? "", SUBJECT));
@@ -300,8 +287,6 @@ function StarSection({ questionId, topic, questionText, feedback }) {
   );
 }
 
-// ── Option row ────────────────────────────────────────────────────────────────
-
 function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCrossOut }) {
   const isSelected = selected === optKey;
   return (
@@ -332,8 +317,6 @@ function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCross
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 export default function MCQSession() {
   const navigate = useNavigate();
   const { state } = useLocation();
@@ -342,11 +325,7 @@ export default function MCQSession() {
 
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(sessionIndex ?? 0);
-
-  // Per-question state — keyed by question ID
-  const [answers, setAnswers] = useState({}); // { [id]: { chosen, correct, flagged_as_guess, layer1, layer2 } }
-
-  // Current question interaction state
+  const [answers, setAnswers] = useState({});
   const [selected, setSelected] = useState(null);
   const [crossedOut, setCrossedOut] = useState(new Set());
   const [isGuess, setIsGuess] = useState(false);
@@ -356,22 +335,15 @@ export default function MCQSession() {
   const [noSelectionError, setNoSelectionError] = useState(false);
   const autoAdvanceTimer = useRef(null);
 
-  // Panel state
   const [notesPanelOpen, setNotesPanelOpen] = useState(false);
   const [calcActive, setCalcActive] = useState(false);
   const [formulaSheetOpen, setFormulaSheetOpen] = useState(false);
-
-  // Workings for ScratchpadPanel
   const [workings, setWorkings] = useState({});
 
-  // Load questions
   useEffect(() => {
     if (guessReviewMode) {
-      const qs = (guessReviewBank ?? []).map(id => {
-        // find in all MCQ questions
-        const { MCQ_QUESTIONS } = require("@/lib/mcqBank");
-        return MCQ_QUESTIONS.find(q => q.id === id);
-      }).filter(Boolean);
+      const { MCQ_QUESTIONS } = require("@/lib/mcqBank");
+      const qs = (guessReviewBank ?? []).map(id => MCQ_QUESTIONS.find(q => q.id === id)).filter(Boolean);
       setQuestions(qs);
     } else {
       if (!topic) { navigate(-1); return; }
@@ -379,12 +351,11 @@ export default function MCQSession() {
     }
   }, [topic, guessReviewMode]);
 
-  // Load workings for this session
   useEffect(() => {
     loadWorkings(PAPER_ID).then(w => setWorkings(w ?? {}));
   }, []);
 
-  // Reset per-question state when index changes
+  // Reset per-question interaction state when idx changes
   useEffect(() => {
     if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     const existing = answers[questions[currentIdx]?.id];
@@ -412,7 +383,6 @@ export default function MCQSession() {
   const layer2 = existingAnswer?.layer2 ?? null;
   const isCorrect = existingAnswer?.correct ?? false;
 
-  // Session answers for header dots
   const sessionAnswerMap = {};
   questions.forEach(q => {
     const a = answers[q.id];
@@ -421,7 +391,6 @@ export default function MCQSession() {
 
   const allNotes = getAllNotes();
   const notesCount = questions.filter(q => allNotes[q.id]?.text).length + getAllStarred(SUBJECT).length;
-
   const isLast = currentIdx >= questions.length - 1;
 
   function handleToggleCrossOut(key) {
@@ -454,7 +423,6 @@ export default function MCQSession() {
 
     const isCorrectAnswer = selected === question.correct;
 
-    // Save attempt immediately
     await recordAttempt(question.topic, isCorrectAnswer ? 1 : 0, { total_marks: 1, question_id: question.id });
     await saveMCQAttempt({
       question_id: question.id, topic: question.topic, source: question.source,
@@ -467,7 +435,6 @@ export default function MCQSession() {
     }
 
     if (isCorrectAnswer && !isGuess) {
-      // Correct — no LLM needed, just show banner and auto-advance
       setAnswers(prev => ({ ...prev, [question.id]: { chosen: selected, correct: true, flagged_as_guess: false, layer1: null, layer2: null } }));
       setShowCorrectBanner(true);
       setLoading(false);
@@ -475,7 +442,6 @@ export default function MCQSession() {
       return;
     }
 
-    // Incorrect or guess — fetch Layer1 feedback
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
     const prompt = `Cambridge A Level Physics MCQ.
 Question: ${question.text}
@@ -568,7 +534,6 @@ Respond ONLY in JSON:
             </div>
           )}
 
-          {/* Question card */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-[11px] font-bold uppercase tracking-widest text-amber-900 bg-amber-400/80 px-3 py-1 rounded-full">Multiple Choice</span>
@@ -590,7 +555,6 @@ Respond ONLY in JSON:
             <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
           </div>
 
-          {/* Options */}
           {!submitted ? (
             <>
               {crossedCount > 0 && (
@@ -622,25 +586,19 @@ Respond ONLY in JSON:
             </>
           ) : (
             <>
-              {/* Options recap */}
               <OptionsRecap question={question} selectedOption={existingAnswer?.chosen} />
-
-              {/* Correct banner */}
               {showCorrectBanner && <CorrectBanner />}
-
-              {/* Incorrect / guess feedback */}
               {!isCorrect && layer1 && <Layer1Feedback feedback={layer1} isGuess={existingAnswer?.flagged_as_guess ?? false} />}
 
-              {/* Notes + star (shown for incorrect/guess answers) */}
+              {/* key= forces fresh mount per question — no note/star state bleed */}
               {(!isCorrect || existingAnswer?.flagged_as_guess) && (
                 <>
-                  <MyNoteWidget questionId={question.id} topic={question.topic} questionText={question.text} />
-                  <StarSection questionId={question.id} topic={question.topic} questionText={question.text} feedback={layer1} />
+                  <MyNoteWidget key={`note-${question.id}`} questionId={question.id} topic={question.topic} questionText={question.text} />
+                  <StarSection key={`star-${question.id}`} questionId={question.id} topic={question.topic} questionText={question.text} feedback={layer1} />
                   <Layer2OnDemand feedback={layer1} question={question} selectedOption={existingAnswer?.chosen} loadingL2={loadingL2} onLoad={handleLoadLayer2} layer2={layer2} />
                 </>
               )}
 
-              {/* Next button */}
               {!showCorrectBanner && (
                 <button onClick={advanceToNext}
                   className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
@@ -653,7 +611,6 @@ Respond ONLY in JSON:
         </div>
       </div>
 
-      {/* Side scratchpads */}
       <ScratchpadPanel
         questionId={question.id}
         paperId={PAPER_ID}
@@ -661,7 +618,6 @@ Respond ONLY in JSON:
         onSaveWorking={handleSaveWorking}
       />
 
-      {/* Notes / workings / starred panel */}
       <SessionNotesPanel
         open={notesPanelOpen}
         onClose={() => setNotesPanelOpen(false)}

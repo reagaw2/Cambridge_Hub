@@ -44,10 +44,14 @@ function MyNoteWidget({ questionId, topic, questionText }) {
         )}
       </div>
       <div className="p-3 space-y-2">
-        <textarea value={text} onChange={e => { setText(e.target.value); setSaved(false); }}
+        <textarea
+          value={text}
+          onChange={e => { setText(e.target.value); setSaved(false); }}
           placeholder="Add a note — what clicked? What was the key idea?"
-          rows={3} autoFocus={editing && !existing?.text}
-          className="w-full bg-secondary/40 border border-border/60 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all leading-relaxed" />
+          rows={3}
+          autoFocus
+          className="w-full bg-secondary/40 border border-border/60 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all leading-relaxed"
+        />
         <div className="flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground/30">Saved notes appear in the Notes panel</p>
           <button onClick={() => { saveNote(questionId, text, { topic, questionText: (questionText ?? "").slice(0, 200) }); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); }}
@@ -122,12 +126,16 @@ function StarSection({ questionId, topic, questionText, markScheme, feedback, an
           </div>
         ) : (
           <div className="space-y-1.5">
-            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }}
-              placeholder="What would you like to ask your teacher about this question?" rows={2} autoFocus
-              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
+            <textarea
+              value={teacherQ}
+              onChange={(e) => { setTeacherQ(e.target.value); setTeacherQSaved(false); }}
+              placeholder="What would you like to ask your teacher about this question?"
+              rows={2}
+              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
+            />
             <div className="flex items-center justify-between">
               {existingEntry?.teacherQuestion && <button onClick={() => { setShowTeacherQInput(false); setTeacherQ(existingEntry.teacherQuestion); }} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>}
-              <button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()} className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">Save question →</button>
+              <button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()} className="ml-auto text-xs font-bold text-amber-400 hover:brightness-110 transition-all bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40">Save question →</button>
             </div>
           </div>
         )}
@@ -285,8 +293,9 @@ export default function Feedback() {
             </div>
           )}
 
-          <MyNoteWidget questionId={questionId ?? "unknown"} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} />
-          <StarSection questionId={questionId} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} markScheme={markScheme ?? ""} feedback={feedback} answer={answer ?? ""} />
+          {/* key= forces a fresh mount per question so notes never bleed across */}
+          <MyNoteWidget key={questionId} questionId={questionId ?? "unknown"} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} />
+          <StarSection key={`star-${questionId}`} questionId={questionId} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} markScheme={markScheme ?? ""} feedback={feedback} answer={answer ?? ""} />
 
           {isQ3 && student_prediction && feedback.prediction_feedback && (
             <div className="bg-card border border-l-4 border-border border-l-green-500/60 rounded-xl p-5 space-y-2">

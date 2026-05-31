@@ -16,7 +16,6 @@ function topicToKey(topic) {
   return (topic ?? "unknown").toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "").replace(/_+/g, "_");
 }
 
-/** Strip markdown code fences that Claude sometimes wraps JSON in */
 function stripCodeFences(text) {
   if (typeof text !== "string") return text;
   return text
@@ -25,7 +24,6 @@ function stripCodeFences(text) {
     .trim();
 }
 
-/** Safely parse JSON from Claude — handles code fences and trailing commas */
 function safeParseJSON(raw) {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === "object" && raw !== null) return raw;
@@ -118,10 +116,9 @@ export default function FullPaperParser() {
       ? "Physical Quantities, Kinematics, Forces, Waves, Circular Motion, Gravitational Fields, Thermal Physics, Oscillations, Electric Fields, Capacitance, Electromagnetic Induction, Quantum Physics, Nuclear Physics, Medical Imaging, Astrophysics"
       : "Data Representation, Compression, Networks, Hardware, Operating Systems, Language Translators, Data Security, Data Integrity, Ethics, Databases, Algorithms";
 
-    // Token-efficient prompt — no verbose examples, concise instructions
     const prompt = `Split this Cambridge A Level ${subject === "physics" ? "9702" : "9618"} paper into sub-questions. Return ONLY a JSON array, no markdown, no explanation.
 
-PAPER (truncated to save tokens):
+PAPER:
 ${paperText.slice(0, 4000)}
 
 MARK SCHEME:
@@ -170,24 +167,20 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
         },
       });
 
-      // Handle both array and {questions:[]} shapes, and strip code fences
       let raw = result?.response ?? result;
       let data;
 
       try {
-        // If it's already an object with a questions array
         if (raw && typeof raw === "object" && Array.isArray(raw.questions)) {
           data = raw.questions;
         } else if (Array.isArray(raw)) {
           data = raw;
         } else {
-          // String response — strip code fences then parse
           const cleaned = stripCodeFences(typeof raw === "string" ? raw : JSON.stringify(raw));
           const parsed2 = JSON.parse(cleaned);
           data = Array.isArray(parsed2) ? parsed2 : (parsed2.questions ?? []);
         }
       } catch (parseErr) {
-        // Last resort — try to find a JSON array anywhere in the string
         const strRaw = typeof raw === "string" ? raw : JSON.stringify(raw);
         const match = strRaw.match(/\[[\s\S]*\]/);
         if (!match) throw new Error(`Could not extract JSON array. Raw: ${strRaw.slice(0, 200)}`);
@@ -281,7 +274,6 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
   const isSaving  = phase === "saving";
   const isDone    = phase === "done";
 
-  // Character counters with colour warnings
   const paperChars = paperText.length;
   const msChars    = msText.length;
   const paperColor = paperChars > 4000 ? "text-amber-400" : "text-white/25";
@@ -296,7 +288,6 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
 
       <div className="relative z-10 max-w-[680px] mx-auto flex flex-col min-h-screen">
 
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 sticky top-0 bg-[#0d0d1a]/95 backdrop-blur z-20">
           <button onClick={() => navigate("/")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-white/5 transition-colors">
             <ArrowLeft className="w-5 h-5 text-white/60" />
@@ -312,17 +303,23 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
 
           {/* Explainer */}
           <div className="bg-purple-500/8 border border-purple-500/20 rounded-2xl p-4 space-y-2">
-            <p className="text-sm font-bold text-white">How to use — token-efficient</p>
+            <p className="text-sm font-bold text-white">How to use</p>
             <ol className="text-xs text-white/50 leading-relaxed space-y-1 list-decimal list-inside">
               <li>Set paper code, session, variant</li>
-              <li>Paste <strong className="text-white/70">question text</strong> — keep under 4 000 chars to save tokens</li>
-              <li>Paste <strong className="text-white/70">mark scheme</strong> — keep under 3 000 chars</li>
-              <li>Click <strong className="text-purple-400">Auto-Parse</strong> — one Claude call, no extra tokens</li>
-              <li>Preview → <strong className="text-emerald-400">Save All</strong></li>
+              <li>Paste <strong className="text-white/70">question paper text</strong> (copy from PDF)</li>
+              <li>Paste <strong className="text-white/70">mark scheme text</strong> (optional but recommended)</li>
+              <li>Click <strong className="text-purple-400">Auto-Parse</strong> — one Claude call does all the splitting</li>
+              <li>Preview → <strong className="text-emerald-400">Save All to Supabase</strong></li>
             </ol>
-            <p className="text-[10px] text-amber-400/70 flex items-start gap-1 pt-1">
-              ⚡ Tip: paste a few questions at a time for cheapest cost — Claude only charges for what you send.
-            </p>
+            <div className="mt-2 bg-white/5 border border-white/8 rounded-xl p-3 space-y-1">
+              <p className="text-[11px] font-bold text-white/60">💡 How tokens are actually saved here:</p>
+              <ul className="text-[11px] text-white/40 space-y-0.5 list-disc list-inside leading-relaxed">
+                <li><strong className="text-white/60">Short prompt</strong> — instructions are minimal, no verbose examples</li>
+                <li><strong className="text-white/60">Input is capped</strong> — only first 4 000 / 3 000 chars are sent, excess is cut</li>
+                <li><strong className="text-white/60">One call per paper</strong> — all sub-questions extracted in a single request</li>
+              </ul>
+              <p className="text-[11px] text-amber-400/70 mt-1">⚠ Batching (multiple smaller calls) uses more tokens, not fewer — each call repeats the prompt overhead.</p>
+            </div>
           </div>
 
           {/* Paper metadata */}
@@ -363,14 +360,14 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
                   Question Paper Text <span className="text-purple-400">*</span>
                 </label>
                 <span className={`text-[10px] font-mono ${paperColor}`}>
-                  {paperChars.toLocaleString()} / 4 000 chars
-                  {paperChars > 4000 && " — only first 4 000 sent to save tokens"}
+                  {paperChars.toLocaleString()} chars
+                  {paperChars > 4000 && " — truncated to 4 000 on send"}
                 </span>
               </div>
               <textarea
                 value={paperText}
                 onChange={e => setPaperText(e.target.value)}
-                placeholder="Paste question text here. For cheapest tokens, paste a few questions at a time (under 4 000 characters)."
+                placeholder="Paste the full paper text here. Copy directly from the PDF — the more complete, the better the parsing."
                 rows={8}
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-purple-500/40 transition-all font-mono leading-relaxed"
               />
@@ -382,14 +379,14 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
                   Mark Scheme Text <span className="text-white/20">(optional)</span>
                 </label>
                 <span className={`text-[10px] font-mono ${msColor}`}>
-                  {msChars.toLocaleString()} / 3 000 chars
-                  {msChars > 3000 && " — only first 3 000 sent"}
+                  {msChars.toLocaleString()} chars
+                  {msChars > 3000 && " — truncated to 3 000 on send"}
                 </span>
               </div>
               <textarea
                 value={msText}
                 onChange={e => setMsText(e.target.value)}
-                placeholder="Paste corresponding mark scheme text. Omit if not available — Claude will infer."
+                placeholder="Paste the mark scheme text here. If omitted, Claude will infer a best-effort mark scheme from the question."
                 rows={5}
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-emerald-500/40 transition-all font-mono leading-relaxed"
               />
@@ -425,7 +422,6 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
               <div className="space-y-1">
                 <p className="text-sm text-red-300 font-semibold">Parse failed</p>
                 <p className="text-xs text-red-300/70 leading-relaxed font-mono">{errorMsg}</p>
-                <p className="text-[11px] text-red-300/50">Try reducing the pasted text to under 4 000 characters.</p>
               </div>
             </div>
           )}
@@ -480,9 +476,9 @@ Rules: every sub-part = separate entry. Respond with ONLY the JSON array.`;
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   {[
-                    ["Saved",       saveResults.results?.length ?? 0,                                          "text-emerald-400"],
-                    ["Errors",      saveResults.errors?.length ?? 0,  saveResults.errors?.length ? "text-red-400" : "text-white"],
-                    ["Mark nodes",  saveResults.results?.reduce((s,r) => s + r.nodes, 0) ?? 0,                  "text-purple-400"],
+                    ["Saved",      saveResults.results?.length ?? 0,                                         "text-emerald-400"],
+                    ["Errors",     saveResults.errors?.length ?? 0, saveResults.errors?.length ? "text-red-400" : "text-white"],
+                    ["Mark nodes", saveResults.results?.reduce((s,r) => s + r.nodes, 0) ?? 0,                "text-purple-400"],
                   ].map(([label, val, color]) => (
                     <div key={label} className="bg-white/[0.03] rounded-xl p-3">
                       <p className={`text-xl font-black ${color}`}>{val}</p>

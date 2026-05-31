@@ -83,17 +83,14 @@ function Layer1Feedback({ feedback, isGuess }) {
 
 function Layer2OnDemand({ feedback, question, selectedOption, loadingL2, onLoad, layer2 }) {
   const [open, setOpen] = useState(false);
-
   async function handle() {
     if (layer2) { setOpen(o => !o); return; }
     await onLoad();
     setOpen(true);
   }
-
   const step1 = layer2?.step1_system ?? feedback?.step1_system;
   const step2 = layer2?.step2_phrase_breakdown ?? feedback?.step2_phrase_breakdown;
   const step3 = layer2?.step3_tipping_point ?? feedback?.step3_tipping_point;
-
   return (
     <div className="rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden">
       <button onClick={handle} className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.025] transition-all">
@@ -106,34 +103,13 @@ function Layer2OnDemand({ feedback, question, selectedOption, loadingL2, onLoad,
             <p className="text-[10px] text-white/30">System · Breakdown · Tipping point</p>
           </div>
         </div>
-        {loadingL2 ? (
-          <Loader2 className="w-4 h-4 text-white/25 animate-spin shrink-0" />
-        ) : layer2 ? (
-          open ? <ChevronUp className="w-4 h-4 text-white/25 shrink-0" /> : <ChevronDown className="w-4 h-4 text-white/25 shrink-0" />
-        ) : (
-          <span className="text-[10px] font-bold border border-emerald-400/30 text-emerald-300 bg-emerald-400/10 rounded-full px-2 py-0.5">Tap</span>
-        )}
+        {loadingL2 ? <Loader2 className="w-4 h-4 text-white/25 animate-spin shrink-0" /> : layer2 ? (open ? <ChevronUp className="w-4 h-4 text-white/25 shrink-0" /> : <ChevronDown className="w-4 h-4 text-white/25 shrink-0" />) : <span className="text-[10px] font-bold border border-emerald-400/30 text-emerald-300 bg-emerald-400/10 rounded-full px-2 py-0.5">Tap</span>}
       </button>
       {open && layer2 && (
         <div className="px-4 pb-4 border-t border-white/5 pt-4 space-y-4">
-          {step1 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-400/70">1 · The System</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{step1}</p>
-            </div>
-          )}
-          {step2 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-purple-400/70">2 · Phrase Breakdown</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{step2}</p>
-            </div>
-          )}
-          {step3 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">3 · Tipping Point</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{step3}</p>
-            </div>
-          )}
+          {step1 && <div className="space-y-1.5"><p className="text-[10px] font-black uppercase tracking-widest text-blue-400/70">1 · The System</p><p className="text-sm text-foreground/80 leading-relaxed">{step1}</p></div>}
+          {step2 && <div className="space-y-1.5"><p className="text-[10px] font-black uppercase tracking-widest text-purple-400/70">2 · Phrase Breakdown</p><p className="text-sm text-foreground/80 leading-relaxed">{step2}</p></div>}
+          {step3 && <div className="space-y-1.5"><p className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">3 · Tipping Point</p><p className="text-sm text-foreground/80 leading-relaxed">{step3}</p></div>}
         </div>
       )}
     </div>
@@ -149,11 +125,7 @@ function OptionsRecap({ question, selectedOption }) {
         const isCorrect = key === correct;
         const isWrongChosen = key === selectedOption && !isCorrect;
         return (
-          <div key={key} className={`flex items-start gap-3 p-2.5 rounded-lg border ${
-            isCorrect ? "border-l-4 border-green-500/70 bg-green-500/8"
-            : isWrongChosen ? "border-l-4 border-red-400/70 bg-red-500/8"
-            : "border-border/40 bg-secondary/30 opacity-50"
-          }`}>
+          <div key={key} className={`flex items-start gap-3 p-2.5 rounded-lg border ${isCorrect ? "border-l-4 border-green-500/70 bg-green-500/8" : isWrongChosen ? "border-l-4 border-red-400/70 bg-red-500/8" : "border-border/40 bg-secondary/30 opacity-50"}`}>
             <span className={`font-mono text-xs font-bold shrink-0 mt-0.5 ${isCorrect ? "text-green-400" : isWrongChosen ? "text-red-400" : "text-muted-foreground"}`}>{key}</span>
             <span className="text-xs text-foreground/80 leading-relaxed">{question.options[key]}</span>
             {isCorrect && <span className="ml-auto text-[10px] text-green-400 font-bold shrink-0">✓ correct</span>}
@@ -165,44 +137,25 @@ function OptionsRecap({ question, selectedOption }) {
   );
 }
 
-// key prop on these ensures a fresh instance per question — no state bleed
 function MyNoteWidget({ questionId, topic, questionText }) {
   const existing = getAllNotes()[questionId];
   const [editing, setEditing] = useState(!existing?.text);
   const [text, setText] = useState(existing?.text ?? "");
   const [saved, setSaved] = useState(false);
-
   if (!editing && existing?.text) {
     return (
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30">
-          <div className="flex items-center gap-2"><span className="text-xs text-primary">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div>
-          <button onClick={() => setEditing(true)} className="text-[11px] text-primary hover:brightness-110 transition-all">Edit</button>
-        </div>
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30"><div className="flex items-center gap-2"><span className="text-xs text-primary">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div><button onClick={() => setEditing(true)} className="text-[11px] text-primary hover:brightness-110 transition-all">Edit</button></div>
         <div className="px-4 py-3"><p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{existing.text}</p></div>
       </div>
     );
   }
-
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30">
-        <div className="flex items-center gap-2"><span className="text-xs text-primary">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div>
-        {existing?.text && <button onClick={() => { setEditing(false); setText(existing.text); }} className="text-[11px] text-muted-foreground hover:text-foreground">Cancel</button>}
-      </div>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30"><div className="flex items-center gap-2"><span className="text-xs text-primary">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div>{existing?.text && <button onClick={() => { setEditing(false); setText(existing.text); }} className="text-[11px] text-muted-foreground hover:text-foreground">Cancel</button>}</div>
       <div className="p-3 space-y-2">
-        <textarea value={text} onChange={e => { setText(e.target.value); setSaved(false); }}
-          placeholder="Add a note — what clicked? What was the key idea?"
-          rows={3}
-          className="w-full bg-secondary/40 border border-border/60 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all leading-relaxed" />
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] text-muted-foreground/30">Appears in the Notes panel</p>
-          <button onClick={() => { saveNote(questionId, text, { topic, questionText: (questionText ?? "").slice(0, 200) }); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); }}
-            disabled={!text.trim()}
-            className="flex items-center gap-1 text-xs font-bold text-primary hover:brightness-110 bg-primary/15 px-3 py-1.5 rounded-lg border border-primary/30 disabled:opacity-40 transition-all">
-            {saved ? <><Check className="w-3 h-3" /> Saved</> : "Save note"}
-          </button>
-        </div>
+        <textarea value={text} onChange={e => { setText(e.target.value); setSaved(false); }} placeholder="Add a note — what clicked? What was the key idea?" rows={3} className="w-full bg-secondary/40 border border-border/60 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all leading-relaxed" />
+        <div className="flex items-center justify-between"><p className="text-[10px] text-muted-foreground/30">Appears in the Notes panel</p><button onClick={() => { saveNote(questionId, text, { topic, questionText: (questionText ?? "").slice(0, 200) }); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); }} disabled={!text.trim()} className="flex items-center gap-1 text-xs font-bold text-primary hover:brightness-110 bg-primary/15 px-3 py-1.5 rounded-lg border border-primary/30 disabled:opacity-40 transition-all">{saved ? <><Check className="w-3 h-3" /> Saved</> : "Save note"}</button></div>
       </div>
     </div>
   );
@@ -220,97 +173,90 @@ function StarSection({ questionId, topic, questionText, feedback }) {
   function handleToggleStar() {
     if (!questionId) return;
     if (starred) { unstarQuestion(questionId, SUBJECT); setStarred(false); setShowTeacherQInput(false); }
-    else {
-      starQuestion(questionId, { topic, questionText, markScheme: "", feedback: { pulse_layer_1: feedback?.pulse_layer_1, cambridge_insight: feedback?.cambridge_insight } }, SUBJECT);
-      setStarred(true); setShowTeacherQInput(!existingEntry?.teacherQuestion);
-    }
+    else { starQuestion(questionId, { topic, questionText, markScheme: "", feedback: { pulse_layer_1: feedback?.pulse_layer_1, cambridge_insight: feedback?.cambridge_insight } }, SUBJECT); setStarred(true); setShowTeacherQInput(!existingEntry?.teacherQuestion); }
   }
+  function handleSaveTeacherQ() { if (!teacherQ.trim()) return; saveTeacherQuestion(questionId, teacherQ, SUBJECT); setTeacherQSaved(true); setShowTeacherQInput(false); setTimeout(() => setTeacherQSaved(false), 2000); }
+  function handleSaveTeacherResponse() { saveTeacherResponse(questionId, teacherResponse, SUBJECT); setTeacherResponseSaved(true); setTimeout(() => setTeacherResponseSaved(false), 2500); }
 
-  function handleSaveTeacherQ() {
-    if (!teacherQ.trim()) return;
-    saveTeacherQuestion(questionId, teacherQ, SUBJECT); setTeacherQSaved(true); setShowTeacherQInput(false);
-    setTimeout(() => setTeacherQSaved(false), 2000);
-  }
-
-  function handleSaveTeacherResponse() {
-    saveTeacherResponse(questionId, teacherResponse, SUBJECT); setTeacherResponseSaved(true);
-    setTimeout(() => setTeacherResponseSaved(false), 2500);
-  }
-
-  if (!starred) {
-    return (
-      <button onClick={handleToggleStar}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border font-semibold text-sm transition-all active:scale-[0.98] bg-card border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5">
-        <Star className="w-4 h-4" /> Star for teacher review
-      </button>
-    );
-  }
+  if (!starred) return <button onClick={handleToggleStar} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border font-semibold text-sm transition-all active:scale-[0.98] bg-card border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5"><Star className="w-4 h-4" /> Star for teacher review</button>;
 
   return (
     <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-amber-500/15">
-        <div className="flex items-center gap-2"><Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" /><p className="text-xs text-amber-400 font-semibold">Starred for teacher review</p></div>
-        <button onClick={handleToggleStar} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Remove</button>
-      </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-amber-500/15"><div className="flex items-center gap-2"><Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" /><p className="text-xs text-amber-400 font-semibold">Starred for teacher review</p></div><button onClick={handleToggleStar} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Remove</button></div>
       <div className="px-4 py-3 space-y-1.5 border-b border-amber-500/10">
         <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5"><MessageCircleQuestion className="w-3 h-3" /> Your question for teacher</p>
         {teacherQSaved && !showTeacherQInput && teacherQ.trim() ? (
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[11px] text-foreground/80 italic flex-1">"{teacherQ}"</p>
-            <button onClick={() => setShowTeacherQInput(true)} className="text-[10px] text-amber-400/60 hover:text-amber-400 shrink-0">Edit</button>
-          </div>
+          <div className="flex items-start justify-between gap-2"><p className="text-[11px] text-foreground/80 italic flex-1">"{teacherQ}"</p><button onClick={() => setShowTeacherQInput(true)} className="text-[10px] text-amber-400/60 hover:text-amber-400 shrink-0">Edit</button></div>
         ) : (
           <div className="space-y-1.5">
-            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }}
-              placeholder="What would you like to ask your teacher?" rows={2} autoFocus
-              className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
-            <div className="flex items-center justify-between">
-              {existingEntry?.teacherQuestion && <button onClick={() => { setShowTeacherQInput(false); setTeacherQ(existingEntry.teacherQuestion); }} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground">Cancel</button>}
-              <button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()} className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">Save →</button>
-            </div>
+            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }} placeholder="What would you like to ask your teacher?" rows={2} autoFocus className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
+            <div className="flex items-center justify-between">{existingEntry?.teacherQuestion && <button onClick={() => setShowTeacherQInput(false)} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground">Cancel</button>}<button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()} className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">Save →</button></div>
           </div>
         )}
       </div>
       <div className="px-4 py-3 space-y-2">
         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" /><p className="text-[10px] font-black uppercase tracking-widest text-amber-400">What the teacher said</p></div>
-        <textarea value={teacherResponse} onChange={e => { setTeacherResponse(e.target.value); setTeacherResponseSaved(false); }}
-          placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…" rows={3}
-          className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all leading-relaxed" />
-        <div className="flex justify-end">
-          <button onClick={handleSaveTeacherResponse} disabled={teacherResponse === (existingEntry?.teacherResponse ?? "")}
-            className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">
-            {teacherResponseSaved ? <><Check className="w-3 h-3" /> Saved</> : "Save"}
-          </button>
-        </div>
+        <textarea value={teacherResponse} onChange={e => { setTeacherResponse(e.target.value); setTeacherResponseSaved(false); }} placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…" rows={3} className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all leading-relaxed" />
+        <div className="flex justify-end"><button onClick={handleSaveTeacherResponse} disabled={teacherResponse === (existingEntry?.teacherResponse ?? "")} className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">{teacherResponseSaved ? <><Check className="w-3 h-3" /> Saved</> : "Save"}</button></div>
       </div>
     </div>
   );
 }
 
+/**
+ * OptionRow — cross-out button is ALWAYS VISIBLE, not hover-only.
+ * Works correctly on both mobile (touch) and desktop.
+ */
 function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCrossOut }) {
   const isSelected = selected === optKey;
+
+  let containerCls = "relative w-full flex items-center gap-2 p-3.5 rounded-xl border text-left transition-all ";
+  if (crossedOut) {
+    containerCls += "border-border/30 bg-secondary/20 opacity-50";
+  } else if (isSelected) {
+    containerCls += "border-l-4 border-amber-400 bg-amber-400/8 cursor-pointer";
+  } else {
+    containerCls += "border-border hover:border-border/80 cursor-pointer";
+  }
+
   return (
-    <div className={`group relative w-full flex items-start gap-3 p-4 rounded-xl border text-left transition-all ${
-      crossedOut ? "border-border/30 bg-secondary/20 opacity-50"
-      : isSelected ? "border-l-4 border-amber-400 bg-amber-400/8"
-      : "border-border hover:border-border/80"
-    }`}>
-      <button type="button" onClick={() => !crossedOut && onSelect(optKey)}
-        className="flex items-start gap-3 flex-1 min-w-0 text-left" style={{ background: "none", border: "none", padding: 0 }}>
-        <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-4 transition-colors ${isSelected ? "text-amber-400" : crossedOut ? "text-muted-foreground/30" : "text-muted-foreground"}`}>{optKey}</span>
-        <span className={`text-sm leading-relaxed flex-1 min-w-0 transition-all ${crossedOut ? "line-through text-muted-foreground/30" : "text-foreground/90"}`}>{text}</span>
+    <div className={containerCls}>
+      {/* Option letter */}
+      <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-5 text-center transition-colors ${
+        isSelected ? "text-amber-400" : crossedOut ? "text-muted-foreground/30" : "text-muted-foreground"
+      }`}>{optKey}</span>
+
+      {/* Option text — clicking selects */}
+      <button
+        type="button"
+        onClick={() => !crossedOut && onSelect(optKey)}
+        disabled={crossedOut}
+        className={`flex-1 min-w-0 text-left text-sm leading-relaxed transition-all ${
+          crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90"
+        }`}
+        style={{ background: "none", border: "none", padding: 0 }}
+      >
+        {text}
       </button>
-      <button type="button" onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
-        title={crossedOut ? "Restore" : "Cross out"}
-        className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ml-1 mt-0.5 ${
-          crossedOut ? "bg-red-500/25 border border-red-500/50 text-red-400 opacity-100"
-          : "opacity-0 group-hover:opacity-100 bg-secondary border border-border text-muted-foreground/50 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
-        }`}>
-        <X className="w-3 h-3" />
+
+      {/* Cross-out / restore button — ALWAYS VISIBLE */}
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
+        title={crossedOut ? "Restore option" : "Cross out — eliminate this option"}
+        className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
+          crossedOut
+            ? "bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+            : "bg-secondary/60 border border-border/60 text-muted-foreground/40 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
+        }`}
+      >
+        <X className="w-3.5 h-3.5" />
       </button>
+
+      {/* Strike-through overlay line */}
       {crossedOut && (
         <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" aria-hidden="true">
-          <div className="absolute top-1/2 left-3 right-3 h-px bg-muted-foreground/30" />
+          <div className="absolute top-1/2 left-10 right-10 h-px bg-muted-foreground/40" />
         </div>
       )}
     </div>
@@ -355,7 +301,6 @@ export default function MCQSession() {
     loadWorkings(PAPER_ID).then(w => setWorkings(w ?? {}));
   }, []);
 
-  // Reset per-question interaction state when idx changes
   useEffect(() => {
     if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     const existing = answers[questions[currentIdx]?.id];
@@ -368,11 +313,7 @@ export default function MCQSession() {
 
   useEffect(() => () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); }, []);
 
-  if (questions.length === 0) return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
-    </div>
-  );
+  if (questions.length === 0) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" /></div>;
 
   const question = questions[currentIdx];
   if (!question) { navigate(-1); return null; }
@@ -384,19 +325,18 @@ export default function MCQSession() {
   const isCorrect = existingAnswer?.correct ?? false;
 
   const sessionAnswerMap = {};
-  questions.forEach(q => {
-    const a = answers[q.id];
-    if (a) sessionAnswerMap[q.id] = a.correct ? "correct" : "wrong";
-  });
+  questions.forEach(q => { const a = answers[q.id]; if (a) sessionAnswerMap[q.id] = a.correct ? "correct" : "wrong"; });
 
   const allNotes = getAllNotes();
   const notesCount = questions.filter(q => allNotes[q.id]?.text).length + getAllStarred(SUBJECT).length;
   const isLast = currentIdx >= questions.length - 1;
+  const crossedCount = crossedOut.size;
 
   function handleToggleCrossOut(key) {
     setCrossedOut(prev => {
       const next = new Set(prev);
-      if (next.has(key)) { next.delete(key); } else { next.add(key); if (selected === key) setSelected(null); }
+      if (next.has(key)) { next.delete(key); }
+      else { next.add(key); if (selected === key) setSelected(null); }
       return next;
     });
   }
@@ -407,12 +347,8 @@ export default function MCQSession() {
   }
 
   function advanceToNext() {
-    if (isLast) {
-      if (guessReviewMode) navigate("/guess-review-bank");
-      else navigate(-1);
-    } else {
-      setCurrentIdx(i => i + 1);
-    }
+    if (isLast) { if (guessReviewMode) navigate("/guess-review-bank"); else navigate(-1); }
+    else { setCurrentIdx(i => i + 1); }
   }
 
   async function handleSubmit() {
@@ -420,54 +356,23 @@ export default function MCQSession() {
     if (loading || submitted) return;
     setLoading(true);
     setNoSelectionError(false);
-
     const isCorrectAnswer = selected === question.correct;
-
     await recordAttempt(question.topic, isCorrectAnswer ? 1 : 0, { total_marks: 1, question_id: question.id });
-    await saveMCQAttempt({
-      question_id: question.id, topic: question.topic, source: question.source,
-      chosen_option: selected, correct_option: question.correct,
-      correct: isCorrectAnswer, flagged_as_guess: isGuess, reasoning: null,
-    });
-
-    if (guessReviewMode && (isCorrectAnswer || isGuess)) {
-      await resetGuessReviewBankLock(question.id).catch(() => {});
-    }
-
+    await saveMCQAttempt({ question_id: question.id, topic: question.topic, source: question.source, chosen_option: selected, correct_option: question.correct, correct: isCorrectAnswer, flagged_as_guess: isGuess, reasoning: null });
+    if (guessReviewMode && (isCorrectAnswer || isGuess)) await resetGuessReviewBankLock(question.id).catch(() => {});
     if (isCorrectAnswer && !isGuess) {
       setAnswers(prev => ({ ...prev, [question.id]: { chosen: selected, correct: true, flagged_as_guess: false, layer1: null, layer2: null } }));
-      setShowCorrectBanner(true);
-      setLoading(false);
+      setShowCorrectBanner(true); setLoading(false);
       autoAdvanceTimer.current = setTimeout(() => advanceToNext(), 1500);
       return;
     }
-
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
-    const prompt = `Cambridge A Level Physics MCQ.
-Question: ${question.text}
-Options: ${optionsList}
-Correct answer: ${question.correct} (${question.options[question.correct]})
-Student chose: ${selected} — WRONG
-${isGuess ? "Student flagged this as a guess." : ""}
-Respond ONLY in JSON (no extra text):
-{
-  "marks_earned": 0,
-  "cambridge_insight": "One clear sentence explaining exactly why ${question.correct} is correct and where the student went wrong.",
-  "pulse_layer_1": "The reusable exam rule. Maximum 12 words."
-}`;
-
+    const prompt = `Cambridge A Level Physics MCQ.\nQuestion: ${question.text}\nOptions: ${optionsList}\nCorrect answer: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${selected} — WRONG\n${isGuess ? "Student flagged this as a guess." : ""}\nRespond ONLY in JSON (no extra text):\n{\n  "marks_earned": 0,\n  "cambridge_insight": "One clear sentence explaining exactly why ${question.correct} is correct and where the student went wrong.",\n  "pulse_layer_1": "The reusable exam rule. Maximum 12 words."\n}`;
     let fb = null;
     try {
-      const r = await base44.integrations.Core.InvokeLLM({
-        prompt,
-        model: "claude_sonnet_4_6",
-        response_json_schema: { type: "object", properties: { marks_earned: { type: "number" }, cambridge_insight: { type: "string" }, pulse_layer_1: { type: "string" } }, required: ["cambridge_insight", "pulse_layer_1"] },
-      });
+      const r = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6", response_json_schema: { type: "object", properties: { marks_earned: { type: "number" }, cambridge_insight: { type: "string" }, pulse_layer_1: { type: "string" } }, required: ["cambridge_insight", "pulse_layer_1"] } });
       fb = r?.response ?? r;
-    } catch {
-      fb = { cambridge_insight: question.explanation ?? "See the correct answer above.", pulse_layer_1: question.explanation ?? "" };
-    }
-
+    } catch { fb = { cambridge_insight: question.explanation ?? "See the correct answer above.", pulse_layer_1: question.explanation ?? "" }; }
     setAnswers(prev => ({ ...prev, [question.id]: { chosen: selected, correct: false, flagged_as_guess: isGuess, layer1: fb, layer2: null } }));
     setLoading(false);
   }
@@ -476,34 +381,15 @@ Respond ONLY in JSON (no extra text):
     if (loadingL2 || layer2) return;
     setLoadingL2(true);
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
-    const prompt = `Cambridge A Level Physics MCQ.
-Question: ${question.text}
-Options: ${optionsList}
-Correct: ${question.correct} (${question.options[question.correct]})
-Student chose: ${selected} — WRONG
-Respond ONLY in JSON:
-{
-  "step1_system": "One sentence: what concept is this question testing.",
-  "step2_phrase_breakdown": "1-2 sentences: which words in the question carry hidden meaning.",
-  "step3_tipping_point": "One sentence: the exact logical boundary that separates ${question.correct} from the wrong options."
-}`;
-
+    const prompt = `Cambridge A Level Physics MCQ.\nQuestion: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${selected} — WRONG\nRespond ONLY in JSON:\n{\n  "step1_system": "One sentence: what concept is this question testing.",\n  "step2_phrase_breakdown": "1-2 sentences: which words in the question carry hidden meaning.",\n  "step3_tipping_point": "One sentence: the exact logical boundary that separates ${question.correct} from the wrong options."\n}`;
     let fb2 = null;
     try {
-      const r = await base44.integrations.Core.InvokeLLM({
-        prompt, model: "claude_sonnet_4_6",
-        response_json_schema: { type: "object", properties: { step1_system: { type: "string" }, step2_phrase_breakdown: { type: "string" }, step3_tipping_point: { type: "string" } }, required: ["step1_system", "step2_phrase_breakdown", "step3_tipping_point"] },
-      });
+      const r = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6", response_json_schema: { type: "object", properties: { step1_system: { type: "string" }, step2_phrase_breakdown: { type: "string" }, step3_tipping_point: { type: "string" } }, required: ["step1_system", "step2_phrase_breakdown", "step3_tipping_point"] } });
       fb2 = r?.response ?? r;
-    } catch {
-      fb2 = { step1_system: "Could not load breakdown.", step2_phrase_breakdown: "", step3_tipping_point: "" };
-    }
-
+    } catch { fb2 = { step1_system: "Could not load breakdown.", step2_phrase_breakdown: "", step3_tipping_point: "" }; }
     setAnswers(prev => ({ ...prev, [question.id]: { ...prev[question.id], layer2: fb2 } }));
     setLoadingL2(false);
   }
-
-  const crossedCount = crossedOut.size;
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -527,12 +413,7 @@ Respond ONLY in JSON:
         />
 
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
-
-          {calcActive && (
-            <div className="relative z-10">
-              <ScientificCalculator onClose={() => setCalcActive(false)} />
-            </div>
-          )}
+          {calcActive && <div className="relative z-10"><ScientificCalculator onClose={() => setCalcActive(false)} /></div>}
 
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -541,10 +422,7 @@ Respond ONLY in JSON:
                 <span className="text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">{question.topic}</span>
                 {submitted && (
                   <button
-                    onClick={() => {
-                      if (checkStarred(question.id, SUBJECT)) { unstarQuestion(question.id, SUBJECT); }
-                      else { starQuestion(question.id, { topic: question.topic, questionText: question.text, markScheme: "", feedback: { pulse_layer_1: layer1?.pulse_layer_1, cambridge_insight: layer1?.cambridge_insight } }, SUBJECT); }
-                    }}
+                    onClick={() => { if (checkStarred(question.id, SUBJECT)) { unstarQuestion(question.id, SUBJECT); } else { starQuestion(question.id, { topic: question.topic, questionText: question.text, markScheme: "", feedback: { pulse_layer_1: layer1?.pulse_layer_1, cambridge_insight: layer1?.cambridge_insight } }, SUBJECT); } }}
                     className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${checkStarred(question.id, SUBJECT) ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
                     <Star className={`w-3 h-3 ${checkStarred(question.id, SUBJECT) ? "fill-amber-400" : ""}`} />
                     {checkStarred(question.id, SUBJECT) ? "Starred" : "Star"}
@@ -557,17 +435,19 @@ Respond ONLY in JSON:
 
           {!submitted ? (
             <>
-              {crossedCount > 0 && (
-                <p className="text-[11px] text-muted-foreground/50 text-center -mt-1">
-                  Hover an option and tap ✕ to cross it out · {crossedCount} crossed out
-                </p>
-              )}
+              {/* Cross-out hint */}
+              <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">
+                Tap ✕ to cross out options you've eliminated{crossedCount > 0 ? ` · ${crossedCount} crossed out` : ""}
+              </p>
+
               <div className="flex flex-col gap-2.5">
                 {OPTION_KEYS.map(key => (
                   <OptionRow key={key} optKey={key} text={question.options[key]} selected={selected} crossedOut={crossedOut.has(key)} onSelect={setSelected} onToggleCrossOut={handleToggleCrossOut} />
                 ))}
               </div>
+
               {noSelectionError && <p className="text-sm text-red-400/80 text-center -mt-1">Select an answer first</p>}
+
               <div className="flex gap-2 items-center">
                 <button onClick={() => { setIsGuess(g => !g); setNoSelectionError(false); }}
                   className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-all shrink-0 ${isGuess ? "bg-amber-400 text-amber-900 border-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}>
@@ -575,12 +455,7 @@ Respond ONLY in JSON:
                 </button>
                 <button onClick={handleSubmit} disabled={!selected || loading}
                   className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
-                      Marking…
-                    </span>
-                  ) : "Submit Answer"}
+                  {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span> : "Submit Answer"}
                 </button>
               </div>
             </>
@@ -590,7 +465,6 @@ Respond ONLY in JSON:
               {showCorrectBanner && <CorrectBanner />}
               {!isCorrect && layer1 && <Layer1Feedback feedback={layer1} isGuess={existingAnswer?.flagged_as_guess ?? false} />}
 
-              {/* key= forces fresh mount per question — no note/star state bleed */}
               {(!isCorrect || existingAnswer?.flagged_as_guess) && (
                 <>
                   <MyNoteWidget key={`note-${question.id}`} questionId={question.id} topic={question.topic} questionText={question.text} />
@@ -600,34 +474,17 @@ Respond ONLY in JSON:
               )}
 
               {!showCorrectBanner && (
-                <button onClick={advanceToNext}
-                  className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
+                <button onClick={advanceToNext} className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
                   {isLast ? (guessReviewMode ? "Back to review bank →" : "Finish →") : "Next question →"}
                 </button>
               )}
             </>
           )}
-
         </div>
       </div>
 
-      <ScratchpadPanel
-        questionId={question.id}
-        paperId={PAPER_ID}
-        workings={workings}
-        onSaveWorking={handleSaveWorking}
-      />
-
-      <SessionNotesPanel
-        open={notesPanelOpen}
-        onClose={() => setNotesPanelOpen(false)}
-        allQuestions={questions.map((q, i) => ({ id: q.id, topic: q.topic, text: q.text }))}
-        currentIdx={currentIdx}
-        onJumpTo={(i) => { setCurrentIdx(i); setNotesPanelOpen(false); }}
-        subject={SUBJECT}
-        userEmail={user?.email ?? ""}
-      />
-
+      <ScratchpadPanel questionId={question.id} paperId={PAPER_ID} workings={workings} onSaveWorking={handleSaveWorking} />
+      <SessionNotesPanel open={notesPanelOpen} onClose={() => setNotesPanelOpen(false)} allQuestions={questions.map((q, i) => ({ id: q.id, topic: q.topic, text: q.text }))} currentIdx={currentIdx} onJumpTo={(i) => { setCurrentIdx(i); setNotesPanelOpen(false); }} subject={SUBJECT} userEmail={user?.email ?? ""} />
       {formulaSheetOpen && <FormulaSheetModal onClose={() => setFormulaSheetOpen(false)} />}
     </div>
   );

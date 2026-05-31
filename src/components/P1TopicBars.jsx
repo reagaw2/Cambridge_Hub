@@ -10,7 +10,6 @@ export default function P1TopicBars({ questions, answers }) {
     const pct = answered.length > 0 ? (correct / answered.length) * 100 : null;
     return { topic, total: topicQs.length, answered: answered.length, correct, pct };
   }).sort((a, b) => {
-    // Unanswered topics go to the bottom
     if (a.pct === null && b.pct === null) return 0;
     if (a.pct === null) return 1;
     if (b.pct === null) return -1;
@@ -35,13 +34,15 @@ export default function P1TopicBars({ questions, answers }) {
           : pct >= 50   ? "text-amber-400"
           : "text-red-400";
 
+        const pctRounded = pct !== null ? Math.round(pct) : null;
+
         return (
           <div key={topic} className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-foreground/80 truncate flex-1">{topic}</span>
               <span className={`text-[11px] font-mono font-semibold shrink-0 ${textColor}`}>
                 {answered > 0
-                  ? `${correct}/${answered} (${Math.round(pct!)}%)`
+                  ? `${correct}/${answered} (${pctRounded}%)`
                   : `0/${total}`}
               </span>
             </div>

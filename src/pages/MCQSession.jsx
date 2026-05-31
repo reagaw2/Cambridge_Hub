@@ -81,30 +81,53 @@ function Layer1Feedback({ feedback, isGuess }) {
   );
 }
 
+/**
+ * Layer2OnDemand — shows a spinner and loading text while fetching,
+ * and is disabled during the fetch to prevent double-taps.
+ */
 function Layer2OnDemand({ feedback, question, selectedOption, loadingL2, onLoad, layer2 }) {
   const [open, setOpen] = useState(false);
+
   async function handle() {
+    if (loadingL2) return;
     if (layer2) { setOpen(o => !o); return; }
     await onLoad();
     setOpen(true);
   }
+
   const step1 = layer2?.step1_system ?? feedback?.step1_system;
   const step2 = layer2?.step2_phrase_breakdown ?? feedback?.step2_phrase_breakdown;
   const step3 = layer2?.step3_tipping_point ?? feedback?.step3_tipping_point;
+
   return (
     <div className="rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden">
-      <button onClick={handle} className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.025] transition-all">
+      <button
+        onClick={handle}
+        disabled={loadingL2}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.025] transition-all disabled:cursor-not-allowed disabled:opacity-80"
+      >
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-            <Microscope className="w-3 h-3 text-white/40" />
+          <div className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+            {loadingL2
+              ? <Loader2 className="w-3 h-3 text-white/40 animate-spin" />
+              : <Microscope className="w-3 h-3 text-white/40" />}
           </div>
           <div className="text-left">
-            <p className="text-xs font-bold text-white">Go deeper</p>
-            <p className="text-[10px] text-white/30">System · Breakdown · Tipping point</p>
+            <p className="text-xs font-bold text-white">
+              {loadingL2 ? "Loading deeper breakdown…" : "Go deeper"}
+            </p>
+            <p className="text-[10px] text-white/30">
+              {loadingL2 ? "This takes a few seconds" : "System · Breakdown · Tipping point"}
+            </p>
           </div>
         </div>
-        {loadingL2 ? <Loader2 className="w-4 h-4 text-white/25 animate-spin shrink-0" /> : layer2 ? (open ? <ChevronUp className="w-4 h-4 text-white/25 shrink-0" /> : <ChevronDown className="w-4 h-4 text-white/25 shrink-0" />) : <span className="text-[10px] font-bold border border-emerald-400/30 text-emerald-300 bg-emerald-400/10 rounded-full px-2 py-0.5">Tap</span>}
+        {loadingL2
+          ? <Loader2 className="w-4 h-4 text-white/30 animate-spin shrink-0" />
+          : layer2
+            ? (open ? <ChevronUp className="w-4 h-4 text-white/25 shrink-0" /> : <ChevronDown className="w-4 h-4 text-white/25 shrink-0" />)
+            : <span className="text-[10px] font-bold border border-emerald-400/30 text-emerald-300 bg-emerald-400/10 rounded-full px-2 py-0.5">Tap</span>}
       </button>
+
       {open && layer2 && (
         <div className="px-4 pb-4 border-t border-white/5 pt-4 space-y-4">
           {step1 && <div className="space-y-1.5"><p className="text-[10px] font-black uppercase tracking-widest text-blue-400/70">1 · The System</p><p className="text-sm text-foreground/80 leading-relaxed">{step1}</p></div>}
@@ -203,10 +226,6 @@ function StarSection({ questionId, topic, questionText, feedback }) {
   );
 }
 
-/**
- * OptionRow — cross-out button is ALWAYS VISIBLE, not hover-only.
- * Works correctly on both mobile (touch) and desktop.
- */
 function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCrossOut }) {
   const isSelected = selected === optKey;
 
@@ -221,39 +240,26 @@ function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCross
 
   return (
     <div className={containerCls}>
-      {/* Option letter */}
       <span className={`font-mono text-xs font-bold mt-0.5 shrink-0 w-5 text-center transition-colors ${
         isSelected ? "text-amber-400" : crossedOut ? "text-muted-foreground/30" : "text-muted-foreground"
       }`}>{optKey}</span>
 
-      {/* Option text — clicking selects */}
-      <button
-        type="button"
-        onClick={() => !crossedOut && onSelect(optKey)}
-        disabled={crossedOut}
-        className={`flex-1 min-w-0 text-left text-sm leading-relaxed transition-all ${
-          crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90"
-        }`}
-        style={{ background: "none", border: "none", padding: 0 }}
-      >
+      <button type="button" onClick={() => !crossedOut && onSelect(optKey)} disabled={crossedOut}
+        className={`flex-1 min-w-0 text-left text-sm leading-relaxed transition-all ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90"}`}
+        style={{ background: "none", border: "none", padding: 0 }}>
         {text}
       </button>
 
-      {/* Cross-out / restore button — ALWAYS VISIBLE */}
-      <button
-        type="button"
-        onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
+      <button type="button" onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
         title={crossedOut ? "Restore option" : "Cross out — eliminate this option"}
         className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
           crossedOut
             ? "bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
             : "bg-secondary/60 border border-border/60 text-muted-foreground/40 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
-        }`}
-      >
+        }`}>
         <X className="w-3.5 h-3.5" />
       </button>
 
-      {/* Strike-through overlay line */}
       {crossedOut && (
         <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" aria-hidden="true">
           <div className="absolute top-1/2 left-10 right-10 h-px bg-muted-foreground/40" />
@@ -309,6 +315,7 @@ export default function MCQSession() {
     setCrossedOut(new Set());
     setShowCorrectBanner(!!existing && existing.correct && !existing.flagged_as_guess);
     setNoSelectionError(false);
+    setLoadingL2(false);
   }, [currentIdx, questions]);
 
   useEffect(() => () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); }, []);
@@ -435,7 +442,6 @@ export default function MCQSession() {
 
           {!submitted ? (
             <>
-              {/* Cross-out hint */}
               <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">
                 Tap ✕ to cross out options you've eliminated{crossedCount > 0 ? ` · ${crossedCount} crossed out` : ""}
               </p>
@@ -469,7 +475,14 @@ export default function MCQSession() {
                 <>
                   <MyNoteWidget key={`note-${question.id}`} questionId={question.id} topic={question.topic} questionText={question.text} />
                   <StarSection key={`star-${question.id}`} questionId={question.id} topic={question.topic} questionText={question.text} feedback={layer1} />
-                  <Layer2OnDemand feedback={layer1} question={question} selectedOption={existingAnswer?.chosen} loadingL2={loadingL2} onLoad={handleLoadLayer2} layer2={layer2} />
+                  <Layer2OnDemand
+                    feedback={layer1}
+                    question={question}
+                    selectedOption={existingAnswer?.chosen}
+                    loadingL2={loadingL2}
+                    onLoad={handleLoadLayer2}
+                    layer2={layer2}
+                  />
                 </>
               )}
 

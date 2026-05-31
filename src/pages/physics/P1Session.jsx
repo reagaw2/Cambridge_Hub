@@ -198,38 +198,25 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
       <div className="w-full max-w-[540px] bg-card border-t border-border rounded-t-2xl flex flex-col" style={{ height: "92vh" }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
           <p className="font-bold text-foreground">Notes, Workings & Starred</p>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary">
-            <X className="w-4 h-4 text-muted-foreground" />
-          </button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
 
         <div className="flex shrink-0 border-b border-border/50">
-          <button onClick={() => setActiveTab("notes")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            <Pencil className="w-3 h-3" /> Notes
-            {noteCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>{noteCount}</span>}
+          <button onClick={() => setActiveTab("notes")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <Pencil className="w-3 h-3" /> Notes {noteCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>{noteCount}</span>}
           </button>
-          <button onClick={() => setActiveTab("workings")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "workings" ? "border-blue-400 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            <PenLine className="w-3 h-3" /> Workings
-            {workingsCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "workings" ? "bg-blue-500/20 text-blue-400" : "bg-secondary text-muted-foreground"}`}>{workingsCount}</span>}
+          <button onClick={() => setActiveTab("workings")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "workings" ? "border-blue-400 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <PenLine className="w-3 h-3" /> Workings {workingsCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "workings" ? "bg-blue-500/20 text-blue-400" : "bg-secondary text-muted-foreground"}`}>{workingsCount}</span>}
           </button>
-          <button onClick={() => setActiveTab("teacher")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "teacher" ? "border-amber-400 text-amber-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            <Star className={`w-3 h-3 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} /> Teacher
-            {starredCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>{starredCount}</span>}
+          <button onClick={() => setActiveTab("teacher")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "teacher" ? "border-amber-400 text-amber-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <Star className={`w-3 h-3 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} /> Teacher {starredCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>{starredCount}</span>}
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
           {activeTab === "notes" && (
             <>
-              {allNotes.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                  <Pencil className="w-8 h-8 text-muted-foreground/30" />
-                  <p className="text-sm text-muted-foreground">No notes yet.</p>
-                </div>
-              )}
+              {allNotes.length === 0 && <div className="flex flex-col items-center justify-center py-12 gap-3 text-center"><Pencil className="w-8 h-8 text-muted-foreground/30" /><p className="text-sm text-muted-foreground">No notes yet.</p></div>}
               {allNotes.map(([questionId, note]) => {
                 const q = getQuestion(questionId);
                 return (
@@ -349,11 +336,6 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   );
 }
 
-/**
- * OptionRow — cross-out button is ALWAYS visible (not hover-only).
- * This ensures it works on mobile/touch devices.
- * The button is subtle when not crossed out, prominent when crossed out.
- */
 function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOption, onSelect, onToggleCrossOut }) {
   const isCorrectOption = optKey === correctOption;
   const isWrongChosen = submitted && optKey === selected && !isCorrectOption;
@@ -371,7 +353,6 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
 
   return (
     <div className={containerCls}>
-      {/* Option letter */}
       <span className={`font-mono text-xs font-black shrink-0 w-5 text-center transition-colors ${
         submitted && isCorrectOption ? "text-green-400"
         : submitted && isWrongChosen ? "text-red-400"
@@ -380,40 +361,27 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
         : "text-muted-foreground"
       }`}>{optKey}</span>
 
-      {/* Option text — clickable area to select */}
-      <button
-        type="button"
-        disabled={submitted || crossedOut}
-        onClick={() => !submitted && !crossedOut && onSelect(optKey)}
-        className={`flex-1 min-w-0 text-left text-sm leading-relaxed transition-all ${
-          crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90"
-        }`}
-        style={{ background: "none", border: "none", padding: 0 }}
-      >
+      <button type="button" disabled={submitted || crossedOut} onClick={() => !submitted && !crossedOut && onSelect(optKey)}
+        className={`flex-1 min-w-0 text-left text-sm leading-relaxed transition-all ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90"}`}
+        style={{ background: "none", border: "none", padding: 0 }}>
         {text}
       </button>
 
-      {/* Cross-out / restore button — ALWAYS VISIBLE, not hover-only */}
       {!submitted && (
-        <button
-          type="button"
-          onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
+        <button type="button" onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
           title={crossedOut ? "Restore option" : "Cross out — eliminate this option"}
           className={`shrink-0 flex items-center justify-center rounded-lg transition-all active:scale-90 ${
             crossedOut
               ? "w-7 h-7 bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
               : "w-7 h-7 bg-secondary/60 border border-border/60 text-muted-foreground/40 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
-          }`}
-        >
+          }`}>
           <X className="w-3.5 h-3.5" />
         </button>
       )}
 
-      {/* Submitted state icons */}
       {submitted && isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />}
       {submitted && isWrongChosen && <X className="w-4 h-4 text-red-400 shrink-0" />}
 
-      {/* Strike-through overlay */}
       {crossedOut && !submitted && (
         <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" aria-hidden="true">
           <div className="absolute top-1/2 left-10 right-10 h-px bg-muted-foreground/40" />
@@ -442,6 +410,8 @@ export default function P1Session() {
   const [layer1, setLayer1] = useState(null);
   const [layer2, setLayer2] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Dedicated loading state for the "Show deeper breakdown" request
+  const [loadingLayer2, setLoadingLayer2] = useState(false);
   const [showFormulas, setShowFormulas] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showCalc, setShowCalc] = useState(false);
@@ -495,6 +465,7 @@ export default function P1Session() {
     setLayer1(existingAnswer?.layer1 ?? null);
     setLayer2(existingAnswer?.layer2 ?? null);
     setShowCalc(false);
+    setLoadingLayer2(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIdx, sessionLoading]);
 
@@ -510,24 +481,15 @@ export default function P1Session() {
     setCrossedOut(prev => {
       const next = new Set(prev);
       if (next.has(key)) { next.delete(key); }
-      else {
-        next.add(key);
-        if (currentAnswer === key) setCurrentAnswer("");
-      }
+      else { next.add(key); if (currentAnswer === key) setCurrentAnswer(""); }
       return next;
     });
   }
 
   function handleToggleStar() {
     if (!question) return;
-    if (isCurrentStarred) {
-      const updated = unstarQuestion(paperId, question.id);
-      setStarredQuestions({ ...updated });
-    } else {
-      const merged = { ...(layer1 ?? {}), ...(layer2 ?? {}) };
-      const updated = starQuestion(paperId, question, merged);
-      setStarredQuestions({ ...updated });
-    }
+    if (isCurrentStarred) { const updated = unstarQuestion(paperId, question.id); setStarredQuestions({ ...updated }); }
+    else { const merged = { ...(layer1 ?? {}), ...(layer2 ?? {}) }; const updated = starQuestion(paperId, question, merged); setStarredQuestions({ ...updated }); }
   }
 
   function handleTeacherQuestionSave(questionId, value) {
@@ -576,27 +538,26 @@ export default function P1Session() {
     try {
       const r = await base44.integrations.Core.InvokeLLM({ prompt: l1prompt, model: "claude_sonnet_4_6", response_json_schema: { type: "object", properties: { marks_earned: { type: "number" }, cambridge_insight: { type: "string" }, pulse_layer_1: { type: "string" } }, required: ["marks_earned", "cambridge_insight", "pulse_layer_1"] } });
       fb1 = r?.response ?? r;
-    } catch {
-      fb1 = { marks_earned: 0, cambridge_insight: question.explanation, pulse_layer_1: question.explanation };
-    }
+    } catch { fb1 = { marks_earned: 0, cambridge_insight: question.explanation, pulse_layer_1: question.explanation }; }
     const record = { chosen: selected, correct: isCorrect, flagged_as_guess: false, layer1: fb1, layer2: null };
     setAnswers(prev => ({ ...prev, [question.id]: record }));
     setLayer1(fb1); setLayer2(null); setSubmitted(true); setLoading(false);
   }
 
   async function handleRequestLayer2() {
-    if (loading || layer2) return;
+    // Guard: don't run if already loading or already have layer2
+    if (loadingLayer2 || layer2) return;
+    setLoadingLayer2(true);
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
     const l2prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${currentAnswer} — WRONG\nRespond ONLY in JSON:\n{ "step1_system": "One sentence.", "step2_phrase_breakdown": "1-2 sentences.", "step3_tipping_point": "One sentence." }`;
     let fb2 = null;
     try {
       const r = await base44.integrations.Core.InvokeLLM({ prompt: l2prompt, model: "claude_sonnet_4_6", response_json_schema: { type: "object", properties: { step1_system: { type: "string" }, step2_phrase_breakdown: { type: "string" }, step3_tipping_point: { type: "string" } }, required: ["step1_system", "step2_phrase_breakdown", "step3_tipping_point"] } });
       fb2 = r?.response ?? r;
-    } catch {
-      fb2 = { step1_system: "Could not load breakdown.", step2_phrase_breakdown: "", step3_tipping_point: "" };
-    }
+    } catch { fb2 = { step1_system: "Could not load breakdown.", step2_phrase_breakdown: "", step3_tipping_point: "" }; }
     setLayer2(fb2);
     setAnswers(prev => ({ ...prev, [question.id]: { ...prev[question.id], layer2: fb2 } }));
+    setLoadingLayer2(false);
   }
 
   if (sessionLoading) {
@@ -669,7 +630,6 @@ export default function P1Session() {
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
-          {/* Cross-out hint — only when unanswered */}
           {!submitted && (
             <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">
               Tap ✕ on any option to cross it out{crossedCount > 0 ? ` · ${crossedCount} crossed out` : ""}
@@ -678,17 +638,7 @@ export default function P1Session() {
 
           <div className="flex flex-col gap-2.5">
             {OPTION_KEYS.map(key => (
-              <OptionRow
-                key={key}
-                optKey={key}
-                text={question.options[key]}
-                selected={currentAnswer}
-                crossedOut={crossedOut.has(key)}
-                submitted={submitted}
-                correctOption={question.correct}
-                onSelect={setCurrentAnswer}
-                onToggleCrossOut={handleToggleCrossOut}
-              />
+              <OptionRow key={key} optKey={key} text={question.options[key]} selected={currentAnswer} crossedOut={crossedOut.has(key)} submitted={submitted} correctOption={question.correct} onSelect={setCurrentAnswer} onToggleCrossOut={handleToggleCrossOut} />
             ))}
           </div>
 
@@ -706,11 +656,28 @@ export default function P1Session() {
               <Star className="w-4 h-4" /> Star for teacher review
             </button>
           )}
+
+          {/* "Show deeper breakdown" button — shows spinner while loading, disabled to prevent double-tap */}
           {showFeedbackPanel && !layer2 && !showCorrectBanner && (
-            <button onClick={handleRequestLayer2} disabled={loading} className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-all disabled:opacity-50">
-              <ChevronDown className="w-4 h-4" /> Show deeper breakdown
+            <button
+              onClick={handleRequestLayer2}
+              disabled={loadingLayer2}
+              className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {loadingLayer2 ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading deeper breakdown…
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  Show deeper breakdown
+                </>
+              )}
             </button>
           )}
+
           {layer2 && <Layer2Feedback feedback={layer2} />}
 
           {!showCorrectBanner && (

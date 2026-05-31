@@ -12,18 +12,16 @@ const PAPER_FILES = {
   "9702/12/F/M/25": "9702_m25_qp_12.pdf",
   "9702/12/M/J/22": "9702_s22_qp_12.pdf",
   "9702/11/M/J/22": "9702_s22_qp_11.pdf",
+  "9702/13/O/N/20": "9702_w20_qp_13.pdf",
 };
 
 /**
  * Get the public URL for a specific paper PDF.
- * Directly constructs the Supabase Storage public URL — no caching, no HEAD check.
- * This ensures the latest uploaded file is always referenced correctly.
  */
 export function getPaperPdfUrl(paperId) {
   const filename = PAPER_FILES[paperId];
   if (!filename) return Promise.resolve(null);
 
-  // Use supabaseClient to get the canonical public URL
   const { data } = supabaseClient.storage
     .from(BUCKET)
     .getPublicUrl(filename);
@@ -32,7 +30,6 @@ export function getPaperPdfUrl(paperId) {
     return Promise.resolve(data.publicUrl);
   }
 
-  // Fallback: construct from env var
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   if (!supabaseUrl) return Promise.resolve(null);
 

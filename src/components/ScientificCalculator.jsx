@@ -1,444 +1,434 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 
-// ── Math engine ────────────────────────────────────────────────────────────────
+// ── Math Engine ───────────────────────────────────────────────────────────────
+const DEG = Math.PI / 180;
+const RAD = 180 / Math.PI;
 
-const D2R = Math.PI / 180;
-const R2D = 180 / Math.PI;
-
-function factorial(n) {
+function fact(n) {
   n = Math.round(n);
   if (n < 0 || n > 170) return NaN;
-  let r = 1;
-  for (let i = 2; i <= n; i++) r *= i;
-  return r;
+  return n <= 1 ? 1 : n * fact(n - 1);
 }
+function nPr(n,r){n=Math.round(n);r=Math.round(r);return r<0||r>n?NaN:fact(n)/fact(n-r);}
+function nCr(n,r){n=Math.round(n);r=Math.round(r);return r<0||r>n?NaN:fact(n)/(fact(r)*fact(n-r));}
+function gcd(a,b){a=Math.abs(Math.round(a));b=Math.abs(Math.round(b));while(b){const t=b;b=a%b;a=t;}return a;}
+function lcm(a,b){const g=gcd(a,b);return g?Math.abs(a*b)/g:0;}
 
-/**
- * Evaluate a display expression string.
- * Returns { val: number } on success, { err: string } on math error, or null if expression is incomplete.
- */
-function calcEval(expr, isDeg, ans) {
+function evalExpr(expr, isDeg, ans) {
   if (!expr.trim()) return null;
   try {
     let e = expr
       .replace(/Ans/g, `(${ans})`)
-      .replace(/π/g, String(Math.PI))
-      .replace(/ℯ/g, String(Math.E))
-      .replace(/×/g, "*")
-      .replace(/÷/g, "/")
-      .replace(/−/g, "-")
-      .replace(/\^/g, "**");
+      .replace(/π/g, Math.PI)
+      .replace(/×/g, "*").replace(/÷/g, "/")
+      .replace(/−/g, "-").replace(/\^/g, "**")
+      .replace(/²/g, "**2").replace(/³/g, "**3").replace(/⁻¹/g, "**(-1)")
+      .replace(/(\d+(?:\.\d+)?)!/g, (_,n) => `_f_(${n})`);
 
-    // Scientific notation: 5×10^3 → 5*(10**(3))
-    e = e.replace(/\*10\*\*([+−\-]?\d+)/g, (_, exp) =>
-      `*(10**(${exp.replace("−", "-")}))`
-    );
+    [
+      ["sin⁻¹(","_as_("],["cos⁻¹(","_ac_("],["tan⁻¹(","_at_("],
+      ["sinh⁻¹(","_ash_("],["cosh⁻¹(","_ach_("],["tanh⁻¹(","_ath_("],
+      ["sinh(","_sh_("],["cosh(","_ch_("],["tanh(","_th_("],
+      ["sin(","_s_("],["cos(","_c_("],["tan(","_t_("],
+      ["log(","Math.log10("],["ln(","Math.log("],["exp(","Math.exp("],
+      ["√(","Math.sqrt("],["∛(","Math.cbrt("],["Abs(","Math.abs("],
+      ["nPr","_nP_"],["nCr","_nC_"],
+      ["GCD(","_gcd_("],["LCM(","_lcm_("],
+    ].forEach(([f,t]) => { e = e.split(f).join(t); });
 
-    // Postfix operators — before function substitution
-    e = e.replace(/(\d+(?:\.\d+)?)!/g, (_, n) => `__fact__(${n})`);
-    e = e.replace(/(\d+(?:\.\d+)?)⁻¹/g, (_, n) => `(1/(${n}))`);
-
-    // Functions — inverse trig FIRST to avoid double-replacement
-    e = e
-      .replace(/sin⁻¹\(/g,  "__asin__(")
-      .replace(/cos⁻¹\(/g,  "__acos__(")
-      .replace(/tan⁻¹\(/g,  "__atan__(")
-      .replace(/sin\(/g,     "__sin__(")
-      .replace(/cos\(/g,     "__cos__(")
-      .replace(/tan\(/g,     "__tan__(")
-      .replace(/log\(/g,     "Math.log10(")
-      .replace(/ln\(/g,      "Math.log(")
-      .replace(/√\(/g,       "Math.sqrt(")
-      .replace(/∛\(/g,       "Math.cbrt(")
-      .replace(/Abs\(/g,     "Math.abs(");
-
-    const sinF  = isDeg ? x => Math.sin(x * D2R)  : Math.sin;
-    const cosF  = isDeg ? x => Math.cos(x * D2R)  : Math.cos;
-    const tanF  = isDeg ? x => Math.tan(x * D2R)  : Math.tan;
-    const asinF = isDeg ? x => Math.asin(x) * R2D : Math.asin;
-    const acosF = isDeg ? x => Math.acos(x) * R2D : Math.acos;
-    const atanF = isDeg ? x => Math.atan(x) * R2D : Math.atan;
+    const S  = isDeg ? x=>Math.sin(x*DEG)  : Math.sin;
+    const C  = isDeg ? x=>Math.cos(x*DEG)  : Math.cos;
+    const T  = isDeg ? x=>Math.tan(x*DEG)  : Math.tan;
+    const aS = isDeg ? x=>Math.asin(x)*RAD : Math.asin;
+    const aC = isDeg ? x=>Math.acos(x)*RAD : Math.acos;
+    const aT = isDeg ? x=>Math.atan(x)*RAD : Math.atan;
 
     // eslint-disable-next-line no-new-func
-    const fn = new Function(
-      "__sin__", "__cos__", "__tan__",
-      "__asin__", "__acos__", "__atan__",
-      "__fact__",
+    const v = new Function(
+      "_s_","_c_","_t_","_as_","_ac_","_at_",
+      "_sh_","_ch_","_th_","_ash_","_ach_","_ath_",
+      "_f_","_nP_","_nC_","_gcd_","_lcm_",
       `"use strict"; return (${e});`
-    );
-    const r = fn(sinF, cosF, tanF, asinF, acosF, atanF, factorial);
+    )(S,C,T,aS,aC,aT,
+      Math.sinh,Math.cosh,Math.tanh,Math.asinh,Math.acosh,Math.atanh,
+      fact,nPr,nCr,gcd,lcm);
 
-    if (typeof r !== "number" || isNaN(r)) return { err: "Math Error" };
-    if (!isFinite(r)) return { err: r > 0 ? "+∞" : "−∞" };
-    return { val: r };
-  } catch {
-    return null; // incomplete — don't show error yet
-  }
+    if (typeof v !== "number" || isNaN(v)) return { err: "Math ERROR" };
+    if (!isFinite(v)) return { err: v > 0 ? "+∞" : "−∞" };
+    return { val: v };
+  } catch { return null; }
 }
 
-function fmtNum(n) {
+function fmt(n) {
+  if (typeof n !== "number") return "0";
   if (n === 0) return "0";
   const a = Math.abs(n);
-  if (a < 1e-9 || a >= 1e11) {
-    return n.toExponential(6)
-      .replace("e+", "×10^")
-      .replace("e-", "×10^−")
-      .replace("e", "×10^");
+  if (a < 0.0001 || a >= 1e10) {
+    return n.toExponential(6).replace("e+","×10^").replace("e-","×10^-");
   }
   return parseFloat(n.toPrecision(10)).toString();
 }
 
-// ── Button layout ────────────────────────────────────────────────────────────
-
-// [label, action, value, colorKey, span?]
-// colorKey: "orange" | "red" | "del" | "mode" | "op" | "num" | "fn" | "eq"
-
-const BTN_ROWS = [
-  // Row 0 — control
-  ["SHIFT",  "noop",   null,   "orange"],
-  ["ALPHA",  "noop",   null,   "red-l"],
-  ["DEL",    "del",    null,   "del"],
-  ["AC",     "clear",  null,   "red"],
-  ["MODE",   "mode",   null,   "mode"],
-
-  // Row 1 — powers + log
-  ["x²",     "insert", "²",    "fn"],
-  ["x^y",    "insert", "^",    "fn"],
-  ["√(",     "insert", "√(",   "fn"],
-  ["log(",   "insert", "log(", "fn"],
-  ["ln(",    "insert", "ln(",  "fn"],
-
-  // Row 2 — trig
-  ["sin(",   "insert", "sin(", "fn"],
-  ["cos(",   "insert", "cos(", "fn"],
-  ["tan(",   "insert", "tan(", "fn"],
-  ["(",      "insert", "(",    "fn"],
-  [")",      "insert", ")",    "fn"],
-
-  // Row 3 — inverse trig + constants
-  ["sin⁻¹(", "insert", "sin⁻¹(", "fn"],
-  ["cos⁻¹(", "insert", "cos⁻¹(", "fn"],
-  ["tan⁻¹(", "insert", "tan⁻¹(", "fn"],
-  ["π",      "insert", "π",   "fn"],
-  ["ℯ",      "insert", "ℯ",   "fn"],
-
-  // Row 4 — misc
-  ["x⁻¹",   "insert", "⁻¹",  "fn"],
-  ["x!",     "insert", "!",   "fn"],
-  ["∛(",     "insert", "∛(",  "fn"],
-  ["Ans",    "insert", "Ans", "fn"],
-  ["÷",      "insert", "÷",   "op"],
-
-  // Row 5 — 7 8 9
-  ["7",      "insert", "7",   "num"],
-  ["8",      "insert", "8",   "num"],
-  ["9",      "insert", "9",   "num"],
-  ["×",      "insert", "×",   "op"],
-  ["−",      "insert", "−",   "op"],
-
-  // Row 6 — 4 5 6
-  ["4",      "insert", "4",   "num"],
-  ["5",      "insert", "5",   "num"],
-  ["6",      "insert", "6",   "num"],
-  ["+",      "insert", "+",   "op"],
-  ["EXP",    "insert", "×10^","fn"],
-
-  // Row 7 — 1 2 3
-  ["1",      "insert", "1",   "num"],
-  ["2",      "insert", "2",   "num"],
-  ["3",      "insert", "3",   "num"],
-  [".",      "insert", ".",   "num"],
-  ["0",      "insert", "0",   "num"],
-
-  // Row 8 — bottom
-  ["(−)",    "insert", "−",   "fn"],
-  ["×10^",   "insert", "×10^","fn"],
-  // = spans 3 columns
-  ["=",      "equals", null,  "eq",  3],
-];
-
-const COL_COLORS = {
-  orange: { bg: "#e07a10", text: "#000",  border: "#c06000" },
-  "red-l":{ bg: "#b44040", text: "#fff",  border: "#922828" },
-  del:    { bg: "#7a3800", text: "#fff",  border: "#5a2800" },
-  red:    { bg: "#cc1111", text: "#fff",  border: "#aa0000" },
-  mode:   { bg: "#1e2e82", text: "#fff",  border: "#141e60" },
-  op:     { bg: "#38384a", text: "#fff",  border: "#5a5a70" },
-  num:    { bg: "#22222e", text: "#fff",  border: "#3a3a4a" },
-  fn:     { bg: "#2a2a40", text: "#d8d8ff", border: "#444460" },
-  eq:     { bg: "#d07000", text: "#000",  border: "#a85000" },
+// ── Color palette matching Casio fx-82ZA PLUS II ──────────────────────────────
+const C = {
+  def:  ["#2d2d2d","#1a1a1a","#ffffff"],   // [bg, shadow/border, text]
+  fn:   ["#282828","#161616","#ffffff"],
+  num:  ["#353535","#1e1e1e","#ffffff"],
+  nav:  ["#20203a","#0e0e28","#7788ee"],
+  navc: ["#1a1a32","#08082a","#99aaff"],
+  shk:  ["#1c1c1c","#884400","#ff9900"],
+  alk:  ["#1c1c1c","#880000","#ff4444"],
+  del:  ["#1c5a1c","#0a2a0a","#ffffff"],
+  ac:   ["#4a7200","#243a00","#ffffff"],
+  eq:   ["#2d2d2d","#1a1a1a","#ffffff"],
 };
 
-// ── Component ────────────────────────────────────────────────────────────────
-
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function ScientificCalculator({ onClose }) {
-  const [expr,      setExpr]      = useState("");   // expression being built
-  const [topLine,   setTopLine]   = useState("");   // top (small) display line
-  const [mainLine,  setMainLine]  = useState("0");  // main (large) display line
-  const [ans,       setAns]       = useState(0);
-  const [isDeg,     setIsDeg]     = useState(true);
-  const [justEvaled,setJustEvaled]= useState(false);
-  const [isError,   setIsError]   = useState(false);
+  const [expr,     setExpr]     = useState("");
+  const [topLine,  setTopLine]  = useState("");
+  const [mainLine, setMainLine] = useState("0");
+  const [ans,      setAns]      = useState(0);
+  const [isDeg,    setIsDeg]    = useState(true);
+  const [sh,       setSh]       = useState(false);
+  const [hypOn,    setHypOn]    = useState(false);
+  const [isErr,    setIsErr]    = useState(false);
+  const [evaled,   setEvaled]   = useState(false);
 
-  /** Compute live preview while user is typing */
-  function livePreview(e, deg, a) {
+  function preview(e) {
     if (!e) return "0";
-    const res = calcEval(e, deg, a);
-    if (!res) return e;          // incomplete — show expression
-    if (res.err) return e;       // error — show expression
-    return fmtNum(res.val);
+    const r = evalExpr(e, isDeg, ans);
+    if (!r || r.err) return e;
+    return fmt(r.val);
   }
 
-  function handleBtn(action, value) {
-    switch (action) {
-      case "noop": return;
+  function ins(str) {
+    const binops = ["+","−","×","÷","^","nPr","nCr"];
+    let ne;
+    if (evaled && !isErr) {
+      ne = binops.some(o => str.startsWith(o)) ? fmt(ans) + str : str;
+      setEvaled(false);
+    } else {
+      ne = expr + str;
+    }
+    setExpr(ne); setIsErr(false);
+    setTopLine(ne); setMainLine(preview(ne));
+    setSh(false); setHypOn(false);
+  }
 
-      case "clear":
-        setExpr(""); setTopLine(""); setMainLine("0");
-        setIsError(false); setJustEvaled(false);
-        return;
+  function doEq() {
+    if (!expr) return;
+    const r = evalExpr(expr, isDeg, ans);
+    if (!r) { setTopLine(expr+"="); setMainLine("Syntax ERROR"); setIsErr(true); setEvaled(true); return; }
+    if (r.err) { setTopLine(expr+"="); setMainLine(r.err); setIsErr(true); setEvaled(true); return; }
+    const s = fmt(r.val);
+    setTopLine(expr+"="); setMainLine(s); setAns(r.val); setExpr(s);
+    setIsErr(false); setEvaled(true); setSh(false); setHypOn(false);
+  }
 
-      case "del":
-        if (justEvaled) {
-          setExpr(""); setTopLine(""); setMainLine("0");
-          setIsError(false); setJustEvaled(false);
-          return;
-        }
-        {
-          const ne = expr.slice(0, -1);
-          setExpr(ne);
-          setIsError(false);
-          setMainLine(ne ? livePreview(ne, isDeg, ans) : "0");
-        }
-        return;
+  function doDel() {
+    if (evaled) { setExpr(""); setTopLine(""); setMainLine("0"); setIsErr(false); setEvaled(false); return; }
+    const ne = expr.slice(0, -1);
+    setExpr(ne); setIsErr(false); setTopLine(ne); setMainLine(preview(ne));
+  }
 
-      case "mode":
-        setIsDeg(d => !d);
-        // Re-evaluate with new mode
-        if (expr) setMainLine(livePreview(expr, !isDeg, ans));
-        return;
+  function doAC() {
+    setExpr(""); setTopLine(""); setMainLine("0");
+    setIsErr(false); setEvaled(false); setSh(false); setHypOn(false);
+  }
 
-      case "insert": {
-        const OPERATORS = ["+", "−", "×", "÷", "^", "×10^"];
-        let ne;
-        if (justEvaled && !isError) {
-          // After a result: operators continue with result, digits start fresh
-          if (OPERATORS.includes(value)) {
-            ne = fmtNum(ans) + value;
-          } else {
-            ne = value;
-          }
-          setJustEvaled(false);
-        } else {
-          ne = expr + value;
-        }
-        setExpr(ne);
-        setIsError(false);
-        setTopLine("");
-        setMainLine(livePreview(ne, isDeg, ans));
-        return;
-      }
-
-      case "equals": {
-        const toEval = justEvaled && !isError ? fmtNum(ans) : expr;
-        if (!toEval) return;
-        const res = calcEval(toEval, isDeg, ans);
-        if (!res) {
-          setTopLine(toEval + " =");
-          setMainLine("Syntax Error");
-          setIsError(true);
-          setJustEvaled(true);
-          return;
-        }
-        if (res.err) {
-          setTopLine(toEval + " =");
-          setMainLine(res.err);
-          setIsError(true);
-          setJustEvaled(true);
-          return;
-        }
-        const str = fmtNum(res.val);
-        setTopLine(toEval + " =");
-        setMainLine(str);
-        setAns(res.val);
-        setExpr(str);
-        setIsError(false);
-        setJustEvaled(true);
-        return;
-      }
+  // General button press
+  function press(act, shAct) {
+    const a = sh && shAct ? shAct : act;
+    if (a !== "SHIFT") setSh(false);
+    if (!a) return;
+    switch(a) {
+      case "SHIFT":  setSh(s => !s); setHypOn(false); break;
+      case "ALPHA":  break;
+      case "MODE":   setIsDeg(d => !d); break;
+      case "ON": case "AC": doAC(); break;
+      case "DEL":    doDel(); break;
+      case "EQ":     doEq(); break;
+      case "HYP":    setHypOn(h => !h); break;
+      case "ANS":    ins("Ans"); break;
+      case "π":      ins("π"); break;
+      case "RAN":    ins(fmt(Math.random())); break;
+      case "ENG":    { const ne = expr + "×10^"; setExpr(ne); setTopLine(ne); setMainLine(preview(ne)); break; }
+      default:
+        if (a.startsWith("I:")) ins(a.slice(2));
+        break;
     }
   }
 
-  const mainFontSize = Math.max(14, Math.min(28, 28 - Math.max(0, mainLine.length - 10) * 1.5));
+  // Trig buttons respect SHIFT (inverse) and HYP (hyperbolic)
+  function pressTrig(main, inv, hM, hI) {
+    if (sh && hypOn && hI) ins(hI);
+    else if (sh && inv)    ins(inv);
+    else if (hypOn && hM)  ins(hM);
+    else                   ins(main);
+    setSh(false); setHypOn(false);
+  }
 
+  const rsize = Math.max(12, Math.min(22, 22 - Math.max(0, mainLine.length - 7) * 1.3));
+  const GAP = 2.5;
+
+  // ── Button renderer ──────────────────────────────────────────────────────
+  function Btn({ label, top, bot, act, sa, col = "def", span = 1, h = 27,
+                 isTrig = false, tMain, tInv, tHyp, tHypI }) {
+    const [bg, border, fg] = C[col] || C.def;
+    const active = (col === "shk" && sh) || (col === "alk" && false) || (label === "HYP" && hypOn);
+
+    const click = () => {
+      if (isTrig) pressTrig(tMain, tInv, tHyp, tHypI);
+      else press(act, sa);
+    };
+
+    const labelLen = (label||"").length;
+    const lsize = labelLen >= 6 ? 7.5 : labelLen >= 4 ? 9 : labelLen >= 3 ? 10 : 11;
+
+    return (
+      <button
+        onMouseDown={e => e.preventDefault()}
+        onClick={click}
+        style={{
+          gridColumn: `span ${span}`,
+          background: bg,
+          border: active ? `1.5px solid ${fg}` : `1px solid ${border}`,
+          color: fg,
+          borderRadius: 3,
+          height: h,
+          cursor: "pointer",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 2.5px 0 ${border}, inset 0 1px 0 rgba(255,255,255,0.07)`,
+          transition: "filter 0.06s",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          touchAction: "manipulation",
+          padding: "1px 1px 2px",
+          overflow: "hidden",
+          minWidth: 0,
+          position: "relative",
+        }}
+        onTouchStart={e => { e.currentTarget.style.filter = "brightness(1.7)"; e.currentTarget.style.transform = "translateY(1px)"; }}
+        onTouchEnd={e => { e.currentTarget.style.filter = ""; e.currentTarget.style.transform = ""; }}
+        onMouseDown2={e => { e.currentTarget.style.transform = "translateY(1px)"; }}
+        onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.3)"; }}
+        onMouseLeave={e => { e.currentTarget.style.filter = ""; e.currentTarget.style.transform = ""; }}
+      >
+        {top && (
+          <span style={{ fontSize: 6.5, color: "#ffcc00", lineHeight: 1, marginBottom: 0.5, whiteSpace: "nowrap", letterSpacing: 0.2 }}>
+            {top}
+          </span>
+        )}
+        <span style={{ fontSize: lsize, fontFamily: "monospace", fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap" }}>
+          {label}
+        </span>
+        {bot && (
+          <span style={{ fontSize: 6, color: "#88aaff", lineHeight: 1, marginTop: 0.5, whiteSpace: "nowrap" }}>
+            {bot}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  // ── Layout ───────────────────────────────────────────────────────────────
   return (
     <div
-      className="select-none"
       style={{
-        background: "linear-gradient(180deg, #1a237e 0%, #0d1554 100%)",
-        borderRadius: 16,
-        padding: "12px 10px 14px",
-        width: "100%",
-        maxWidth: 320,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08)",
-        fontFamily: "'Inter', 'JetBrains Mono', monospace",
-        border: "1px solid #2a3a8a",
+        background: "linear-gradient(175deg, #1e1e1e 0%, #141414 100%)",
+        borderRadius: 14,
+        padding: "8px 9px 11px",
+        width: 296,
+        boxShadow: "0 14px 44px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)",
+        border: "1px solid #2e2e2e",
         userSelect: "none",
         WebkitUserSelect: "none",
+        touchAction: "manipulation",
       }}
     >
       {/* ── Header ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "2px 2px 0" }}>
         <div>
-          <div style={{ color: "#fff", fontSize: 15, fontWeight: 800, letterSpacing: 2, fontFamily: "serif" }}>CASIO</div>
-          <div style={{ color: "#90caf9", fontSize: 7.5, letterSpacing: 1, marginTop: -2 }}>fx-991ZA PLUS II</div>
+          <div style={{ color: "#fff", fontSize: 16, fontWeight: 900, fontFamily: "Georgia, serif", letterSpacing: 3, lineHeight: 1 }}>CASIO</div>
+          <div style={{ color: "#777", fontSize: 8, letterSpacing: 0.8, marginTop: 1 }}>fx-82ZA PLUS II</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Solar cells decoration */}
-          <div style={{ display: "flex", gap: 2 }}>
-            {Array(6).fill(0).map((_, i) => (
-              <div key={i} style={{ width: 10, height: 18, background: "#1a1a2e", borderRadius: 2, border: "1px solid #333" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Solar cells */}
+          <div style={{ display: "flex", gap: 1.5, marginTop: 2 }}>
+            {[...Array(7)].map((_, i) => (
+              <div key={i} style={{ width: 8, height: 15, background: "#111", border: "1px solid #2a2a2a", borderRadius: 1 }} />
             ))}
           </div>
           <button
             onMouseDown={e => e.preventDefault()}
             onClick={onClose}
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              borderRadius: 6, width: 24, height: 24,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", color: "#fff",
-            }}
+            style={{ background: "#2a2a2a", border: "1px solid #444", borderRadius: 4, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#aaa" }}
           >
-            <X size={14} />
+            <X size={11} />
           </button>
         </div>
       </div>
 
+      <div style={{ textAlign: "center", color: "#555", fontSize: 7.5, letterSpacing: 2.5, margin: "4px 0 6px", fontStyle: "italic" }}>
+        NATURAL-V.P.A.M.
+      </div>
+
       {/* ── LCD Display ── */}
       <div style={{
-        background: "#c8d8a0",
-        borderRadius: 6,
-        border: "3px solid #8a9a60",
-        boxShadow: "inset 0 2px 8px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.1)",
-        padding: "6px 10px 8px",
-        marginBottom: 8,
-        minHeight: 76,
+        background: "linear-gradient(180deg, #b8c870 0%, #c8d878 40%, #bcc868 100%)",
+        borderRadius: 5,
+        border: "3px solid #7a8e3a",
+        boxShadow: "inset 0 3px 10px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.08)",
+        padding: "4px 8px 5px",
+        marginBottom: 7,
+        minHeight: 82,
+        position: "relative",
+        overflow: "hidden",
       }}>
-        {/* Mode + status row */}
-        <div style={{ display: "flex", gap: 5, marginBottom: 2, alignItems: "center" }}>
-          <span style={{
-            fontSize: 9, color: "#2d4a1a", fontWeight: 700,
-            border: "1px solid #2d4a1a", padding: "0 3px", borderRadius: 2,
-          }}>
-            {isDeg ? "D" : "R"}
-          </span>
-          {justEvaled && !isError && (
-            <span style={{ fontSize: 8, color: "#2d4a1a", opacity: 0.7 }}>ANS</span>
-          )}
-          <span style={{ fontSize: 8, color: "#2d4a1a", marginLeft: "auto", opacity: 0.6 }}>
-            NATURAL-V.P.A.M.
-          </span>
+        {/* Scanline texture */}
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(180deg,transparent,transparent 10px,rgba(0,0,0,0.03) 10px,rgba(0,0,0,0.03) 11px)", pointerEvents: "none" }} />
+
+        {/* Status row */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 3, position: "relative" }}>
+          {sh && <span style={{ fontSize: 8, background: "#4a5820", color: "#c8d878", borderRadius: 2, padding: "0 3px", fontWeight: 700, lineHeight: 1.5 }}>S</span>}
+          {hypOn && <span style={{ fontSize: 8, background: "#4a5820", color: "#c8d878", borderRadius: 2, padding: "0 3px", fontWeight: 700, lineHeight: 1.5 }}>HYP</span>}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+            {evaled && !isErr && <span style={{ fontSize: 8, color: "#3a4c10", fontWeight: 700 }}>Ans</span>}
+            <span style={{ fontSize: 8, background: "#4a5820", color: "#c8d878", borderRadius: 2, padding: "0 3px", fontWeight: 700, lineHeight: 1.5 }}>
+              {isDeg ? "D" : "R"}
+            </span>
+          </div>
         </div>
 
-        {/* Top line — expression / history */}
+        {/* Expression line (small, top) */}
         <div style={{
-          fontSize: 10,
-          color: "#4a6a1a",
-          textAlign: "right",
-          marginBottom: 2,
-          fontFamily: "monospace",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          minHeight: 14,
-          opacity: topLine ? 1 : 0,
+          fontSize: 9.5, color: "#3a4c10", textAlign: "right", fontFamily: "monospace",
+          minHeight: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", position: "relative",
         }}>
-          {topLine || "_"}
+          {topLine || "\u00a0"}
         </div>
 
-        {/* Main display line */}
+        {/* Result line (large, main) */}
         <div style={{
-          fontSize: mainFontSize,
-          fontWeight: 700,
-          fontFamily: "monospace",
-          textAlign: "right",
-          color: isError ? "#cc0000" : "#1a2e0a",
-          letterSpacing: 0.5,
-          lineHeight: 1.1,
-          minHeight: 30,
+          fontSize: rsize, fontWeight: 700, fontFamily: "monospace",
+          textAlign: "right", color: isErr ? "#cc2222" : "#1a2a06",
+          minHeight: 30, display: "flex", alignItems: "center", justifyContent: "flex-end",
+          lineHeight: 1, letterSpacing: 0.5, position: "relative",
         }}>
           {mainLine}
         </div>
 
         {/* Ans memory */}
-        <div style={{ fontSize: 8, color: "#4a6a1a", marginTop: 2, opacity: 0.7 }}>
-          Ans = {fmtNum(ans).slice(0, 14)}
+        <div style={{ fontSize: 7.5, color: "#4a5820", textAlign: "right", opacity: 0.75, position: "relative", marginTop: 1 }}>
+          Ans={fmt(ans).slice(0, 13)}
         </div>
       </div>
 
-      {/* ── Buttons ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
-        {BTN_ROWS.map((btn, i) => {
-          const [label, action, value, colorKey, span] = btn;
-          const c = COL_COLORS[colorKey] ?? COL_COLORS.fn;
-          const labelLen = (label ?? "").length;
-          const fontSize = labelLen >= 7 ? 8 : labelLen >= 5 ? 9 : labelLen >= 3 ? 10 : 12;
-
-          return (
-            <button
-              key={i}
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => handleBtn(action, value)}
-              style={{
-                gridColumn: span ? `span ${span}` : undefined,
-                background: `linear-gradient(180deg, ${c.bg}f0, ${c.bg}c0)`,
-                border: `1px solid ${c.border}`,
-                color: c.text,
-                borderRadius: 4,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "3px 2px",
-                minHeight: 28,
-                fontSize,
-                fontWeight: 700,
-                fontFamily: "monospace",
-                letterSpacing: 0,
-                boxShadow: "0 2px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
-                transition: "filter 0.06s, transform 0.06s",
-                touchAction: "manipulation",
-              }}
-              onTouchStart={e => {
-                e.currentTarget.style.filter = "brightness(1.35)";
-                e.currentTarget.style.transform = "translateY(1px)";
-              }}
-              onTouchEnd={e => {
-                e.currentTarget.style.filter = "";
-                e.currentTarget.style.transform = "";
-              }}
-              onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.2)"; }}
-              onMouseLeave={e => {
-                e.currentTarget.style.filter = "";
-                e.currentTarget.style.transform = "";
-              }}
-              onMouseDown2={e => { e.currentTarget.style.transform = "translateY(1px)"; }}
-            >
-              {label}
-            </button>
-          );
-        })}
+      {/* ── NAV SECTION: Row 1 (5 wide) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="SHIFT" col="shk" act="SHIFT" />
+        <Btn label="ALPHA" col="alk" act="ALPHA" />
+        <Btn label="▲"     col="nav" act={null}  />
+        <Btn label="SETUP" top="MODE" col="def" act="MODE" />
+        <Btn label="ON"    col="def" act="ON"   />
       </div>
 
-      {/* Footer */}
-      <div style={{
-        textAlign: "center", marginTop: 7,
-        color: "rgba(255,255,255,0.2)", fontSize: 8, letterSpacing: 1,
-      }}>
-        NATURAL-V.P.A.M. · {isDeg ? "DEGREE" : "RADIAN"} · {fmtNum(ans).slice(0,14)}
+      {/* ── NAV SECTION: Row 2 (5 wide) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="Abs"   top="÷R"  bot="A"  col="fn"   act="I:Abs(" sa="I:÷" />
+        <Btn label="◄"     col="nav" act={null} />
+        <Btn label="●"     col="navc" act={null} />
+        <Btn label="►"     col="nav" act={null} />
+        <Btn label="x⁻¹"  top={null} bot={null} col="fn" act="I:⁻¹" />
+      </div>
+
+      {/* ── NAV SECTION: Row 3 (5 wide) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: GAP, marginBottom: 5 }}>
+        <Btn label="x³"   top="■■" bot="C"  col="fn"  act="I:³"    sa="I:∛(" />
+        <Btn label="▼"    col="nav" act={null} />
+        <div />
+        <div />
+        <Btn label="log□" top={null} bot={null} col="fn" act="I:log(" />
+      </div>
+
+      {/* ── Divider ── */}
+      <div style={{ height: 4, background: "#111", borderRadius: 2, marginBottom: 5 }} />
+
+      {/* ── FUNCTION SECTION: Row F1 — √ x² x^y 10ˣ log ln (6 wide) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="√□"   top="■■■" bot={null} col="fn"  act="I:√("   sa="I:√("  />
+        <Btn label="x²"   top="■■"  bot={null} col="fn"  act="I:²"    sa="I:³"   />
+        <Btn label="x^□"  top={null} bot={null} col="fn" act="I:^"                />
+        <Btn label="10ˣ"  top="BIN" bot={null} col="fn"  act="I:10^("             />
+        <Btn label="log"  top="OCT" bot={null} col="fn"  act="I:log("  sa="I:10^(" />
+        <Btn label="ln"   top={null} bot={null} col="fn" act="I:ln("   sa="I:exp(" />
+      </div>
+
+      {/* ── FUNCTION SECTION: Row F2 — (-) CALC HYP sin cos tan ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="(-)"  top="FACT" bot="A"  col="fn" act="I:−(" sa="I:!" />
+        <Btn label="CALC" top={null} bot={null} col="fn" act={null} />
+        <Btn label="HYP"  top={null} bot={null} col={hypOn ? "shk" : "fn"} act="HYP" />
+        <Btn label="sin"  top="A₁"  bot="B"   col="fn"
+             isTrig tMain="sin(" tInv="sin⁻¹(" tHyp="sinh(" tHypI="sinh⁻¹(" />
+        <Btn label="cos"  top="E₁"  bot={null} col="fn"
+             isTrig tMain="cos(" tInv="cos⁻¹(" tHyp="cosh(" tHypI="cosh⁻¹(" />
+        <Btn label="tan"  top="F"   bot={null} col="fn"
+             isTrig tMain="tan(" tInv="tan⁻¹(" tHyp="tanh(" tHypI="tanh⁻¹(" />
+      </div>
+
+      {/* ── FUNCTION SECTION: Row F3 — RCL ENG ( ) S⟺D M+ ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="RCL"   top="STO"  bot={null}  col="fn" act="ANS"     sa="I:Ans→" />
+        <Btn label="ENG"   top={null} bot={null}  col="fn" act="ENG"                  />
+        <Btn label="("     top="Abs"  bot={null}  col="fn" act="I:("      sa="I:Abs(" />
+        <Btn label=")"     top={null} bot={null}  col="fn" act="I:)"                  />
+        <Btn label="S⟺D"  top={null} bot={null}  col="fn" act={null}                 />
+        <Btn label="M+"    top="M−"   bot="M"     col="fn" act={null}                 />
+      </div>
+
+      {/* ── Divider ── */}
+      <div style={{ height: 4, background: "#111", borderRadius: 2, marginBottom: 5 }} />
+
+      {/* ── NUMBER SECTION: Row N1 — 7 8 9 DEL AC (5 wide) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="7"   top="Pol"  bot={null}  col="num" act="I:7" h={30} />
+        <Btn label="8"   top="Rec"  bot={null}  col="num" act="I:8" h={30} />
+        <Btn label="9"   top="GCD"  bot={null}  col="num" act="I:9" sa="I:GCD(" h={30} />
+        <Btn label="DEL" top="INS"  bot={null}  col="del" act="DEL" h={30} />
+        <Btn label="AC"  top="OFF"  bot={null}  col="ac"  act="AC"  h={30} />
+      </div>
+
+      {/* ── NUMBER SECTION: Row N2 — 4 5 6 × ÷ ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="4"  top="r"    bot="STAT" col="num" act="I:4"  h={30} />
+        <Btn label="5"  top={null} bot={null} col="num" act="I:5"  h={30} />
+        <Btn label="6"  top={null} bot={null} col="num" act="I:6"  h={30} />
+        <Btn label="×"  top="nPr"  bot={null} col="fn"  act="I:×"  sa="I:nPr" h={30} />
+        <Btn label="÷"  top="nCr"  bot="LCM"  col="fn" act="I:÷"  sa="I:nCr" h={30} />
+      </div>
+
+      {/* ── NUMBER SECTION: Row N3 — 1 2 3 + − ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: GAP, marginBottom: GAP }}>
+        <Btn label="1"  top="Rnd"  bot={null}  col="num" act="I:1"  sa="RAN"  h={30} />
+        <Btn label="2"  top="Ran#" bot={null}  col="num" act="I:2"            h={30} />
+        <Btn label="3"  top="π"    bot="BASE"  col="num" act="I:3"  sa="π"    h={30} />
+        <Btn label="+"  top={null} bot="Pol"   col="fn"  act="I:+"            h={30} />
+        <Btn label="−"  top="Rec"  bot={null}  col="fn"  act="I:−"            h={30} />
+      </div>
+
+      {/* ── NUMBER SECTION: Row N4 — 0 , ×10ˣ Ans = ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: GAP }}>
+        <Btn label="0"     top={null}    bot={null}      col="num" act="I:0"    h={30} />
+        <Btn label=","     top={null}    bot={null}      col="num" act="I:,"    h={30} />
+        <Btn label="×10ˣ" top={null}    bot={null}      col="fn"  act="I:×10^" h={30} />
+        <Btn label="Ans"   top="DRG▶"   bot="ProAns"    col="fn"  act="ANS"    h={30} />
+        <Btn label="="     top={null}    bot={null}      col="eq"  act="EQ"     h={30} />
       </div>
     </div>
   );

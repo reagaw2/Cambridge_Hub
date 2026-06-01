@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { X, CheckCircle2, Zap, Microscope, Loader2, Star, Check, MessageCircleQuestion, ChevronDown, ChevronUp } from "lucide-react";
 import { getQuestionsForTopic, getQuestionsByIds } from "@/lib/mcqBank";
@@ -81,10 +81,6 @@ function Layer1Feedback({ feedback, isGuess }) {
   );
 }
 
-/**
- * Layer2OnDemand — shows a spinner and loading text while fetching,
- * and is disabled during the fetch to prevent double-taps.
- */
 function Layer2OnDemand({ feedback, question, selectedOption, loadingL2, onLoad, layer2 }) {
   const [open, setOpen] = useState(false);
 
@@ -226,16 +222,17 @@ function StarSection({ questionId, topic, questionText, feedback }) {
   );
 }
 
-function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCrossOut }) {
+// ── Memoized OptionRow — only re-renders when its own props change ─────────
+const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCrossOut }) {
   const isSelected = selected === optKey;
 
-  let containerCls = "relative w-full flex items-center gap-2 p-3.5 rounded-xl border text-left transition-all ";
+  let containerCls = "relative w-full flex items-center gap-2 p-3.5 rounded-xl border text-left transition-colors ";
   if (crossedOut) {
     containerCls += "border-border/30 bg-secondary/20 opacity-50";
   } else if (isSelected) {
-    containerCls += "border-l-4 border-amber-400 bg-amber-400/8 cursor-pointer";
+    containerCls += "border-l-4 border-amber-400 bg-amber-400/8";
   } else {
-    containerCls += "border-border hover:border-border/80 cursor-pointer";
+    containerCls += "border-border hover:border-border/80";
   }
 
   return (
@@ -244,19 +241,26 @@ function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCross
         isSelected ? "text-amber-400" : crossedOut ? "text-muted-foreground/30" : "text-muted-foreground"
       }`}>{optKey}</span>
 
-      <button type="button" onClick={() => !crossedOut && onSelect(optKey)} disabled={crossedOut}
-        className={`flex-1 min-w-0 text-left text-sm leading-relaxed transition-all ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90"}`}
-        style={{ background: "none", border: "none", padding: 0 }}>
+      <button
+        type="button"
+        onPointerDown={() => !crossedOut && onSelect(optKey)}
+        disabled={crossedOut}
+        className={`flex-1 min-w-0 text-left text-sm leading-relaxed ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90 cursor-pointer"}`}
+        style={{ background: "none", border: "none", padding: 0 }}
+      >
         {text}
       </button>
 
-      <button type="button" onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
+      <button
+        type="button"
+        onPointerDown={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
         title={crossedOut ? "Restore option" : "Cross out — eliminate this option"}
-        className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
+        className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-colors active:scale-90 ${
           crossedOut
             ? "bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
             : "bg-secondary/60 border border-border/60 text-muted-foreground/40 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
-        }`}>
+        }`}
+      >
         <X className="w-3.5 h-3.5" />
       </button>
 
@@ -267,7 +271,7 @@ function OptionRow({ optKey, text, selected, crossedOut, onSelect, onToggleCross
       )}
     </div>
   );
-}
+});
 
 export default function MCQSession() {
   const navigate = useNavigate();
@@ -339,16 +343,23 @@ export default function MCQSession() {
   const isLast = currentIdx >= questions.length - 1;
   const crossedCount = crossedOut.size;
 
-  function handleToggleCrossOut(key) {
+  // ── useCallback handlers so OptionRow doesn't re-render siblings ──
+  const handleSelect = useCallback((key) => {
+    setSelected(key);
+    setNoSelectionError(false);
+  }, []);
+
+  const handleToggleCrossOut = useCallback((key) => {
     setCrossedOut(prev => {
       const next = new Set(prev);
       if (next.has(key)) { next.delete(key); }
       else { next.add(key); if (selected === key) setSelected(null); }
       return next;
     });
-  }
+  }, [selected]);
 
   function handleSaveWorking(side, imageData) {
+    if (!question) return;
     const updated = saveTopicWorking(PAPER_ID, question.id, side, imageData, { questionNumber: currentIdx + 1, topic: question.topic, questionText: question.text });
     setWorkings({ ...updated });
   }
@@ -430,7 +441,7 @@ export default function MCQSession() {
                 {submitted && (
                   <button
                     onClick={() => { if (checkStarred(question.id, SUBJECT)) { unstarQuestion(question.id, SUBJECT); } else { starQuestion(question.id, { topic: question.topic, questionText: question.text, markScheme: "", feedback: { pulse_layer_1: layer1?.pulse_layer_1, cambridge_insight: layer1?.cambridge_insight } }, SUBJECT); } }}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${checkStarred(question.id, SUBJECT) ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${checkStarred(question.id, SUBJECT) ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
                     <Star className={`w-3 h-3 ${checkStarred(question.id, SUBJECT) ? "fill-amber-400" : ""}`} />
                     {checkStarred(question.id, SUBJECT) ? "Starred" : "Star"}
                   </button>
@@ -442,26 +453,45 @@ export default function MCQSession() {
 
           {!submitted ? (
             <>
-              <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">
-                Tap ✕ to cross out options you've eliminated{crossedCount > 0 ? ` · ${crossedCount} crossed out` : ""}
-              </p>
+              {crossedCount > 0 && (
+                <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">
+                  {crossedCount} option{crossedCount !== 1 ? "s" : ""} crossed out — tap ✕ to eliminate more
+                </p>
+              )}
 
               <div className="flex flex-col gap-2.5">
                 {OPTION_KEYS.map(key => (
-                  <OptionRow key={key} optKey={key} text={question.options[key]} selected={selected} crossedOut={crossedOut.has(key)} onSelect={setSelected} onToggleCrossOut={handleToggleCrossOut} />
+                  <OptionRow
+                    key={key}
+                    optKey={key}
+                    text={question.options[key]}
+                    selected={selected}
+                    crossedOut={crossedOut.has(key)}
+                    onSelect={handleSelect}
+                    onToggleCrossOut={handleToggleCrossOut}
+                  />
                 ))}
               </div>
 
               {noSelectionError && <p className="text-sm text-red-400/80 text-center -mt-1">Select an answer first</p>}
 
               <div className="flex gap-2 items-center">
-                <button onClick={() => { setIsGuess(g => !g); setNoSelectionError(false); }}
-                  className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-all shrink-0 ${isGuess ? "bg-amber-400 text-amber-900 border-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}>
+                <button
+                  onClick={() => { setIsGuess(g => !g); setNoSelectionError(false); }}
+                  className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-colors shrink-0 ${
+                    isGuess ? "bg-amber-400 text-amber-900 border-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"
+                  }`}
+                >
                   🎲 {isGuess ? "Guess!" : "Just a guess"}
                 </button>
-                <button onClick={handleSubmit} disabled={!selected || loading}
-                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                  {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span> : "Submit Answer"}
+                <button
+                  onClick={handleSubmit}
+                  disabled={!selected || loading}
+                  className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {loading
+                    ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span>
+                    : "Submit Answer"}
                 </button>
               </div>
             </>
@@ -487,7 +517,7 @@ export default function MCQSession() {
               )}
 
               {!showCorrectBanner && (
-                <button onClick={advanceToNext} className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
+                <button onClick={advanceToNext} className="w-full bg-secondary text-secondary-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors">
                   {isLast ? (guessReviewMode ? "Back to review bank →" : "Finish →") : "Next question →"}
                 </button>
               )}

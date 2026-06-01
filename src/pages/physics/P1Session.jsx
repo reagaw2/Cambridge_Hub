@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download, Pencil, NotebookPen, MessageCircleQuestion, PenLine, Trash2, Check } from "lucide-react";
 import { getP1Paper } from "@/lib/physicsP1Bank";
@@ -202,13 +202,13 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
         </div>
 
         <div className="flex shrink-0 border-b border-border/50">
-          <button onClick={() => setActiveTab("notes")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          <button onClick={() => setActiveTab("notes")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             <Pencil className="w-3 h-3" /> Notes {noteCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>{noteCount}</span>}
           </button>
-          <button onClick={() => setActiveTab("workings")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "workings" ? "border-blue-400 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          <button onClick={() => setActiveTab("workings")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2 ${activeTab === "workings" ? "border-blue-400 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             <PenLine className="w-3 h-3" /> Workings {workingsCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "workings" ? "bg-blue-500/20 text-blue-400" : "bg-secondary text-muted-foreground"}`}>{workingsCount}</span>}
           </button>
-          <button onClick={() => setActiveTab("teacher")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-all border-b-2 ${activeTab === "teacher" ? "border-amber-400 text-amber-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          <button onClick={() => setActiveTab("teacher")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2 ${activeTab === "teacher" ? "border-amber-400 text-amber-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             <Star className={`w-3 h-3 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} /> Teacher {starredCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>{starredCount}</span>}
           </button>
         </div>
@@ -327,7 +327,7 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   const [saved, setSaved] = useState(false);
   function handleSave() { const updated = saveNote(paperId, questionId, text); onNoteSaved(updated); setSaved(true); setTimeout(() => setSaved(false), 2000); if (!text.trim()) setOpen(false); }
   function handleKeyDown(e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave(); }
-  if (!open && !existing?.text) return <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground/60 hover:text-green-400 hover:border-green-500/30 border border-border/40 bg-secondary/40 px-3 py-2 rounded-xl transition-all w-full"><Pencil className="w-3.5 h-3.5" /> Add a note</button>;
+  if (!open && !existing?.text) return <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground/60 hover:text-green-400 hover:border-green-500/30 border border-border/40 bg-secondary/40 px-3 py-2 rounded-xl transition-colors w-full"><Pencil className="w-3.5 h-3.5" /> Add a note</button>;
   return (
     <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 space-y-2">
       <div className="flex items-center justify-between"><div className="flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5 text-green-400" /><p className="text-[11px] font-bold uppercase tracking-widest text-green-400/70">My Note</p></div>{existing?.text && !open && <button onClick={() => setOpen(true)} className="text-[10px] text-green-400/60 hover:text-green-400 transition-colors">Edit</button>}</div>
@@ -336,11 +336,12 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   );
 }
 
-function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOption, onSelect, onToggleCrossOut }) {
+// ── Memoized OptionRow — only re-renders when its own props change ─────────
+const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOption, onSelect, onToggleCrossOut }) {
   const isCorrectOption = optKey === correctOption;
   const isWrongChosen = submitted && optKey === selected && !isCorrectOption;
 
-  let containerCls = "relative w-full flex items-center gap-2 p-3.5 rounded-xl border text-left transition-all select-none ";
+  let containerCls = "relative w-full flex items-center gap-2 p-3.5 rounded-xl border text-left select-none transition-colors ";
   if (submitted) {
     if (isCorrectOption) containerCls += "border-l-4 border-green-500 bg-green-500/10";
     else if (isWrongChosen) containerCls += "border-l-4 border-red-400 bg-red-500/10";
@@ -348,7 +349,7 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
   } else if (crossedOut) {
     containerCls += "border-border/30 bg-secondary/20 opacity-50";
   } else {
-    containerCls += selected === optKey ? "border-l-4 border-primary bg-primary/10 cursor-pointer" : "border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer";
+    containerCls += selected === optKey ? "border-l-4 border-primary bg-primary/10" : "border-border hover:border-primary/40 hover:bg-primary/5";
   }
 
   return (
@@ -361,20 +362,27 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
         : "text-muted-foreground"
       }`}>{optKey}</span>
 
-      <button type="button" disabled={submitted || crossedOut} onClick={() => !submitted && !crossedOut && onSelect(optKey)}
-        className={`flex-1 min-w-0 text-left text-sm leading-relaxed transition-all ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : "text-foreground/90"}`}
-        style={{ background: "none", border: "none", padding: 0 }}>
+      <button
+        type="button"
+        disabled={submitted || crossedOut}
+        onPointerDown={() => !submitted && !crossedOut && onSelect(optKey)}
+        className={`flex-1 min-w-0 text-left text-sm leading-relaxed ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : submitted ? "text-foreground/90 cursor-default" : "text-foreground/90 cursor-pointer"}`}
+        style={{ background: "none", border: "none", padding: 0 }}
+      >
         {text}
       </button>
 
       {!submitted && (
-        <button type="button" onClick={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
+        <button
+          type="button"
+          onPointerDown={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
           title={crossedOut ? "Restore option" : "Cross out — eliminate this option"}
-          className={`shrink-0 flex items-center justify-center rounded-lg transition-all active:scale-90 ${
+          className={`shrink-0 flex items-center justify-center rounded-lg transition-colors active:scale-90 ${
             crossedOut
               ? "w-7 h-7 bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
               : "w-7 h-7 bg-secondary/60 border border-border/60 text-muted-foreground/40 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
-          }`}>
+          }`}
+        >
           <X className="w-3.5 h-3.5" />
         </button>
       )}
@@ -389,7 +397,7 @@ function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOptio
       )}
     </div>
   );
-}
+});
 
 export default function P1Session() {
   const navigate = useNavigate();
@@ -477,7 +485,13 @@ export default function P1Session() {
   const isCurrentStarred = question ? starredIds.has(question.id) : false;
   const totalPanelItems = starredIds.size + notedIds.size + Object.keys(workings).length;
 
-  function handleToggleCrossOut(key) {
+  // ── useCallback handlers so OptionRow doesn't re-render siblings ──
+  const handleSelect = useCallback((key) => {
+    if (submitted) return;
+    setCurrentAnswer(key);
+  }, [submitted]);
+
+  const handleToggleCrossOut = useCallback((key) => {
     if (submitted) return;
     setCrossedOut(prev => {
       const next = new Set(prev);
@@ -485,7 +499,7 @@ export default function P1Session() {
       else { next.add(key); if (currentAnswer === key) setCurrentAnswer(""); }
       return next;
     });
-  }
+  }, [submitted, currentAnswer]);
 
   function handleToggleStar() {
     if (!question) return;
@@ -521,35 +535,32 @@ export default function P1Session() {
   }
 
   async function handleSubmit() {
-    const selected = currentAnswer;
-    if (!selected || loading || submitted) return;
+    const sel = currentAnswer;
+    if (!sel || loading || submitted) return;
     setLoading(true);
-    const isCorrect = selected === question.correct;
+    const isCorrect = sel === question.correct;
 
-    // Always log to MCQ attempt store — with flagged_as_guess if applicable
     await saveMCQAttempt({
       question_id: question.id,
       topic: question.topic,
       source: paper.id,
-      chosen_option: selected,
+      chosen_option: sel,
       correct_option: question.correct,
       correct: isCorrect,
       flagged_as_guess: isGuess,
       reasoning: null,
     });
 
-    // Auto-advance ONLY when correct AND not flagged as a guess
     if (isCorrect && !isGuess) {
-      const record = { chosen: selected, correct: true, flagged_as_guess: false, layer1: null, layer2: null };
+      const record = { chosen: sel, correct: true, flagged_as_guess: false, layer1: null, layer2: null };
       setAnswers(prev => ({ ...prev, [question.id]: record }));
       setSubmitted(true); setShowCorrectBanner(true); setLoading(false);
       autoAdvanceTimer.current = setTimeout(() => advanceQuestion(), 1500);
       return;
     }
 
-    // For wrong answers OR correct-but-guessed: fetch AI feedback and show it
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
-    const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${selected}${isGuess ? " — flagged as a GUESS" : " — WRONG"}\nRespond ONLY in JSON:\n{ "marks_earned": 0, "cambridge_insight": "One sentence: why ${question.correct} is the right answer.", "pulse_layer_1": "The reusable exam rule. Max 12 words." }`;
+    const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${sel}${isGuess ? " — flagged as a GUESS" : " — WRONG"}\nRespond ONLY in JSON:\n{ "marks_earned": 0, "cambridge_insight": "One sentence: why ${question.correct} is the right answer.", "pulse_layer_1": "The reusable exam rule. Max 12 words." }`;
 
     let fb1 = null;
     try {
@@ -559,7 +570,7 @@ export default function P1Session() {
       fb1 = { marks_earned: 0, cambridge_insight: question.explanation ?? "", pulse_layer_1: question.explanation ?? "" };
     }
 
-    const record = { chosen: selected, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
+    const record = { chosen: sel, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
     setAnswers(prev => ({ ...prev, [question.id]: record }));
     setLayer1(fb1); setLayer2(null); setSubmitted(true); setLoading(false);
   }
@@ -601,10 +612,10 @@ export default function P1Session() {
             <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors"><ArrowLeft className="w-4 h-4 text-foreground" /></button>
             <div className="flex flex-col items-center"><p className="text-xs font-bold text-foreground">{paper.label}</p><p className="text-[10px] text-muted-foreground">Q{currentIdx + 1} / {questions.length}</p></div>
             <div className="flex items-center gap-1.5">
-              <button onClick={() => setShowCalc(c => !c)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${showCalc ? "bg-primary/20 border-primary/50 text-primary" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><Calculator className="w-3.5 h-3.5" /></button>
-              <button onClick={() => setShowFormulas(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-all"><BookOpen className="w-3.5 h-3.5" /></button>
-              <button onClick={() => setShowStarred(true)} className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${totalPanelItems > 0 ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><NotebookPen className={`w-3.5 h-3.5 ${totalPanelItems > 0 ? "text-amber-400" : ""}`} />{totalPanelItems > 0 && <span className="font-mono text-[10px]">{totalPanelItems}</span>}</button>
-              <button onClick={() => setShowOverview(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-all"><Grid3X3 className="w-3.5 h-3.5" /><span className="font-mono text-[10px]">{answeredCount}/{questions.length}</span></button>
+              <button onClick={() => setShowCalc(c => !c)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${showCalc ? "bg-primary/20 border-primary/50 text-primary" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><Calculator className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setShowFormulas(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-colors"><BookOpen className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setShowStarred(true)} className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${totalPanelItems > 0 ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><NotebookPen className={`w-3.5 h-3.5 ${totalPanelItems > 0 ? "text-amber-400" : ""}`} />{totalPanelItems > 0 && <span className="font-mono text-[10px]">{totalPanelItems}</span>}</button>
+              <button onClick={() => setShowOverview(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-colors"><Grid3X3 className="w-3.5 h-3.5" /><span className="font-mono text-[10px]">{answeredCount}/{questions.length}</span></button>
             </div>
           </div>
           <div className="w-full h-0.5 bg-secondary"><div className="h-0.5 bg-primary transition-all duration-500" style={{ width: `${progress * 100}%` }} /></div>
@@ -620,7 +631,7 @@ export default function P1Session() {
             const a = answers[q.id];
             const isCurrent = i === currentIdx;
             return (
-              <button key={q.id} onClick={() => setCurrentIdx(i)} className={`relative shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-all ${isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110" : a?.chosen && a?.correct && !a?.flagged_as_guess ? "bg-green-500/20 border-green-500/40 text-green-400" : a?.chosen && a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : a?.chosen && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-secondary/60 border-border/40 text-muted-foreground/50"}`}>{q.number}</button>
+              <button key={q.id} onClick={() => setCurrentIdx(i)} className={`relative shrink-0 w-6 h-6 rounded-md text-[9px] font-bold border transition-colors ${isCurrent ? "ring-2 ring-primary border-primary bg-primary/20 text-primary scale-110" : a?.chosen && a?.correct && !a?.flagged_as_guess ? "bg-green-500/20 border-green-500/40 text-green-400" : a?.chosen && a?.flagged_as_guess ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : a?.chosen && !a?.correct ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-secondary/60 border-border/40 text-muted-foreground/50"}`}>{q.number}</button>
             );
           })}
         </div>
@@ -634,7 +645,7 @@ export default function P1Session() {
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">{question.topic}</span>
                 {submitted && (
-                  <button onClick={handleToggleStar} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${isCurrentStarred ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
+                  <button onClick={handleToggleStar} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${isCurrentStarred ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
                     <Star className={`w-3.5 h-3.5 ${isCurrentStarred ? "fill-amber-400" : ""}`} /><span>{isCurrentStarred ? "Starred" : "Star"}</span>
                   </button>
                 )}
@@ -649,27 +660,34 @@ export default function P1Session() {
             <QuestionAnnotator text={question.text} questionId={question.id} />
           </div>
 
-          {!submitted && (
+          {!submitted && crossedCount > 0 && (
             <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">
-              Tap ✕ on any option to cross it out{crossedCount > 0 ? ` · ${crossedCount} crossed out` : ""}
+              {crossedCount} option{crossedCount !== 1 ? "s" : ""} crossed out
             </p>
           )}
 
           <div className="flex flex-col gap-2.5">
             {OPTION_KEYS.map(key => (
-              <OptionRow key={key} optKey={key} text={question.options[key]} selected={currentAnswer} crossedOut={crossedOut.has(key)} submitted={submitted} correctOption={question.correct} onSelect={setCurrentAnswer} onToggleCrossOut={handleToggleCrossOut} />
+              <OptionRow
+                key={key}
+                optKey={key}
+                text={question.options[key]}
+                selected={currentAnswer}
+                crossedOut={crossedOut.has(key)}
+                submitted={submitted}
+                correctOption={question.correct}
+                onSelect={handleSelect}
+                onToggleCrossOut={handleToggleCrossOut}
+              />
             ))}
           </div>
 
-          {/* Submit row — "Just a guess" toggle + Submit button */}
           {!submitted && (
             <div className="flex gap-2 items-center">
               <button
                 onClick={() => setIsGuess(g => !g)}
-                className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-all shrink-0 ${
-                  isGuess
-                    ? "bg-amber-400 text-amber-900 border-amber-400"
-                    : "bg-secondary border-border text-muted-foreground hover:brightness-110"
+                className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-colors shrink-0 ${
+                  isGuess ? "bg-amber-400 text-amber-900 border-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"
                 }`}
               >
                 🎲 {isGuess ? "Guess!" : "Just a guess"}
@@ -677,7 +695,7 @@ export default function P1Session() {
               <button
                 onClick={handleSubmit}
                 disabled={!currentAnswer || loading}
-                className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading
                   ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span>
@@ -690,7 +708,7 @@ export default function P1Session() {
           {showFeedbackPanel && <Layer1Feedback feedback={layer1} isCorrect={existingAnswer?.correct ?? false} isGuess={existingAnswer?.flagged_as_guess ?? false} />}
           {submitted && !showCorrectBanner && <MiniNoteWidget questionId={question.id} paperId={paperId} notes={notes} onNoteSaved={updated => setNotes({ ...updated })} />}
           {showFeedbackPanel && !isCurrentStarred && (
-            <button onClick={handleToggleStar} className="w-full flex items-center justify-center gap-2 border border-amber-500/25 bg-amber-500/5 text-amber-400/80 text-sm font-semibold py-2.5 rounded-xl hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/50 active:scale-[0.98] transition-all">
+            <button onClick={handleToggleStar} className="w-full flex items-center justify-center gap-2 border border-amber-500/25 bg-amber-500/5 text-amber-400/80 text-sm font-semibold py-2.5 rounded-xl hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/50 active:scale-[0.98] transition-colors">
               <Star className="w-4 h-4" /> Star for teacher review
             </button>
           )}
@@ -699,7 +717,7 @@ export default function P1Session() {
             <button
               onClick={handleRequestLayer2}
               disabled={loadingLayer2}
-              className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-colors disabled:cursor-not-allowed disabled:opacity-70"
             >
               {loadingLayer2 ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />Loading deeper breakdown…</>
@@ -713,8 +731,8 @@ export default function P1Session() {
 
           {!showCorrectBanner && (
             <div className="grid grid-cols-2 gap-3 pb-4">
-              <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0} className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-30"><ChevronLeft className="w-4 h-4" /> Previous</button>
-              <button onClick={() => currentIdx < questions.length - 1 ? setCurrentIdx(i => i + 1) : navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } })} className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">{isLast ? "Finish" : "Next"} <ChevronRight className="w-4 h-4" /></button>
+              <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0} className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors disabled:opacity-30"><ChevronLeft className="w-4 h-4" /> Previous</button>
+              <button onClick={() => currentIdx < questions.length - 1 ? setCurrentIdx(i => i + 1) : navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } })} className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors">{isLast ? "Finish" : "Next"} <ChevronRight className="w-4 h-4" /></button>
             </div>
           )}
         </div>

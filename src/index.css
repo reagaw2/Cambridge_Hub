@@ -94,6 +94,15 @@
     -webkit-user-select: text;
   }
 
+  /* ── Critical: remove 300ms tap delay on all interactive elements ── */
+  button,
+  a,
+  [role="button"],
+  label,
+  select {
+    touch-action: manipulation;
+  }
+
   html {
     overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;

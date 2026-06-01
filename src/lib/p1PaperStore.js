@@ -1,23 +1,19 @@
 /**
  * p1PaperStore.js — manages past paper PDFs in Supabase Storage.
- * Supports multiple papers, each stored at its own path in the bucket.
  */
 
 import { supabaseClient } from "@/api/base44Client";
 
 const BUCKET = "paper-assets";
 
-// Registry of known papers — filename must match exactly what is in Supabase Storage
 const PAPER_FILES = {
   "9702/12/F/M/25": "9702_m25_qp_12.pdf",
   "9702/12/M/J/22": "9702_s22_qp_12.pdf",
   "9702/11/M/J/22": "9702_s22_qp_11.pdf",
   "9702/13/O/N/20": "9702_w20_qp_13.pdf",
+  "9702/13/M/J/21": "9702_s21_qp_13.pdf",
 };
 
-/**
- * Get the public URL for a specific paper PDF.
- */
 export function getPaperPdfUrl(paperId) {
   const filename = PAPER_FILES[paperId];
   if (!filename) return Promise.resolve(null);
@@ -38,9 +34,6 @@ export function getPaperPdfUrl(paperId) {
   );
 }
 
-/**
- * Upload a PDF via the server-side route (bypasses RLS).
- */
 export async function uploadPaperPdf(file, paperId) {
   const filename = PAPER_FILES[paperId] ?? file.name;
 

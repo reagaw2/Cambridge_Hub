@@ -5,6 +5,8 @@ import { preloadCSStore } from '@/lib/csTopicStore';
 import { loadAllNotes } from '@/lib/questionNotesStore';
 import { setSessionUserId } from '@/lib/userSession';
 
+const UID_KEY = 'cambridge_hub_current_uid';
+
 function applyColorScheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
 }
@@ -37,58 +39,54 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingProgress, setIsLoadingProgress] = useState(false);
   const [authError] = useState(null);
 
-  // Track the currently loaded user ID to detect real user changes
   const currentUserIdRef = useRef(null);
 
   useEffect(() => {
     const { data: { subscription } } = base44.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] event:', event);
 
-      // ── USER_UPDATED: only refresh metadata, no full reload ────────────────
       if (event === 'USER_UPDATED' && session?.user) {
         const mappedUser = buildUser(session.user);
         if (mappedUser.preferred_name) {
-          localStorage.setItem(
-            `cambridge_hub_preferred_name_${mappedUser.id}`,
-            mappedUser.preferred_name
-          );
+          localStorage.setItem(`cambridge_hub_preferred_name_${mappedUser.id}`, mappedUser.preferred_name);
         }
         setUser(mappedUser);
         return;
       }
 
-      // ── TOKEN_REFRESHED: same user, nothing to do ─────────────────────────
       if (event === 'TOKEN_REFRESHED') return;
 
       const incomingUserId = session?.user?.id ?? null;
 
-      // ── If the user is changing, IMMEDIATELY clear stale state ────────────
-      // This prevents briefly showing the previous user's data while the
-      // new user's progress loads asynchronously.
+      // ── Write user ID to localStorage IMMEDIATELY ─────────────────────────
+      // This is the key fix: p1PaperMode reads 'cambridge_hub_current_uid'
+      // synchronously during render. It must already be set by the time
+      // any dashboard component calls getPaperMode() or isPaperFresh().
+      if (incomingUserId) {
+        try { localStorage.setItem(UID_KEY, incomingUserId); } catch {}
+      } else {
+        // Signed out — remove so the next user doesn't inherit this value
+        try { localStorage.removeItem(UID_KEY); } catch {}
+        // Also clear the anon session ID so the next user starts fresh
+        try { sessionStorage.removeItem('cambridge_hub_anon_uid'); } catch {}
+      }
+
+      // Also update the module-level variable for other stores
+      setSessionUserId(incomingUserId);
+
       if (incomingUserId !== currentUserIdRef.current) {
         currentUserIdRef.current = incomingUserId;
-
-        // Scope all localStorage stores to the new user right away
-        setSessionUserId(incomingUserId);
-
-        // Clear UI immediately — show loading instead of wrong account data
         setUser(null);
         setIsAuthenticated(false);
         setIsLoadingAuth(true);
-        if (incomingUserId) {
-          setIsLoadingProgress(true);
-        }
+        if (incomingUserId) setIsLoadingProgress(true);
       }
 
-      // ── Load new user ──────────────────────────────────────────────────────
       if (session?.user) {
         const mappedUser = buildUser(session.user);
 
         if (mappedUser.preferred_name) {
-          localStorage.setItem(
-            `cambridge_hub_preferred_name_${mappedUser.id}`,
-            mappedUser.preferred_name
-          );
+          localStorage.setItem(`cambridge_hub_preferred_name_${mappedUser.id}`, mappedUser.preferred_name);
         }
 
         const userEmail = session.user.email;
@@ -104,19 +102,15 @@ export const AuthProvider = ({ children }) => {
           console.warn('[Auth] progress load error (continuing anyway):', err);
         }
 
-        // Sync notes in background — doesn't block login
         loadAllNotes().then(notes => {
-          console.log('[Auth] ✓ notes synced from cloud:', Object.keys(notes).length, 'notes');
-        }).catch(e => {
-          console.warn('[Auth] notes sync failed (non-blocking):', e);
-        });
+          console.log('[Auth] ✓ notes synced:', Object.keys(notes).length);
+        }).catch(() => {});
 
         setUser(mappedUser);
         setIsAuthenticated(true);
         setIsLoadingAuth(false);
         setIsLoadingProgress(false);
       } else {
-        // ── Signed out ──────────────────────────────────────────────────────
         setUser(null);
         setIsAuthenticated(false);
         setIsLoadingAuth(false);
@@ -137,6 +131,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     setIsLoadingAuth(true);
+    setSessionUserId(null);
+    try { localStorage.removeItem(UID_KEY); } catch {}
+    try { sessionStorage.removeItem('cambridge_hub_anon_uid'); } catch {}
     try {
       await base44.auth.signOut();
     } catch (err) {
@@ -172,8 +169,6 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

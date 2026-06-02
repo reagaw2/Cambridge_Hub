@@ -1,59 +1,38 @@
-import { getSessionUserId } from "@/lib/userSession";
-
 /**
  * p1PaperMode.js — tracks whether each P1 paper has been attempted and in what mode.
- * Keys are scoped by user ID so each account has its own independent state.
+ * Keys are scoped per-user by reading the user ID directly from Supabase's own
+ * localStorage auth cache — this is synchronous and always correct regardless of
+ * when the module loads or when AuthContext fires.
  */
 
+/** Reads the current user ID synchronously from Supabase's cached auth token. */
+function getCurrentUserId() {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? "";
+    const match = supabaseUrl.match(/https?:\/\/([^.]+)\.supabase\.co/);
+    if (match) {
+      const projectRef = match[1];
+      const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+      if (raw) {
+        const authData = JSON.parse(raw);
+        const userId = authData?.user?.id;
+        if (userId) return userId;
+      }
+    }
+  } catch {}
+  // Absolute fallback — should never happen in practice
+  return "anon";
+}
+
 function key(paperId) {
-  const uid = getSessionUserId();
+  const uid = getCurrentUserId();
   return `p1_paper_mode_${uid}_${(paperId ?? "").replace(/\//g, "_")}`;
 }
 
 /**
  * Returns "practice" | "exam" | null
- * null = never attempted at all → both modes available
- */
-export function getPaperMode(paperId) {
-  try { return localStorage.getItem(key(paperId)) ?? null; } catch { return null; }
-}
-
-/**
- * Record that a paper has been started in a given mode.
- */
-export function setPaperMode(paperId, mode) {
-  try { localStorage.setItem(key(paperId), mode); } catch {}
-}
-
-/**
- * Returns true if the paper has never been attempted (exam mode available).
- */
-export function isPaperFresh(paperId) {
-  return getPaperMode(paperId) === null;
-}
-</thinking>
-
-The fix is one line — `key()` now includes the user ID: `p1_paper_mode_<userId>_<paperId>` instead of `p1_paper_mode_<paperId>`. When a different user logs in their `getSessionUserId()` returns a different value, so they get a completely fresh set of paper mode entries and all papers show as unattempted.
-
-<dyad-chat-summary>Fixed paper mode (Practice/Exam badge) leaking across user accounts by scoping localStorage key by user ID</dyad-chat-summary><dyad-write path="src/lib/p1PaperMode.js" description="Scope paper mode localStorage keys by user ID to prevent cross-account leakage">
-import { getSessionUserId } from "@/lib/userSession";
-
-/**
- * p1PaperMode.js — tracks whether each P1 paper has been attempted and in what mode.
- * Keys are scoped by user ID so each account has its own independent state.
- * Once a paper is attempted (in any mode), it is locked to Practice mode going forward.
- * Exam mode is only available for completely fresh, never-attempted papers.
- */
-
-function key(paperId) {
-  const uid = getSessionUserId();
-  return `p1_paper_mode_${uid}_${(paperId ?? "").replace(/\//g, "_")}`;
-}
-
-/**
- * Returns "practice" | "exam" | null
- * null = never attempted at all → both modes available
- * "practice" or "exam" → paper has been attempted → lock to practice
+ * null  = never attempted → Exam mode still available
+ * "practice" / "exam" = already attempted → locked to Practice mode
  */
 export function getPaperMode(paperId) {
   try { return localStorage.getItem(key(paperId)) ?? null; } catch { return null; }
@@ -68,7 +47,7 @@ export function setPaperMode(paperId, mode) {
 }
 
 /**
- * Returns true if the paper has never been attempted (exam mode available).
+ * Returns true if the paper has never been attempted (Exam mode available).
  */
 export function isPaperFresh(paperId) {
   return getPaperMode(paperId) === null;

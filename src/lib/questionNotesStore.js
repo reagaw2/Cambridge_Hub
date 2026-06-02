@@ -1,18 +1,16 @@
-/**
- * questionNotesStore.js — universal per-question notes across all subjects and question types.
- * localStorage is the primary store; Supabase is synced in the background.
- */
-
 import { supabaseClient } from "@/api/base44Client";
+import { getSessionUserId } from "@/lib/userSession";
 
-const LOCAL_KEY = "hub_question_notes_v1";
+function localKey() {
+  return `hub_question_notes_v1_${getSessionUserId()}`;
+}
 
 function readAll() {
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "{}"); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(localKey()) ?? "{}"); } catch { return {}; }
 }
 
 function writeAll(data) {
-  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch {}
+  try { localStorage.setItem(localKey(), JSON.stringify(data)); } catch {}
 }
 
 async function getStudentRow() {
@@ -31,7 +29,6 @@ async function pushToSupabase(data) {
   } catch (e) { console.warn("[questionNotesStore] push failed:", e?.message); }
 }
 
-/** Load notes from Supabase — falls back to localStorage */
 export async function loadAllNotes() {
   const local = readAll();
   try {
@@ -44,18 +41,12 @@ export async function loadAllNotes() {
   } catch { return local; }
 }
 
-export function getNote(questionId) {
-  return readAll()[questionId] ?? null;
-}
+export function getNote(questionId) { return readAll()[questionId] ?? null; }
 
 export function saveNote(questionId, text, meta = {}) {
   const all = readAll();
   if (text.trim()) {
-    all[questionId] = {
-      text: text.trim(),
-      savedAt: new Date().toISOString(),
-      ...meta,
-    };
+    all[questionId] = { text: text.trim(), savedAt: new Date().toISOString(), ...meta };
   } else {
     delete all[questionId];
   }
@@ -71,6 +62,4 @@ export function deleteNote(questionId) {
   pushToSupabase(all).catch(() => {});
 }
 
-export function getAllNotes() {
-  return readAll();
-}
+export function getAllNotes() { return readAll(); }

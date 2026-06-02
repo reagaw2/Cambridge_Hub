@@ -1,12 +1,8 @@
-/**
- * p1StarStore.js — persists starred questions per paper.
- * Each entry: { starred, questionNumber, questionText, topic, options, correctAnswer, explanation, feedback, teacherQuestion, starredAt }
- */
-
 import { supabaseClient } from "@/api/base44Client";
+import { getSessionUserId } from "@/lib/userSession";
 
 function localKey(paperId) {
-  return `p1_stars_${(paperId ?? "default").replace(/\//g, "_")}`;
+  return `p1_stars_${getSessionUserId()}_${(paperId ?? "default").replace(/\//g, "_")}`;
 }
 
 function readLocal(paperId) {
@@ -21,9 +17,7 @@ async function getStudentRow() {
   const { data: { user }, error } = await supabaseClient.auth.getUser();
   if (error || !user) return null;
   const { data: rows } = await supabaseClient
-    .from("StudentData")
-    .select("id, p1_stars")
-    .eq("user_id", user.id);
+    .from("StudentData").select("id, p1_stars").eq("user_id", user.id);
   return rows?.[0] ?? null;
 }
 
@@ -32,40 +26,27 @@ async function pushToSupabase(paperId, data) {
   if (!row) return;
   const paperKey = (paperId ?? "default").replace(/\//g, "_");
   const existing = row.p1_stars ?? {};
-  const updated = { ...existing, [paperKey]: data };
-  await supabaseClient
-    .from("StudentData")
-    .update({ p1_stars: updated })
+  await supabaseClient.from("StudentData")
+    .update({ p1_stars: { ...existing, [paperKey]: data } })
     .eq("id", row.id)
     .catch(e => console.warn("[p1StarStore] push failed:", e));
 }
 
-/**
- * Load starred questions for a paper — checks Supabase first, falls back to localStorage.
- * Call this on mount instead of the synchronous getStarredQuestions().
- */
 export async function loadStarredQuestions(paperId) {
   const local = readLocal(paperId);
-
   try {
     const row = await getStudentRow();
     if (!row) return local;
     const paperKey = (paperId ?? "default").replace(/\//g, "_");
     const remote = row.p1_stars?.[paperKey];
     if (!remote) return local;
-    // Remote is source of truth — merge over local and update cache
     const merged = { ...local, ...remote };
     writeLocal(paperId, merged);
     return merged;
-  } catch {
-    return local;
-  }
+  } catch { return local; }
 }
 
-/** Synchronous read from localStorage only — use after loadStarredQuestions() has run */
-export function getStarredQuestions(paperId) {
-  return readLocal(paperId);
-}
+export function getStarredQuestions(paperId) { return readLocal(paperId); }
 
 export function starQuestion(paperId, question, feedback, teacherQuestion) {
   const data = readLocal(paperId);

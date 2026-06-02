@@ -1,8 +1,9 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { preloadStore } from '@/lib/topicStore';
 import { preloadCSStore } from '@/lib/csTopicStore';
 import { loadAllNotes } from '@/lib/questionNotesStore';
+import { setSessionUserId } from '@/lib/userSession';
 
 function applyColorScheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
@@ -36,10 +37,14 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingProgress, setIsLoadingProgress] = useState(false);
   const [authError] = useState(null);
 
+  // Track the currently loaded user ID to detect real user changes
+  const currentUserIdRef = useRef(null);
+
   useEffect(() => {
     const { data: { subscription } } = base44.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] event:', event);
 
+      // ── USER_UPDATED: only refresh metadata, no full reload ────────────────
       if (event === 'USER_UPDATED' && session?.user) {
         const mappedUser = buildUser(session.user);
         if (mappedUser.preferred_name) {
@@ -52,6 +57,30 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
+      // ── TOKEN_REFRESHED: same user, nothing to do ─────────────────────────
+      if (event === 'TOKEN_REFRESHED') return;
+
+      const incomingUserId = session?.user?.id ?? null;
+
+      // ── If the user is changing, IMMEDIATELY clear stale state ────────────
+      // This prevents briefly showing the previous user's data while the
+      // new user's progress loads asynchronously.
+      if (incomingUserId !== currentUserIdRef.current) {
+        currentUserIdRef.current = incomingUserId;
+
+        // Scope all localStorage stores to the new user right away
+        setSessionUserId(incomingUserId);
+
+        // Clear UI immediately — show loading instead of wrong account data
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsLoadingAuth(true);
+        if (incomingUserId) {
+          setIsLoadingProgress(true);
+        }
+      }
+
+      // ── Load new user ──────────────────────────────────────────────────────
       if (session?.user) {
         const mappedUser = buildUser(session.user);
 
@@ -65,8 +94,6 @@ export const AuthProvider = ({ children }) => {
         const userEmail = session.user.email;
         const userId = session.user.id;
 
-        setIsLoadingProgress(true);
-
         try {
           await Promise.all([
             withTimeout(preloadStore(userEmail, userId), 8000),
@@ -77,7 +104,7 @@ export const AuthProvider = ({ children }) => {
           console.warn('[Auth] progress load error (continuing anyway):', err);
         }
 
-        // Pull question notes from Supabase in the background — doesn't block login
+        // Sync notes in background — doesn't block login
         loadAllNotes().then(notes => {
           console.log('[Auth] ✓ notes synced from cloud:', Object.keys(notes).length, 'notes');
         }).catch(e => {
@@ -89,6 +116,7 @@ export const AuthProvider = ({ children }) => {
         setIsLoadingAuth(false);
         setIsLoadingProgress(false);
       } else {
+        // ── Signed out ──────────────────────────────────────────────────────
         setUser(null);
         setIsAuthenticated(false);
         setIsLoadingAuth(false);

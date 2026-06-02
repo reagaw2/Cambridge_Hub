@@ -1,3 +1,5 @@
+import { sanitisePdf } from "@/lib/sanitisePdf";
+
 const JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 
 async function loadJsPDF() {
@@ -11,93 +13,6 @@ async function loadJsPDF() {
   });
 }
 
-/**
- * Convert characters that jsPDF helvetica cannot render into clean ASCII.
- * Rules:
- *   - Greek letters → standard physics abbreviations (no underscores, no full words)
- *   - Superscripts → ^n  (so 10²² → 10^22)
- *   - Subscripts   → just the digit/letter, NO underscore (y₁ → y1)
- *   - Other math symbols → ASCII equivalents
- */
-function sanitise(str) {
-  if (!str) return "";
-  return String(str)
-    // ── Superscripts ──────────────────────────────────────────────────────
-    .replace(/\u00b2/g, "^2")
-    .replace(/\u00b3/g, "^3")
-    .replace(/\u00b9/g, "^1")
-    .replace(/\u2070/g, "^0")
-    .replace(/[\u2074-\u2079]/g, c => "^" + (c.codePointAt(0) - 0x2070))
-    .replace(/\u207A/g, "^+")
-    .replace(/\u207B/g, "^-")
-
-    // ── Subscripts (NO underscore — just the character) ───────────────────
-    .replace(/[\u2080-\u2089]/g, c => String(c.codePointAt(0) - 0x2080))
-    .replace(/\u208A/g, "+")
-    .replace(/\u208B/g, "-")
-
-    // ── Greek letters — short physics conventions ─────────────────────────
-    .replace(/\u03b1/g, "alpha")
-    .replace(/\u03b2/g, "beta")
-    .replace(/\u03b3/g, "gamma")
-    .replace(/\u0393/g, "Gamma")
-    .replace(/\u03b4/g, "delta")
-    .replace(/\u0394/g, "Delta")
-    .replace(/\u03b5/g, "epsilon")
-    .replace(/\u03b6/g, "zeta")
-    .replace(/\u03b7/g, "eta")
-    .replace(/\u03b8/g, "theta")
-    .replace(/\u0398/g, "Theta")
-    .replace(/\u03ba/g, "kappa")
-    .replace(/\u03bb/g, "lambda")
-    .replace(/\u039b/g, "Lambda")
-    .replace(/\u03bc/g, "mu")
-    .replace(/\u03bd/g, "nu")
-    .replace(/\u03be/g, "xi")
-    .replace(/\u03c0/g, "pi")
-    .replace(/\u03a0/g, "Pi")
-    .replace(/\u03c1/g, "rho")
-    .replace(/\u03c3/g, "sigma")
-    .replace(/\u03a3/g, "Sigma")
-    .replace(/\u03c4/g, "tau")
-    .replace(/\u03c6/g, "phi")
-    .replace(/\u03a6/g, "Phi")
-    .replace(/\u03c7/g, "chi")
-    .replace(/\u03c8/g, "psi")
-    .replace(/\u03c9/g, "omega")
-    .replace(/\u03a9/g, "Omega")
-
-    // ── Math operators ────────────────────────────────────────────────────
-    .replace(/\u00d7/g, "x")
-    .replace(/\u00f7/g, "/")
-    .replace(/\u2212/g, "-")
-    .replace(/\u2013/g, "-")
-    .replace(/\u2014/g, "--")
-    .replace(/\u2260/g, "!=")
-    .replace(/\u2264/g, "<=")
-    .replace(/\u2265/g, ">=")
-    .replace(/\u221a/g, "sqrt")
-    .replace(/\u221e/g, "inf")
-    .replace(/\u2248/g, "~=")
-    .replace(/\u221d/g, "prop.")
-    .replace(/\u00b0/g, " deg")
-    .replace(/\u00b1/g, "+/-")
-
-    // ── Arrows & misc ─────────────────────────────────────────────────────
-    .replace(/\u2192/g, "->")
-    .replace(/\u2190/g, "<-")
-    .replace(/\u2194/g, "<->")
-    .replace(/\u21d2/g, "=>")
-
-    // ── Typography ────────────────────────────────────────────────────────
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201c\u201d]/g, '"')
-    .replace(/\u2026/g, "...")
-
-    // ── Any remaining non-Latin-1 ─────────────────────────────────────────
-    .replace(/[^\x00-\xFF]/g, " ");
-}
-
 export async function generateP1ReviewPdf({
   paperId,
   paperLabel,
@@ -108,16 +23,9 @@ export async function generateP1ReviewPdf({
 }) {
   const JsPDF = await loadJsPDF();
 
-  // ── Page geometry ──────────────────────────────────────────────────────────
-  const PW  = 210;
-  const PH  = 297;
-  const ML  = 18;          // left margin
-  const MR  = 18;          // right margin
-  const MT  = 20;          // top margin
-  const MB  = 22;          // bottom margin
-  // IMPORTANT: reduce usable width by an extra 4 mm so wrapped text
-  // never touches the physical right margin of the page.
-  const CW  = PW - ML - MR - 4;    // 170 mm — safe content width
+  const PW  = 210, PH  = 297;
+  const ML  = 18,  MR  = 18,  MT = 20, MB = 22;
+  const CW  = PW - ML - MR - 4;
   const SAFE_Y = PH - MB;
 
   const doc = new JsPDF({ unit: "mm", format: "a4" });
@@ -128,7 +36,6 @@ export async function generateP1ReviewPdf({
     day: "2-digit", month: "short", year: "numeric",
   });
 
-  // ── Typography helpers ─────────────────────────────────────────────────────
   const LH = (fs) => (fs / 72) * 25.4 * 1.65;
 
   function setF(style, size, r, g, b) {
@@ -138,11 +45,11 @@ export async function generateP1ReviewPdf({
   }
 
   function txt(str, x, ty, opts) {
-    doc.text(sanitise(str), x, ty, opts);
+    doc.text(sanitisePdf(str), x, ty, opts);
   }
 
   function wrapLines(str, maxW) {
-    return doc.splitTextToSize(sanitise(str), maxW);
+    return doc.splitTextToSize(sanitisePdf(str), maxW);
   }
 
   function checkPage(needed) {
@@ -170,7 +77,7 @@ export async function generateP1ReviewPdf({
     y += 5;
   }
 
-  // ── Build stats ────────────────────────────────────────────────────────────
+  // ── Stats ──────────────────────────────────────────────────────────────────
   const topicMap = {};
   questions.forEach(q => {
     if (!topicMap[q.topic]) topicMap[q.topic] = { correct: 0, total: 0 };
@@ -202,12 +109,9 @@ export async function generateP1ReviewPdf({
     .filter(([, { correct, total }]) => total > 0 && correct / total < 0.5)
     .map(([t]) => t);
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // HEADER
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── Header ─────────────────────────────────────────────────────────────────
   setF("bold", 16, 20, 20, 20);
   txt("Cambridge Hub", ML, y);
-
   setF("normal", 9, 110, 110, 110);
   txt("MCQ Review Report", ML + 54, y + 0.5);
   txt(dateStr, ML + CW + 4, y, { align: "right" });
@@ -221,9 +125,7 @@ export async function generateP1ReviewPdf({
 
   boldRule();
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // SCORE HERO
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── Score hero ─────────────────────────────────────────────────────────────
   checkPage(30);
   const heroY = y;
   const heroW = CW + 4;
@@ -237,16 +139,14 @@ export async function generateP1ReviewPdf({
   setF("bold", 11, 50, 60, 100);
   txt(`${pct}%   -   ${grade}`, ML + 5, heroY + 20);
 
-  // Stats column on the right
   const sX = ML + heroW * 0.52;
-  const statRows = [
+  let sY = heroY + 5;
+  [
     ["Correct",  String(totalCorrect), [22, 163, 74]],
     ["Wrong",    String(totalWrong),   [210, 38, 38]],
     ["Guessed",  String(totalGuessed), [217, 119, 6]],
     ["Blank",    String(totalBlank),   [130, 130, 130]],
-  ];
-  let sY = heroY + 5;
-  statRows.forEach(([label, val, col]) => {
+  ].forEach(([label, val, col]) => {
     setF("normal", 8.5, 90, 90, 90);
     txt(label + ":", sX, sY);
     setF("bold", 8.5, ...col);
@@ -257,9 +157,7 @@ export async function generateP1ReviewPdf({
   doc.setTextColor(0, 0, 0);
   y = heroY + 30;
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // TOPIC ANALYSIS
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── Topic Analysis ─────────────────────────────────────────────────────────
   y += 4;
   checkPage(14 + topicsSorted.length * 13);
 
@@ -267,7 +165,6 @@ export async function generateP1ReviewPdf({
   txt("TOPIC ANALYSIS  (weakest first)", ML, y);
   y += 6;
 
-  // Layout: | TOPIC LABEL (40%) | BAR (44%) | STAT (16%) |
   const T_LABEL_W = CW * 0.40;
   const T_BAR_X   = ML + T_LABEL_W + 6;
   const T_BAR_W   = CW * 0.42;
@@ -277,29 +174,22 @@ export async function generateP1ReviewPdf({
     const tp      = total > 0 ? correct / total : 0;
     const pctInt  = Math.round(tp * 100);
     const barFill = T_BAR_W * tp;
-    const col =
-      pctInt >= 70 ? [34, 197, 94]  :
-      pctInt >= 50 ? [251, 146, 60] :
-                     [239, 68, 68];
+    const col = pctInt >= 70 ? [34, 197, 94] : pctInt >= 50 ? [251, 146, 60] : [239, 68, 68];
 
     checkPage(12);
 
-    // Label (truncated to fit)
     setF("normal", 8.5, 30, 30, 30);
-    const labelLines = doc.splitTextToSize(sanitise(topic), T_LABEL_W);
+    const labelLines = doc.splitTextToSize(sanitisePdf(topic), T_LABEL_W);
     doc.text(labelLines[0], ML, y + 3);
 
-    // Stat right-aligned
     setF("bold", 8.5, ...col);
     txt(`${correct}/${total} (${pctInt}%)`, ML + CW + 4, y + 3, { align: "right" });
 
-    // Bar track
     doc.setFillColor(222, 226, 236);
     doc.setDrawColor(205, 210, 224);
     doc.setLineWidth(0.2);
     doc.roundedRect(T_BAR_X, y, T_BAR_W, T_BAR_H, 1.5, 1.5, "FD");
 
-    // Bar fill
     if (barFill > 1) {
       doc.setFillColor(...col);
       doc.roundedRect(T_BAR_X, y, barFill, T_BAR_H, 1.5, 1.5, "F");
@@ -309,13 +199,11 @@ export async function generateP1ReviewPdf({
     y += 11;
   });
 
-  // Focus areas box
   if (weakTopics.length > 0) {
     y += 2;
     checkPage(16);
-    const warnStr   = weakTopics.slice(0, 5).join("  |  ");
-    const warnLines = wrapLines(warnStr, CW - 30);
-    const warnH     = warnLines.length * LH(8) + 12;
+    const warnLines = wrapLines(weakTopics.slice(0, 5).join("  |  "), CW - 30);
+    const warnH = warnLines.length * LH(8) + 12;
     doc.setFillColor(255, 248, 230);
     doc.setDrawColor(245, 185, 60);
     doc.setLineWidth(0.5);
@@ -330,15 +218,11 @@ export async function generateP1ReviewPdf({
 
   boldRule();
 
-  // ── Section heading ─────────────────────────────────────────────────────
   checkPage(12);
   setF("bold", 10, 20, 20, 20);
   txt("Failed Questions", ML, y);
   setF("normal", 8.5, 120, 120, 120);
-  txt(
-    `${failedQs.length} question${failedQs.length !== 1 ? "s" : ""} to review`,
-    ML + 42, y + 0.5
-  );
+  txt(`${failedQs.length} question${failedQs.length !== 1 ? "s" : ""} to review`, ML + 42, y + 0.5);
   doc.setTextColor(0, 0, 0);
   y += 7;
 
@@ -349,17 +233,12 @@ export async function generateP1ReviewPdf({
     y += 8;
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // FAILED QUESTION ENTRIES
-  // ══════════════════════════════════════════════════════════════════════════
-  const OPTS     = ["A", "B", "C", "D"];
+  // ── Failed question entries ────────────────────────────────────────────────
+  const OPTS = ["A", "B", "C", "D"];
   const NUM_RULES = 4;
   const RULE_GAP  = 9;
-
-  // Option text available width:
-  // Starts at ML + 8 (left padding + key letter space), ends at ML + CW - 2
   const OPT_TEXT_X = ML + 8;
-  const OPT_TEXT_W = CW - 10;   // leaves room for the tag badge on the right
+  const OPT_TEXT_W = CW - 10;
 
   failedQs.forEach((q, qi) => {
     const a       = answers[q.id];
@@ -370,32 +249,27 @@ export async function generateP1ReviewPdf({
 
     checkPage(60);
 
-    // ── Question header card ──────────────────────────────────────────────
+    // Question header card
     const CARD_H = 14;
     doc.setFillColor(233, 241, 255);
     doc.setDrawColor(175, 200, 235);
     doc.setLineWidth(0.4);
     doc.roundedRect(ML, y, CW + 4, CARD_H, 2.5, 2.5, "FD");
 
-    // Q number
     setF("bold", 9, 20, 55, 130);
     txt(`Q${q.number}`, ML + 4, y + 9);
 
-    // Topic — truncated, kept well away from the status pill
     setF("normal", 8, 55, 75, 130);
-    const topicSafe  = sanitise(q.topic ?? "");
-    const topicLines = doc.splitTextToSize(topicSafe, CW - 50);
+    const topicLines = doc.splitTextToSize(sanitisePdf(q.topic ?? ""), CW - 50);
     doc.text(topicLines[0], ML + 18, y + 9);
 
-    // Status pill — RIGHT-ALIGNED inside the card, vertically centred
     const pillLabel = isGuess ? "GUESSED" : "WRONG";
-    const pillW     = isGuess ? 23 : 19;
-    const pillH     = 6;
-    const pillX     = ML + CW + 4 - pillW - 4;
-    const pillY     = y + (CARD_H - pillH) / 2;
-    const pillR     = isGuess ? [200, 110, 0] : [195, 30, 30];
-    const pillBgR   = isGuess ? [255, 240, 210] : [255, 230, 230];
-    doc.setFillColor(...pillBgR);
+    const pillW = isGuess ? 23 : 19;
+    const pillH = 6;
+    const pillX = ML + CW + 4 - pillW - 4;
+    const pillY = y + (CARD_H - pillH) / 2;
+    const pillR  = isGuess ? [200, 110, 0] : [195, 30, 30];
+    doc.setFillColor(...(isGuess ? [255, 240, 210] : [255, 230, 230]));
     doc.setDrawColor(...pillR);
     doc.setLineWidth(0.5);
     doc.roundedRect(pillX, pillY, pillW, pillH, 1.5, 1.5, "FD");
@@ -405,17 +279,14 @@ export async function generateP1ReviewPdf({
     doc.setTextColor(0, 0, 0);
     y += CARD_H + 4;
 
-    // ── Question text (full width, safe wrap) ─────────────────────────────
+    // Question text
     const qLines = wrapLines(q.text, CW);
     checkPage(qLines.length * LH(9.5) + 6);
     setF("normal", 9.5, 20, 20, 20);
-    qLines.forEach(line => {
-      doc.text(line, ML, y);
-      y += LH(9.5);
-    });
+    qLines.forEach(line => { doc.text(line, ML, y); y += LH(9.5); });
     y += 4;
 
-    // ── Options ───────────────────────────────────────────────────────────
+    // Options
     OPTS.forEach(k => {
       const optRaw = q.options?.[k];
       if (!optRaw) return;
@@ -428,55 +299,35 @@ export async function generateP1ReviewPdf({
       let txtR = 65, txtG = 65, txtB = 65;
 
       if (isCorrectOpt) {
-        bgR = 228; bgG = 250; bgB = 234;
-        brR = 90;  brG = 195; brB = 120;
-        txtR = 15; txtG = 100; txtB = 40;
+        bgR = 228; bgG = 250; bgB = 234; brR = 90; brG = 195; brB = 120; txtR = 15; txtG = 100; txtB = 40;
       } else if (isChosenWrong) {
-        bgR = 255; bgG = 232; bgB = 232;
-        brR = 215; brG = 110; brB = 110;
-        txtR = 170; txtG = 25; txtB = 25;
+        bgR = 255; bgG = 232; bgB = 232; brR = 215; brG = 110; brB = 110; txtR = 170; txtG = 25; txtB = 25;
       }
 
-      // Calculate option height BEFORE drawing, using OPT_TEXT_W
-      const optText  = `${k}.  ${sanitise(optRaw)}`;
+      const optText  = `${k}.  ${sanitisePdf(optRaw)}`;
       const optLines = doc.splitTextToSize(optText, OPT_TEXT_W);
       const optH     = Math.max(9, optLines.length * LH(9) + 5);
 
       checkPage(optH + 2.5);
 
-      // Background box
       doc.setFillColor(bgR, bgG, bgB);
       doc.setDrawColor(brR, brG, brB);
       doc.setLineWidth(0.35);
       doc.roundedRect(ML, y, CW + 4, optH, 1.8, 1.8, "FD");
 
-      // Left accent bar
-      if (isCorrectOpt) {
-        doc.setFillColor(90, 195, 120);
-        doc.roundedRect(ML, y, 3, optH, 1, 1, "F");
-      } else if (isChosenWrong) {
-        doc.setFillColor(215, 110, 110);
-        doc.roundedRect(ML, y, 3, optH, 1, 1, "F");
-      }
+      if (isCorrectOpt) { doc.setFillColor(90, 195, 120); doc.roundedRect(ML, y, 3, optH, 1, 1, "F"); }
+      else if (isChosenWrong) { doc.setFillColor(215, 110, 110); doc.roundedRect(ML, y, 3, optH, 1, 1, "F"); }
 
-      // Option text — starts after accent bar + padding
       setF(isCorrectOpt ? "bold" : "normal", 9, txtR, txtG, txtB);
-      optLines.forEach((line, li) => {
-        doc.text(line, OPT_TEXT_X, y + 5.5 + li * LH(9));
-      });
+      optLines.forEach((line, li) => doc.text(line, OPT_TEXT_X, y + 5.5 + li * LH(9)));
 
-      // Badge tag (right-aligned, vertically centred in the option box)
       if (isCorrectOpt || isChosenWrong) {
         const tagLabel = isCorrectOpt ? "CORRECT" : "YOUR ANSWER";
-        const tagW     = isCorrectOpt ? 22 : 30;
-        const tagH     = 5.5;
-        const tagX     = ML + CW + 4 - tagW - 3;
-        const tagY     = y + (optH - tagH) / 2;
-        doc.setFillColor(
-          isCorrectOpt ? 90 : 215,
-          isCorrectOpt ? 195 : 110,
-          isCorrectOpt ? 120 : 110
-        );
+        const tagW = isCorrectOpt ? 22 : 30;
+        const tagH = 5.5;
+        const tagX = ML + CW + 4 - tagW - 3;
+        const tagY = y + (optH - tagH) / 2;
+        doc.setFillColor(isCorrectOpt ? 90 : 215, isCorrectOpt ? 195 : 110, isCorrectOpt ? 120 : 110);
         doc.roundedRect(tagX, tagY, tagW, tagH, 1.2, 1.2, "F");
         setF("bold", 6.5, 255, 255, 255);
         txt(tagLabel, tagX + tagW / 2, tagY + tagH * 0.7, { align: "center" });
@@ -488,14 +339,12 @@ export async function generateP1ReviewPdf({
 
     y += 2;
 
-    // ── AI Feedback ───────────────────────────────────────────────────────
+    // AI Feedback
     if (layer1?.pulse_layer_1) {
       const tkLines = wrapLines(layer1.pulse_layer_1, CW - 4);
-      const tkH     = tkLines.length * LH(9) + 13;
+      const tkH = tkLines.length * LH(9) + 13;
       checkPage(tkH + 4);
-      doc.setFillColor(232, 250, 240);
-      doc.setDrawColor(95, 190, 120);
-      doc.setLineWidth(0.4);
+      doc.setFillColor(232, 250, 240); doc.setDrawColor(95, 190, 120); doc.setLineWidth(0.4);
       doc.roundedRect(ML, y, CW + 4, tkH, 2, 2, "FD");
       setF("bold", 7.5, 20, 110, 55);
       txt("KEY EXAM TAKEAWAY", ML + 5, y + 6);
@@ -507,11 +356,9 @@ export async function generateP1ReviewPdf({
 
     if (layer1?.cambridge_insight) {
       const ciLines = wrapLines(layer1.cambridge_insight, CW - 4);
-      const ciH     = ciLines.length * LH(9) + 13;
+      const ciH = ciLines.length * LH(9) + 13;
       checkPage(ciH + 4);
-      doc.setFillColor(244, 246, 254);
-      doc.setDrawColor(185, 195, 230);
-      doc.setLineWidth(0.35);
+      doc.setFillColor(244, 246, 254); doc.setDrawColor(185, 195, 230); doc.setLineWidth(0.35);
       doc.roundedRect(ML, y, CW + 4, ciH, 2, 2, "FD");
       setF("bold", 7.5, 80, 85, 130);
       txt("CAMBRIDGE INSIGHT", ML + 5, y + 6);
@@ -523,37 +370,27 @@ export async function generateP1ReviewPdf({
 
     y += 3;
 
-    // ── Reflection sections ───────────────────────────────────────────────
+    // Reflection boxes
     ["What I Thought Was True", "What I Now Understand"].forEach((heading, ri) => {
       const boxH = NUM_RULES * RULE_GAP + 17;
       checkPage(boxH + 5);
-
-      doc.setFillColor(252, 252, 250);
-      doc.setDrawColor(198, 196, 190);
-      doc.setLineWidth(0.3);
+      doc.setFillColor(252, 252, 250); doc.setDrawColor(198, 196, 190); doc.setLineWidth(0.3);
       doc.roundedRect(ML, y, CW + 4, boxH, 2, 2, "FD");
-
       setF("bold", 8.5, 30, 30, 30);
       txt(heading, ML + 5, y + 8);
-
       setF("italic", 7.5, 155, 155, 155);
       txt("(fill in by hand)", ML + CW, y + 8, { align: "right" });
-
-      doc.setDrawColor(175, 172, 162);
-      doc.setLineWidth(0.22);
+      doc.setDrawColor(175, 172, 162); doc.setLineWidth(0.22);
       for (let i = 0; i < NUM_RULES; i++) {
         doc.line(ML + 5, y + 14 + i * RULE_GAP, ML + CW - 1, y + 14 + i * RULE_GAP);
       }
-
       doc.setTextColor(0, 0, 0);
       y += boxH + (ri === 0 ? 4 : 9);
     });
 
-    // ── Divider between questions ─────────────────────────────────────────
     if (qi < failedQs.length - 1) {
       checkPage(8);
-      doc.setDrawColor(210, 210, 210);
-      doc.setLineWidth(0.3);
+      doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.3);
       doc.line(ML, y, ML + CW + 4, y);
       y += 8;
       doc.setDrawColor(0, 0, 0);
@@ -562,15 +399,8 @@ export async function generateP1ReviewPdf({
 
   footer();
 
-  // ── Save ──────────────────────────────────────────────────────────────────
   const safeName = (paperLabel ?? paperId ?? "review")
-    .replace(/[^\w]/g, "_")
-    .replace(/_+/g, "_")
-    .slice(0, 40);
+    .replace(/[^\w]/g, "_").replace(/_+/g, "_").slice(0, 40);
   const filename = `MCQ_Review_${safeName}_${dateStr.replace(/\s/g, "")}.pdf`;
-  try {
-    doc.save(filename);
-  } catch {
-    window.open(doc.output("bloburl"), "_blank");
-  }
+  try { doc.save(filename); } catch { window.open(doc.output("bloburl"), "_blank"); }
 }

@@ -1,23 +1,23 @@
 import { supabaseClient } from "@/api/base44Client";
+import { getSessionUserId } from "@/lib/userSession";
 
-const LOCAL_KEY = "topical_workings_v1";
+function localKey() {
+  return `topical_workings_v1_${getSessionUserId()}`;
+}
 
 function readAll() {
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "{}"); } catch { return {}; }
-}
-function writeLocal(data) {
-  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch {}
+  try { return JSON.parse(localStorage.getItem(localKey()) ?? "{}"); } catch { return {}; }
 }
 
-// ── Supabase helpers ──────────────────────────────────────────────────────────
+function writeLocal(data) {
+  try { localStorage.setItem(localKey(), JSON.stringify(data)); } catch {}
+}
 
 async function getStudentRow() {
   const { data: { user }, error } = await supabaseClient.auth.getUser();
   if (error || !user) return null;
   const { data: rows } = await supabaseClient
-    .from("StudentData")
-    .select("id, topical_workings")
-    .eq("user_id", user.id);
+    .from("StudentData").select("id, topical_workings").eq("user_id", user.id);
   return rows?.[0] ?? null;
 }
 
@@ -25,20 +25,12 @@ async function pushToSupabase(data) {
   try {
     const row = await getStudentRow();
     if (!row) return;
-    await supabaseClient
-      .from("StudentData")
-      .update({ topical_workings: data })
-      .eq("id", row.id);
+    await supabaseClient.from("StudentData").update({ topical_workings: data }).eq("id", row.id);
   } catch (e) {
     console.warn("[topicalWorkingsStore] Supabase push failed:", e?.message ?? e);
   }
 }
 
-/**
- * Load topical workings from Supabase.
- * Falls back to localStorage when offline / not authenticated.
- * Call this once on mount.
- */
 export async function loadTopicalWorkingsFromCloud() {
   const local = readAll();
   try {
@@ -48,16 +40,10 @@ export async function loadTopicalWorkingsFromCloud() {
     const merged = { ...local, ...remote };
     writeLocal(merged);
     return merged;
-  } catch {
-    return local;
-  }
+  } catch { return local; }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
-export function getWorking(questionId) {
-  return readAll()[questionId] ?? null;
-}
+export function getWorking(questionId) { return readAll()[questionId] ?? null; }
 
 export function saveWorking(questionId, imageData) {
   const all = readAll();
@@ -73,6 +59,4 @@ export function deleteWorking(questionId) {
   pushToSupabase(all).catch(() => {});
 }
 
-export function getAllWorkings() {
-  return readAll();
-}
+export function getAllWorkings() { return readAll(); }

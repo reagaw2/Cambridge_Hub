@@ -93,9 +93,13 @@ export async function generateP1ReviewPdf({
   const totalBlank    = questions.length - totalAnswered;
   const pct           = questions.length > 0 ? Math.round((totalCorrect / questions.length) * 100) : 0;
 
-  const failedQs = questions.filter(q => {
+  // ── All questions that need review: wrong + guessed + blank ───────────────
+  const reviewQs = questions.filter(q => {
     const a = answers[q.id];
-    return a && (!a.correct || a.flagged_as_guess);
+    if (!a) return true;                          // blank — never answered
+    if (!a.correct) return true;                  // wrong answer
+    if (a.flagged_as_guess) return true;          // correct but flagged as guess
+    return false;
   });
 
   const topicsSorted = Object.entries(topicMap).sort((a, b) => {
@@ -145,7 +149,7 @@ export async function generateP1ReviewPdf({
     ["Correct",  String(totalCorrect), [22, 163, 74]],
     ["Wrong",    String(totalWrong),   [210, 38, 38]],
     ["Guessed",  String(totalGuessed), [217, 119, 6]],
-    ["Blank",    String(totalBlank),   [130, 130, 130]],
+    ["Blank",    String(totalBlank),   [100, 100, 120]],
   ].forEach(([label, val, col]) => {
     setF("normal", 8.5, 90, 90, 90);
     txt(label + ":", sX, sY);
@@ -218,38 +222,45 @@ export async function generateP1ReviewPdf({
 
   boldRule();
 
+  // ── Section heading ────────────────────────────────────────────────────────
   checkPage(12);
   setF("bold", 10, 20, 20, 20);
-  txt("Failed Questions", ML, y);
+  txt("Questions to Review", ML, y);
   setF("normal", 8.5, 120, 120, 120);
-  txt(`${failedQs.length} question${failedQs.length !== 1 ? "s" : ""} to review`, ML + 42, y + 0.5);
+  txt(
+    `${reviewQs.length} question${reviewQs.length !== 1 ? "s" : ""} (wrong + guessed + blank)`,
+    ML + 50, y + 0.5
+  );
   doc.setTextColor(0, 0, 0);
   y += 7;
 
-  if (failedQs.length === 0) {
+  if (reviewQs.length === 0) {
     checkPage(10);
     setF("italic", 10, 80, 80, 80);
-    txt("No failed questions - perfect score!", ML, y);
+    txt("No questions to review - perfect score!", ML, y);
     y += 8;
   }
 
-  // ── Failed question entries ────────────────────────────────────────────────
-  const OPTS = ["A", "B", "C", "D"];
+  // ══════════════════════════════════════════════════════════════════════════
+  // REVIEW QUESTION ENTRIES (wrong + guessed + blank)
+  // ══════════════════════════════════════════════════════════════════════════
+  const OPTS      = ["A", "B", "C", "D"];
   const NUM_RULES = 4;
   const RULE_GAP  = 9;
   const OPT_TEXT_X = ML + 8;
   const OPT_TEXT_W = CW - 10;
 
-  failedQs.forEach((q, qi) => {
+  reviewQs.forEach((q, qi) => {
     const a       = answers[q.id];
     const chosen  = a?.chosen ?? null;
     const correct = q.correct;
     const isGuess = a?.flagged_as_guess ?? false;
+    const isBlank = !a;
     const layer1  = a?.layer1 ?? null;
 
     checkPage(60);
 
-    // Question header card
+    // ── Question header card ──────────────────────────────────────────────
     const CARD_H = 14;
     doc.setFillColor(233, 241, 255);
     doc.setDrawColor(175, 200, 235);
@@ -263,45 +274,51 @@ export async function generateP1ReviewPdf({
     const topicLines = doc.splitTextToSize(sanitisePdf(q.topic ?? ""), CW - 50);
     doc.text(topicLines[0], ML + 18, y + 9);
 
-    const pillLabel = isGuess ? "GUESSED" : "WRONG";
-    const pillW = isGuess ? 23 : 19;
-    const pillH = 6;
-    const pillX = ML + CW + 4 - pillW - 4;
-    const pillY = y + (CARD_H - pillH) / 2;
-    const pillR  = isGuess ? [200, 110, 0] : [195, 30, 30];
-    doc.setFillColor(...(isGuess ? [255, 240, 210] : [255, 230, 230]));
-    doc.setDrawColor(...pillR);
+    // Status pill
+    const pillLabel = isBlank ? "BLANK" : isGuess ? "GUESSED" : "WRONG";
+    const pillW     = isBlank ? 19 : isGuess ? 23 : 19;
+    const pillH     = 6;
+    const pillX     = ML + CW + 4 - pillW - 4;
+    const pillY     = y + (CARD_H - pillH) / 2;
+    const pillFg    = isBlank ? [80, 80, 110]  : isGuess ? [200, 110, 0] : [195, 30, 30];
+    const pillBg    = isBlank ? [225, 225, 240] : isGuess ? [255, 240, 210] : [255, 230, 230];
+    doc.setFillColor(...pillBg);
+    doc.setDrawColor(...pillFg);
     doc.setLineWidth(0.5);
     doc.roundedRect(pillX, pillY, pillW, pillH, 1.5, 1.5, "FD");
-    setF("bold", 7, ...pillR);
+    setF("bold", 7, ...pillFg);
     txt(pillLabel, pillX + pillW / 2, pillY + pillH * 0.67, { align: "center" });
 
     doc.setTextColor(0, 0, 0);
     y += CARD_H + 4;
 
-    // Question text
+    // ── Question text ─────────────────────────────────────────────────────
     const qLines = wrapLines(q.text, CW);
     checkPage(qLines.length * LH(9.5) + 6);
     setF("normal", 9.5, 20, 20, 20);
     qLines.forEach(line => { doc.text(line, ML, y); y += LH(9.5); });
     y += 4;
 
-    // Options
+    // ── Options ───────────────────────────────────────────────────────────
     OPTS.forEach(k => {
       const optRaw = q.options?.[k];
       if (!optRaw) return;
 
       const isCorrectOpt  = k === correct;
-      const isChosenWrong = k === chosen && !isCorrectOpt;
+      const isChosenWrong = !isBlank && k === chosen && !isCorrectOpt;
 
       let bgR = 248, bgG = 248, bgB = 248;
       let brR = 210, brG = 210, brB = 210;
-      let txtR = 65, txtG = 65, txtB = 65;
+      let txtR = 65,  txtG = 65,  txtB = 65;
 
       if (isCorrectOpt) {
-        bgR = 228; bgG = 250; bgB = 234; brR = 90; brG = 195; brB = 120; txtR = 15; txtG = 100; txtB = 40;
+        bgR = 228; bgG = 250; bgB = 234;
+        brR = 90;  brG = 195; brB = 120;
+        txtR = 15; txtG = 100; txtB = 40;
       } else if (isChosenWrong) {
-        bgR = 255; bgG = 232; bgB = 232; brR = 215; brG = 110; brB = 110; txtR = 170; txtG = 25; txtB = 25;
+        bgR = 255; bgG = 232; bgB = 232;
+        brR = 215; brG = 110; brB = 110;
+        txtR = 170; txtG = 25; txtB = 25;
       }
 
       const optText  = `${k}.  ${sanitisePdf(optRaw)}`;
@@ -315,12 +332,19 @@ export async function generateP1ReviewPdf({
       doc.setLineWidth(0.35);
       doc.roundedRect(ML, y, CW + 4, optH, 1.8, 1.8, "FD");
 
-      if (isCorrectOpt) { doc.setFillColor(90, 195, 120); doc.roundedRect(ML, y, 3, optH, 1, 1, "F"); }
-      else if (isChosenWrong) { doc.setFillColor(215, 110, 110); doc.roundedRect(ML, y, 3, optH, 1, 1, "F"); }
+      // Left accent bar
+      if (isCorrectOpt) {
+        doc.setFillColor(90, 195, 120);
+        doc.roundedRect(ML, y, 3, optH, 1, 1, "F");
+      } else if (isChosenWrong) {
+        doc.setFillColor(215, 110, 110);
+        doc.roundedRect(ML, y, 3, optH, 1, 1, "F");
+      }
 
       setF(isCorrectOpt ? "bold" : "normal", 9, txtR, txtG, txtB);
       optLines.forEach((line, li) => doc.text(line, OPT_TEXT_X, y + 5.5 + li * LH(9)));
 
+      // Badge tag
       if (isCorrectOpt || isChosenWrong) {
         const tagLabel = isCorrectOpt ? "CORRECT" : "YOUR ANSWER";
         const tagW = isCorrectOpt ? 22 : 30;
@@ -339,12 +363,27 @@ export async function generateP1ReviewPdf({
 
     y += 2;
 
-    // AI Feedback
+    // ── For blank questions: show a "You left this blank" notice ──────────
+    if (isBlank) {
+      checkPage(10);
+      doc.setFillColor(230, 230, 245);
+      doc.setDrawColor(160, 160, 190);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(ML, y, CW + 4, 9, 1.5, 1.5, "FD");
+      setF("italic", 8.5, 80, 80, 120);
+      txt("You left this question blank — the correct answer is highlighted above.", ML + 4, y + 5.8);
+      doc.setTextColor(0, 0, 0);
+      y += 13;
+    }
+
+    // ── AI Feedback (only present if question was submitted) ──────────────
     if (layer1?.pulse_layer_1) {
       const tkLines = wrapLines(layer1.pulse_layer_1, CW - 4);
       const tkH = tkLines.length * LH(9) + 13;
       checkPage(tkH + 4);
-      doc.setFillColor(232, 250, 240); doc.setDrawColor(95, 190, 120); doc.setLineWidth(0.4);
+      doc.setFillColor(232, 250, 240);
+      doc.setDrawColor(95, 190, 120);
+      doc.setLineWidth(0.4);
       doc.roundedRect(ML, y, CW + 4, tkH, 2, 2, "FD");
       setF("bold", 7.5, 20, 110, 55);
       txt("KEY EXAM TAKEAWAY", ML + 5, y + 6);
@@ -358,7 +397,9 @@ export async function generateP1ReviewPdf({
       const ciLines = wrapLines(layer1.cambridge_insight, CW - 4);
       const ciH = ciLines.length * LH(9) + 13;
       checkPage(ciH + 4);
-      doc.setFillColor(244, 246, 254); doc.setDrawColor(185, 195, 230); doc.setLineWidth(0.35);
+      doc.setFillColor(244, 246, 254);
+      doc.setDrawColor(185, 195, 230);
+      doc.setLineWidth(0.35);
       doc.roundedRect(ML, y, CW + 4, ciH, 2, 2, "FD");
       setF("bold", 7.5, 80, 85, 130);
       txt("CAMBRIDGE INSIGHT", ML + 5, y + 6);
@@ -370,17 +411,20 @@ export async function generateP1ReviewPdf({
 
     y += 3;
 
-    // Reflection boxes
+    // ── Reflection boxes ──────────────────────────────────────────────────
     ["What I Thought Was True", "What I Now Understand"].forEach((heading, ri) => {
       const boxH = NUM_RULES * RULE_GAP + 17;
       checkPage(boxH + 5);
-      doc.setFillColor(252, 252, 250); doc.setDrawColor(198, 196, 190); doc.setLineWidth(0.3);
+      doc.setFillColor(252, 252, 250);
+      doc.setDrawColor(198, 196, 190);
+      doc.setLineWidth(0.3);
       doc.roundedRect(ML, y, CW + 4, boxH, 2, 2, "FD");
       setF("bold", 8.5, 30, 30, 30);
       txt(heading, ML + 5, y + 8);
       setF("italic", 7.5, 155, 155, 155);
       txt("(fill in by hand)", ML + CW, y + 8, { align: "right" });
-      doc.setDrawColor(175, 172, 162); doc.setLineWidth(0.22);
+      doc.setDrawColor(175, 172, 162);
+      doc.setLineWidth(0.22);
       for (let i = 0; i < NUM_RULES; i++) {
         doc.line(ML + 5, y + 14 + i * RULE_GAP, ML + CW - 1, y + 14 + i * RULE_GAP);
       }
@@ -388,9 +432,11 @@ export async function generateP1ReviewPdf({
       y += boxH + (ri === 0 ? 4 : 9);
     });
 
-    if (qi < failedQs.length - 1) {
+    // ── Divider between questions ─────────────────────────────────────────
+    if (qi < reviewQs.length - 1) {
       checkPage(8);
-      doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.3);
+      doc.setDrawColor(210, 210, 210);
+      doc.setLineWidth(0.3);
       doc.line(ML, y, ML + CW + 4, y);
       y += 8;
       doc.setDrawColor(0, 0, 0);

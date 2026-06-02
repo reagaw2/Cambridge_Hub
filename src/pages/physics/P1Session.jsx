@@ -20,6 +20,7 @@ import P1OverviewPanel from "@/pages/physics/P1OverviewPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 import { setPaperMode } from "@/lib/p1PaperMode";
+import { saveExamResult } from "@/lib/p1ExamResultsStore";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 const EXAM_DURATION_SECS = 90 * 60; // 1 hour 30 minutes
@@ -28,9 +29,7 @@ function formatExamTime(secs) {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
@@ -334,7 +333,6 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
 const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOption, onSelect, onToggleCrossOut }) {
   const isCorrectOption = optKey === correctOption;
   const isWrongChosen = submitted && optKey === selected && !isCorrectOption;
-
   let containerCls = "relative w-full flex items-center gap-2 p-3.5 rounded-xl border text-left select-none transition-colors ";
   if (submitted) {
     if (isCorrectOption) containerCls += "border-l-4 border-green-500 bg-green-500/10";
@@ -345,49 +343,18 @@ const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, 
   } else {
     containerCls += selected === optKey ? "border-l-4 border-primary bg-primary/10" : "border-border hover:border-primary/40 hover:bg-primary/5";
   }
-
   return (
     <div className={containerCls}>
-      <span className={`font-mono text-xs font-black shrink-0 w-5 text-center transition-colors ${
-        submitted && isCorrectOption ? "text-green-400"
-        : submitted && isWrongChosen ? "text-red-400"
-        : selected === optKey ? "text-primary"
-        : crossedOut ? "text-muted-foreground/30"
-        : "text-muted-foreground"
-      }`}>{optKey}</span>
-
-      <button
-        type="button"
-        disabled={submitted || crossedOut}
-        onPointerDown={() => !submitted && !crossedOut && onSelect(optKey)}
-        className={`flex-1 min-w-0 text-left text-sm leading-relaxed ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : submitted ? "text-foreground/90 cursor-default" : "text-foreground/90 cursor-pointer"}`}
-        style={{ background: "none", border: "none", padding: 0 }}
-      >
-        {text}
-      </button>
-
+      <span className={`font-mono text-xs font-black shrink-0 w-5 text-center transition-colors ${submitted && isCorrectOption ? "text-green-400" : submitted && isWrongChosen ? "text-red-400" : selected === optKey ? "text-primary" : crossedOut ? "text-muted-foreground/30" : "text-muted-foreground"}`}>{optKey}</span>
+      <button type="button" disabled={submitted || crossedOut} onPointerDown={() => !submitted && !crossedOut && onSelect(optKey)} className={`flex-1 min-w-0 text-left text-sm leading-relaxed ${crossedOut ? "line-through text-muted-foreground/30 cursor-not-allowed" : submitted ? "text-foreground/90 cursor-default" : "text-foreground/90 cursor-pointer"}`} style={{ background: "none", border: "none", padding: 0 }}>{text}</button>
       {!submitted && (
-        <button
-          type="button"
-          onPointerDown={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
-          className={`shrink-0 flex items-center justify-center rounded-lg transition-colors active:scale-90 ${
-            crossedOut
-              ? "w-7 h-7 bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
-              : "w-7 h-7 bg-secondary/60 border border-border/60 text-muted-foreground/40 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"
-          }`}
-        >
+        <button type="button" onPointerDown={e => { e.stopPropagation(); onToggleCrossOut(optKey); }} className={`shrink-0 flex items-center justify-center rounded-lg transition-colors active:scale-90 ${crossedOut ? "w-7 h-7 bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30" : "w-7 h-7 bg-secondary/60 border border-border/60 text-muted-foreground/40 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-400"}`}>
           <X className="w-3.5 h-3.5" />
         </button>
       )}
-
       {submitted && isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />}
       {submitted && isWrongChosen && <X className="w-4 h-4 text-red-400 shrink-0" />}
-
-      {crossedOut && !submitted && (
-        <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" aria-hidden="true">
-          <div className="absolute top-1/2 left-10 right-10 h-px bg-muted-foreground/40" />
-        </div>
-      )}
+      {crossedOut && !submitted && <div className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden" aria-hidden="true"><div className="absolute top-1/2 left-10 right-10 h-px bg-muted-foreground/40" /></div>}
     </div>
   );
 });
@@ -438,7 +405,6 @@ export default function P1Session() {
   const [starredQuestions, setStarredQuestions] = useState({});
   const [notes, setNotes] = useState({});
   const [workings, setWorkings] = useState({});
-
   const [examTimeLeft, setExamTimeLeft] = useState(EXAM_DURATION_SECS);
   const [showExamSubmitConfirm, setShowExamSubmitConfirm] = useState(false);
 
@@ -450,28 +416,38 @@ export default function P1Session() {
 
   useEffect(() => { answersRef.current = answers; }, [answers]);
 
-  const doExamSubmit = useCallback((finalAnswers) => {
+  // ── doExamSubmit — saves result then navigates ─────────────────────────
+  const doExamSubmit = useCallback(async (finalAnswers) => {
     if (examSubmittedRef.current) return;
     examSubmittedRef.current = true;
     clearInterval(examTimerRef.current);
-    // Mark paper as attempted (locks it to practice mode from now on)
+
+    // Persist the result before navigating
+    await saveExamResult({
+      paperId,
+      paperLabel: paper.label,
+      answers: finalAnswers,
+      questions,
+    });
+
     setPaperMode(paperId, "practice");
     localStorage.removeItem(`p1_exam_${paperId}`);
     navigate("/physics/p1-summary", {
       state: { answers: finalAnswers, questions, paperId: paper.id, examMode: true }
     });
-  }, [paperId, questions, paper.id, navigate]);
+  }, [paperId, paper.label, paper.id, questions, navigate]);
 
   useEffect(() => {
     if (!paper) { navigate("/physics"); return; }
     setSessionLoading(true);
 
-    // Check for interrupted exam session
     try {
       const savedExam = JSON.parse(localStorage.getItem(`p1_exam_${paperId}`) ?? "null");
       if (savedExam?.interrupted && savedExam?.paperId === paperId) {
         localStorage.removeItem(`p1_exam_${paperId}`);
-        setPaperMode(paperId, "practice"); // lock to practice after interrupted exam
+        setPaperMode(paperId, "practice");
+        // Save the interrupted result too
+        saveExamResult({ paperId, paperLabel: paper.label, answers: savedExam.answers ?? {}, questions });
         setSessionLoading(false);
         navigate("/physics/p1-summary", {
           state: { answers: savedExam.answers ?? {}, questions, paperId: paper.id, examMode: true },
@@ -482,19 +458,12 @@ export default function P1Session() {
     } catch {}
 
     if (examMode) {
-      // Starting fresh exam — do NOT set mode yet (set it on completion)
-      setAnswers({});
-      setCurrentIdx(0);
-      setNotes({});
-      setStarredQuestions({});
-      setWorkings({});
+      setAnswers({}); setCurrentIdx(0); setNotes({}); setStarredQuestions({}); setWorkings({});
       setSessionLoading(false);
       return;
     }
 
-    // Practice mode — record it immediately so the paper is locked
     setPaperMode(paperId, "practice");
-
     Promise.all([
       loadP1Session(paperId),
       loadNotes(paperId),
@@ -512,47 +481,29 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
-  // Exam timer
   useEffect(() => {
     if (!examMode || sessionLoading) return;
-
     const startTime = Date.now();
     examStartTimeRef.current = startTime;
-
-    localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify({
-      paperId,
-      startTime,
-      answers: {},
-      interrupted: false,
-    }));
-
+    localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify({ paperId, startTime, answers: {}, interrupted: false }));
     examTimerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const remaining = Math.max(0, EXAM_DURATION_SECS - elapsed);
       setExamTimeLeft(remaining);
-      if (remaining <= 0) {
-        clearInterval(examTimerRef.current);
-        doExamSubmit(answersRef.current);
-      }
+      if (remaining <= 0) { clearInterval(examTimerRef.current); doExamSubmit(answersRef.current); }
     }, 1000);
-
     return () => clearInterval(examTimerRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examMode, sessionLoading]);
 
-  // Keep persisted exam answers up to date
   useEffect(() => {
     if (!examMode || sessionLoading || examSubmittedRef.current) return;
     try {
       const saved = JSON.parse(localStorage.getItem(`p1_exam_${paperId}`) ?? "{}");
-      if (!saved.interrupted) {
-        saved.answers = answers;
-        localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify(saved));
-      }
+      if (!saved.interrupted) { saved.answers = answers; localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify(saved)); }
     } catch {}
   }, [answers, examMode, sessionLoading, paperId]);
 
-  // Beforeunload — mark interrupted
   useEffect(() => {
     if (!examMode) return;
     function handleBeforeUnload() {
@@ -581,24 +532,16 @@ export default function P1Session() {
   }, [answers, currentIdx, sessionLoading]);
 
   useEffect(() => {
-    return () => {
-      clearInterval(examTimerRef.current);
-      if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
-    };
+    return () => { clearInterval(examTimerRef.current); if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); };
   }, []);
 
   useEffect(() => {
     if (sessionLoading) return;
     if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
     setCurrentAnswer(existingAnswer?.chosen ?? "");
-    setCrossedOut(new Set());
-    setIsGuess(false);
-    setSubmitted(!!existingAnswer);
-    setShowCorrectBanner(false);
-    setLayer1(existingAnswer?.layer1 ?? null);
-    setLayer2(existingAnswer?.layer2 ?? null);
-    setShowCalc(false);
-    setLoadingLayer2(false);
+    setCrossedOut(new Set()); setIsGuess(false); setSubmitted(!!existingAnswer);
+    setShowCorrectBanner(false); setLayer1(existingAnswer?.layer1 ?? null); setLayer2(existingAnswer?.layer2 ?? null);
+    setShowCalc(false); setLoadingLayer2(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIdx, sessionLoading]);
 
@@ -612,7 +555,7 @@ export default function P1Session() {
   const handleSelect = useCallback((key) => { if (submitted) return; setCurrentAnswer(key); }, [submitted]);
   const handleToggleCrossOut = useCallback((key) => {
     if (submitted) return;
-    setCrossedOut(prev => { const next = new Set(prev); if (next.has(key)) { next.delete(key); } else { next.add(key); if (currentAnswer === key) setCurrentAnswer(""); } return next; });
+    setCrossedOut(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else { next.add(key); if (currentAnswer === key) setCurrentAnswer(""); } return next; });
   }, [submitted, currentAnswer]);
 
   function handleToggleStar() {
@@ -640,10 +583,7 @@ export default function P1Session() {
 
   function advanceQuestion() {
     if (currentIdx < questions.length - 1) { setCurrentIdx(i => i + 1); }
-    else {
-      if (examMode) { doExamSubmit(answersRef.current); }
-      else { navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } }); }
-    }
+    else { if (examMode) { doExamSubmit(answersRef.current); } else { navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } }); } }
   }
 
   async function handleSubmit() {
@@ -725,9 +665,7 @@ export default function P1Session() {
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {examMode && (
-                <div className={`font-mono text-sm font-black tabular-nums px-2.5 py-1 rounded-lg transition-all ${
-                  timerPulse ? "bg-red-500/20 text-red-400 animate-pulse" : timerRed ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"
-                }`}>
+                <div className={`font-mono text-sm font-black tabular-nums px-2.5 py-1 rounded-lg transition-all ${timerPulse ? "bg-red-500/20 text-red-400 animate-pulse" : timerRed ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}>
                   {formatExamTime(examTimeLeft)}
                 </div>
               )}
@@ -846,10 +784,7 @@ export default function P1Session() {
               <button
                 onClick={() => {
                   if (currentIdx < questions.length - 1) { setCurrentIdx(i => i + 1); }
-                  else {
-                    if (examMode) { setShowExamSubmitConfirm(true); }
-                    else { navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } }); }
-                  }
+                  else { if (examMode) { setShowExamSubmitConfirm(true); } else { navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } }); } }
                 }}
                 className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors"
               >

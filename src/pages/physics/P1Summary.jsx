@@ -1,6 +1,16 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { CheckCircle2, XCircle, Home, RotateCcw, Timer } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Home, RotateCcw, Timer, Trophy, Calendar } from "lucide-react";
 import P1TopicBars from "@/components/P1TopicBars";
+import { loadExamResults } from "@/lib/p1ExamResultsStore";
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
 
 function TopicRow({ topic, correct, total }) {
   const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -23,11 +33,22 @@ export default function P1Summary() {
   const location = useLocation();
   const { answers = {}, questions = [], paperId, examMode } = location.state ?? {};
 
+  const [pastResults, setPastResults] = useState([]);
+
+  useEffect(() => {
+    if (examMode) {
+      loadExamResults().then(all => {
+        // Show all results for this paper except the very latest (already shown above)
+        const forPaper = all.filter(r => r.paperId === paperId);
+        setPastResults(forPaper);
+      });
+    }
+  }, [examMode, paperId]);
+
   const totalAnswered = Object.keys(answers).length;
   const totalCorrect = Object.values(answers).filter(a => a.correct && !a.flagged_as_guess).length;
   const pct = questions.length > 0 ? Math.round((totalCorrect / questions.length) * 100) : 0;
 
-  // Build per-topic stats
   const topicMap = {};
   questions.forEach(q => {
     if (!topicMap[q.topic]) topicMap[q.topic] = { correct: 0, total: 0 };
@@ -62,7 +83,7 @@ export default function P1Summary() {
           {/* Hero score */}
           <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-2">
             {examMode && (
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1">Timed Exam Result</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1">Timed Exam Result — Saved ✓</p>
             )}
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{paperId}</p>
             <p className="text-5xl font-black tabular-nums text-foreground">
@@ -88,29 +109,23 @@ export default function P1Summary() {
             ))}
           </div>
 
-          {/* Per-question breakdown */}
+          {/* Per-question grid */}
           <div className="bg-card border border-border rounded-xl p-4 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">All Questions</p>
             <div className="flex flex-wrap gap-2">
-              {questions.map((q, i) => {
+              {questions.map((q) => {
                 const a = answers[q.id];
                 const isCorrect = a?.correct && !a?.flagged_as_guess;
                 const isGuessed = a?.flagged_as_guess;
                 const isAnswered = !!a;
                 return (
-                  <div
-                    key={q.id}
-                    title={`Q${q.number}: ${q.topic}`}
+                  <div key={q.id} title={`Q${q.number}: ${q.topic}`}
                     className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold border ${
-                      !isAnswered
-                        ? "bg-secondary border-border text-muted-foreground/40"
-                        : isGuessed
-                          ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                          : isCorrect
-                            ? "bg-green-500/20 border-green-500/40 text-green-400"
-                            : "bg-red-500/20 border-red-500/40 text-red-400"
-                    }`}
-                  >
+                      !isAnswered ? "bg-secondary border-border text-muted-foreground/40"
+                      : isGuessed ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                      : isCorrect ? "bg-green-500/20 border-green-500/40 text-green-400"
+                      : "bg-red-500/20 border-red-500/40 text-red-400"
+                    }`}>
                     {q.number}
                   </div>
                 );
@@ -124,28 +139,54 @@ export default function P1Summary() {
             </div>
           </div>
 
+          {/* Past exam attempts for this paper */}
+          {examMode && pastResults.length > 1 && (
+            <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">All Exam Attempts — {paperId}</p>
+              </div>
+              <div className="space-y-2">
+                {pastResults.map((r, i) => {
+                  const isLatest = i === 0;
+                  return (
+                    <div key={r.resultId} className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border ${isLatest ? "border-primary/30 bg-primary/8" : "border-border/40 bg-secondary/20"}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isLatest && <span className="text-[9px] font-black uppercase tracking-wider text-primary bg-primary/20 px-1.5 py-0.5 rounded-full shrink-0">Latest</span>}
+                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
+                          <Calendar className="w-3 h-3" />
+                          <span>{fmtDate(r.date)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-[11px] text-muted-foreground font-mono">{r.score}/{r.total}</span>
+                        <span className={`text-sm font-black tabular-nums ${r.pct >= 70 ? "text-green-400" : r.pct >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                          {r.pct}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="grid grid-cols-2 gap-3">
             {!examMode && (
-              <button
-                onClick={() => navigate("/physics/p1", { state: { paperId } })}
-                className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-              >
+              <button onClick={() => navigate("/physics/p1", { state: { paperId } })}
+                className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
                 <RotateCcw className="w-4 h-4" /> Retry
               </button>
             )}
             {examMode && (
-              <button
-                onClick={() => navigate("/physics")}
-                className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-              >
+              <button onClick={() => navigate("/physics")}
+                className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
                 <RotateCcw className="w-4 h-4" /> Practice Mode
               </button>
             )}
-            <button
-              onClick={() => navigate("/physics")}
-              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-semibold py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-            >
+            <button onClick={() => navigate("/physics")}
+              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-semibold py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">
               <Home className="w-4 h-4" /> Dashboard
             </button>
           </div>

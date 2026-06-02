@@ -5,6 +5,22 @@ import { saveNote } from "@/lib/questionNotesStore";
 import { getWorking, saveWorking as saveTopicalWorking, deleteWorking, getAllWorkings } from "@/lib/topicalWorkingsStore";
 import { getAllStarred, saveTeacherQuestion, unstarQuestion } from "@/lib/writtenStarStore";
 import { AnimatePresence, motion } from "framer-motion";
+import RichNoteInput, { hasContent } from "@/components/RichNoteInput";
+
+/** Renders note text — handles both legacy plain text and new HTML notes */
+function NoteDisplay({ text, className }) {
+  if (!text) return null;
+  const isHtml = /<[a-z][^>]*>/i.test(text);
+  if (isHtml) {
+    return (
+      <div
+        className={`[&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_em]:italic [&_u]:underline ${className}`}
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    );
+  }
+  return <p className={`whitespace-pre-wrap ${className}`}>{text}</p>;
+}
 
 function WorkingsCanvas({ questionId }) {
   const canvasRef = useRef(null);
@@ -221,7 +237,7 @@ function WorkingsCanvas({ questionId }) {
     applyStrokes([]);
   }
 
-  const hasContent = strokes.length > 0;
+  const hasContentCanvas = strokes.length > 0;
 
   return (
     <div className="space-y-2">
@@ -232,7 +248,7 @@ function WorkingsCanvas({ questionId }) {
             {t === "pen" ? "✏️ Pen" : "🧹 Eraser"}
           </button>
         ))}
-        <button onClick={handleClear} disabled={!hasContent}
+        <button onClick={handleClear} disabled={!hasContentCanvas}
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-500/40 text-red-400 bg-red-500/10 text-xs font-bold hover:brightness-110 disabled:opacity-30 transition-all">
           <Trash2 className="w-3 h-3" /> Clear
         </button>
@@ -252,13 +268,8 @@ function WorkingsCanvas({ questionId }) {
   );
 }
 
-/**
- * StarredEntryCard — one starred question in the teacher panel.
- * Fixed: Edit button uses local state (no destructive clear), Cancel button added.
- */
 function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
   const [teacherQ, setTeacherQ] = useState(entry.teacherQuestion ?? "");
-  // Start in view mode if there's already a question, otherwise edit mode
   const [editing, setEditing] = useState(!entry.teacherQuestion);
   const [saved, setSaved] = useState(false);
 
@@ -282,7 +293,6 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
 
   return (
     <div className="border border-amber-500/20 bg-amber-500/5 rounded-xl overflow-hidden">
-      {/* Header: topic + X button to unstar */}
       <div className="flex items-start justify-between gap-2 px-4 py-3">
         <div className="space-y-0.5 flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -291,7 +301,6 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
           </div>
           <p className="text-xs text-foreground/70 leading-relaxed line-clamp-2 pl-5">{entry.questionText}</p>
         </div>
-        {/* Unstar button — deletes from starred without navigating to the question */}
         <button
           onClick={() => onUnstar(entry.questionId)}
           title="Remove star"
@@ -300,7 +309,6 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
         </button>
       </div>
 
-      {/* AI takeaway */}
       {entry.feedback?.pulse_layer_1 && (
         <div className="mx-4 mb-2 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2">
           <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Exam Takeaway</p>
@@ -308,13 +316,11 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
         </div>
       )}
 
-      {/* Teacher question section */}
       <div className="px-4 pb-3 space-y-1.5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5">
           <MessageCircleQuestion className="w-3 h-3" /> Your question for teacher
         </p>
 
-        {/* View mode: question saved and not currently editing */}
         {entry.teacherQuestion && !editing ? (
           <div className="flex items-start justify-between gap-2">
             <p className="text-[11px] text-foreground/80 leading-relaxed italic flex-1">
@@ -327,7 +333,6 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
             </button>
           </div>
         ) : (
-          /* Edit / add mode */
           <div className="space-y-1.5">
             <textarea
               value={teacherQ}
@@ -337,13 +342,8 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
               className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
             />
             <div className="flex items-center justify-between gap-2">
-              {/* Cancel only shown if there was previously a saved question */}
               {entry.teacherQuestion ? (
-                <button
-                  onClick={handleCancel}
-                  className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-                  Cancel
-                </button>
+                <button onClick={handleCancel} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>
               ) : <span />}
               <button
                 onClick={handleSave}
@@ -359,6 +359,34 @@ function StarredEntryCard({ entry, subject, onUnstar, onSaveTeacherQ }) {
   );
 }
 
+// ── Inline note editor inside the panel (also uses RichNoteInput) ────────────
+function InlineNoteEditor({ questionId, initialText, onSave, onCancel }) {
+  const [text, setText] = useState(initialText ?? "");
+
+  return (
+    <div className="space-y-2">
+      <RichNoteInput
+        key={questionId}
+        value={text}
+        onChange={setText}
+        placeholder="What did you learn? What was the key insight?"
+        minRows={3}
+        autoFocus
+      />
+      <div className="flex items-center justify-between gap-2">
+        <button onClick={onCancel} className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>
+        <button
+          onClick={() => onSave(text)}
+          disabled={!hasContent(text) && !hasContent(initialText)}
+          className="text-xs font-bold text-primary hover:brightness-110 transition-all bg-primary/15 px-3 py-1.5 rounded-lg border border-primary/30 disabled:opacity-40"
+        >
+          Save note
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SessionNotesPanel({
   open, onClose, allQuestions = [], currentIdx = 0, onJumpTo,
   subject = "physics", userEmail = "",
@@ -369,6 +397,7 @@ export default function SessionNotesPanel({
   const [starredData, setStarredData] = useState([]);
   const [downloadingNotes, setDownloadingNotes] = useState(false);
   const [downloadingStarred, setDownloadingStarred] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState(null);
 
   const sessionQuestionIds = new Set(allQuestions.map(q => q.id));
 
@@ -385,9 +414,18 @@ export default function SessionNotesPanel({
 
   const sessionNotes = allQuestions
     .map((q, i) => ({ q, i, note: notesData[q.id] }))
-    .filter(({ note }) => note?.text?.trim());
+    .filter(({ note }) => hasContent(note?.text));
   const notesCount = sessionNotes.length;
   const starredCount = starredData.length;
+
+  function handleSaveNote(questionId, html) {
+    saveNote(questionId, html, {
+      topic: allQuestions.find(q => q.id === questionId)?.topic ?? "",
+      questionText: (allQuestions.find(q => q.id === questionId)?.text ?? "").slice(0, 200),
+    });
+    setNotesData(getAllNotes());
+    setEditingNoteId(null);
+  }
 
   function handleUnstar(questionId) {
     unstarQuestion(questionId, subject);
@@ -481,6 +519,7 @@ export default function SessionNotesPanel({
                       </div>
                     ) : sessionNotes.map(({ q, i, note }) => {
                       const qIdx = allQuestions.findIndex(aq => aq.id === q.id);
+                      const isEditing = editingNoteId === q.id;
                       return (
                         <div key={q.id} className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 space-y-2">
                           <div className="flex items-start justify-between gap-2">
@@ -489,15 +528,38 @@ export default function SessionNotesPanel({
                                 <span className="font-mono text-xs font-bold text-primary">Q{i + 1}</span>
                                 <span className="text-[11px] text-muted-foreground">{q.topic ?? ""}</span>
                               </div>
-                              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                              {!isEditing && (
+                                <NoteDisplay
+                                  text={note.text}
+                                  className="text-sm text-foreground/80 leading-relaxed"
+                                />
+                              )}
                             </div>
-                            {qIdx >= 0 && (
-                              <button onClick={() => { onJumpTo?.(qIdx); onClose(); }}
-                                className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">
-                                Go to →
-                              </button>
-                            )}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {!isEditing && (
+                                <button
+                                  onClick={() => setEditingNoteId(q.id)}
+                                  className="text-[10px] text-primary/60 hover:text-primary px-2 py-1 rounded-lg bg-primary/8 hover:bg-primary/15 transition-all"
+                                >
+                                  Edit
+                                </button>
+                              )}
+                              {qIdx >= 0 && !isEditing && (
+                                <button onClick={() => { onJumpTo?.(qIdx); onClose(); }}
+                                  className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">
+                                  Go to →
+                                </button>
+                              )}
+                            </div>
                           </div>
+                          {isEditing && (
+                            <InlineNoteEditor
+                              questionId={q.id}
+                              initialText={note.text}
+                              onSave={html => handleSaveNote(q.id, html)}
+                              onCancel={() => setEditingNoteId(null)}
+                            />
+                          )}
                         </div>
                       );
                     })}

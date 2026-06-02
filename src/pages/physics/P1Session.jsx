@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 import { setPaperMode } from "@/lib/p1PaperMode";
 import { saveExamResult } from "@/lib/p1ExamResultsStore";
+import RichNoteInput, { hasContent } from "@/components/RichNoteInput";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
 const EXAM_DURATION_SECS = 90 * 60;
@@ -31,6 +32,21 @@ function formatExamTime(secs) {
   const s = secs % 60;
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+/** Renders note text — handles both legacy plain text and new HTML notes */
+function NoteDisplay({ text, className }) {
+  if (!text) return null;
+  const isHtml = /<[a-z][^>]*>/i.test(text);
+  if (isHtml) {
+    return (
+      <div
+        className={`[&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_em]:italic [&_u]:underline ${className}`}
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    );
+  }
+  return <p className={`whitespace-pre-wrap ${className}`}>{text}</p>;
 }
 
 function CorrectBanner() {
@@ -186,7 +202,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
   }
 
   const starred = Object.entries(starredQuestions).sort((a, b) => a[1].questionNumber - b[1].questionNumber);
-  const noteCount = Object.keys(notes).length;
+  const noteCount = Object.keys(notes).filter(id => hasContent(notes[id]?.text)).length;
   const starredCount = starred.length;
   const workingEntries = Object.entries(workings).sort((a, b) => {
     const qa = questions.find(q => q.id === a[0]);
@@ -194,7 +210,9 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
     return (qa?.number ?? a[1].questionNumber ?? 0) - (qb?.number ?? b[1].questionNumber ?? 0);
   });
   const workingsCount = workingEntries.length;
-  const allNotes = Object.entries(notes).sort(([, a], [, b]) => new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0));
+  const allNotes = Object.entries(notes)
+    .filter(([, n]) => hasContent(n?.text))
+    .sort(([, a], [, b]) => new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0));
   function getQuestion(questionId) { return questions.find(q => q.id === questionId); }
 
   return (
@@ -226,7 +244,8 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 space-y-1">
                         {q && <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-primary">Q{q.number}</span><span className="text-[11px] text-muted-foreground">{q.topic}</span></div>}
-                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                        {/* Render as HTML to preserve bold/italic/underline */}
+                        <NoteDisplay text={note.text} className="text-sm text-foreground/80 leading-relaxed" />
                       </div>
                       {q && <button onClick={() => { const idx = questions.findIndex(qq => qq.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }} className="text-[11px] font-semibold text-primary shrink-0 px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>}
                     </div>
@@ -314,14 +333,14 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
   );
 }
 
-// ── MiniNoteWidget — resets when questionId changes ──────────────────────────
+// ── MiniNoteWidget — uses RichNoteInput, resets on question change ────────────
 function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   const existing = notes[questionId];
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(existing?.text ?? "");
   const [saved, setSaved] = useState(false);
 
-  // Reset state whenever the question changes
+  // Reset when question changes
   useEffect(() => {
     const note = notes[questionId];
     setText(note?.text ?? "");
@@ -334,14 +353,10 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
     onNoteSaved(updated);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    if (!text.trim()) setOpen(false);
+    if (!hasContent(text)) setOpen(false);
   }
 
-  function handleKeyDown(e) {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave();
-  }
-
-  if (!open && !existing?.text) {
+  if (!open && !hasContent(existing?.text)) {
     return (
       <button onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground/60 hover:text-green-400 hover:border-green-500/30 border border-border/40 bg-secondary/40 px-3 py-2 rounded-xl transition-colors w-full">
@@ -357,25 +372,24 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
           <Pencil className="w-3.5 h-3.5 text-green-400" />
           <p className="text-[11px] font-bold uppercase tracking-widest text-green-400/70">My Note</p>
         </div>
-        {existing?.text && !open && (
+        {hasContent(existing?.text) && !open && (
           <button onClick={() => setOpen(true)} className="text-[10px] text-green-400/60 hover:text-green-400 transition-colors">Edit</button>
         )}
       </div>
       {open ? (
         <>
-          <textarea
+          <RichNoteInput
+            key={questionId}
             value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onChange={setText}
             placeholder="What did you understand? What confused you?"
-            rows={3}
+            minRows={3}
             autoFocus
-            className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/30 transition-all"
           />
           <div className="flex items-center justify-between gap-2">
             <button onClick={() => { setOpen(false); setText(existing?.text ?? ""); }} className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>
             <div className="flex items-center gap-2">
-              {text.trim() && (
+              {hasContent(text) && (
                 <button onClick={() => { setText(""); saveNote(paperId, questionId, ""); onNoteSaved({}); setOpen(false); }} className="text-[11px] text-red-400/60 hover:text-red-400 transition-colors">Delete note</button>
               )}
               <button onClick={handleSave} className="text-xs font-bold text-green-400 hover:brightness-110 transition-all bg-green-500/15 px-3 py-1.5 rounded-lg border border-green-500/30">
@@ -383,10 +397,10 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
               </button>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground/30">Cmd/Ctrl + Enter to save</p>
         </>
       ) : (
-        <p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">{existing?.text}</p>
+        /* Display saved note as HTML to preserve formatting */
+        <NoteDisplay text={existing?.text ?? ""} className="text-xs text-foreground/70 leading-relaxed" />
       )}
     </div>
   );
@@ -600,7 +614,7 @@ export default function P1Session() {
   const answeredCount = Object.keys(answers).length;
   const progress = answeredCount / questions.length;
   const starredIds = new Set(Object.keys(starredQuestions));
-  const notedIds = new Set(Object.keys(notes));
+  const notedIds = new Set(Object.keys(notes).filter(id => hasContent(notes[id]?.text)));
   const isCurrentStarred = question ? starredIds.has(question.id) : false;
   const totalPanelItems = starredIds.size + notedIds.size + Object.keys(workings).length;
 
@@ -818,7 +832,7 @@ export default function P1Session() {
           {showCorrectBanner && <CorrectBanner />}
           {showFeedbackPanel && <Layer1Feedback feedback={layer1} isCorrect={existingAnswer?.correct ?? false} isGuess={existingAnswer?.flagged_as_guess ?? false} />}
 
-          {/* Note widget — key prop ensures full remount on question change */}
+          {/* Note widget — key prop ensures full remount + reset on question change */}
           {submitted && !showCorrectBanner && !examMode && (
             <MiniNoteWidget
               key={question.id}

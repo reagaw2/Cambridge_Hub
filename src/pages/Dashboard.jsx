@@ -3,10 +3,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles, FileText } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles, FileText, AlertTriangle } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import { getStreakData } from "@/lib/topicStore";
 import { P1_PAPERS } from "@/lib/physicsP1Bank";
+import P1ModeModal from "@/components/P1ModeModal";
 
 function getLockStatus(locked_until) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -131,6 +132,49 @@ export default function Dashboard() {
   const startY = useRef(null);
   const { avatarLetter } = useDisplayName();
 
+  // P1 paper mode modal
+  const [selectedPaper, setSelectedPaper] = useState(null);
+
+  // Interrupted exam detection
+  const [interruptedExam, setInterruptedExam] = useState(null);
+
+  useEffect(() => {
+    // Check for interrupted P1 exam sessions
+    for (const paper of P1_PAPERS) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`p1_exam_${paper.id}`) ?? 'null');
+        if (saved?.interrupted && saved?.paperId === paper.id) {
+          setInterruptedExam({ paper, answers: saved.answers ?? {} });
+          break;
+        }
+      } catch {}
+    }
+  }, []);
+
+  function handleViewInterruptedResults() {
+    if (!interruptedExam) return;
+    const { paper, answers } = interruptedExam;
+    localStorage.removeItem(`p1_exam_${paper.id}`);
+    setInterruptedExam(null);
+    navigate("/physics/p1-summary", {
+      state: { answers, questions: paper.questions, paperId: paper.id, examMode: true }
+    });
+  }
+
+  function handleDismissInterrupted() {
+    if (!interruptedExam) return;
+    localStorage.removeItem(`p1_exam_${interruptedExam.paper.id}`);
+    setInterruptedExam(null);
+  }
+
+  function handleModeSelect(mode) {
+    if (!selectedPaper) return;
+    setSelectedPaper(null);
+    navigate("/physics/p1", {
+      state: { paperId: selectedPaper.id, examMode: mode === "exam" }
+    });
+  }
+
   async function loadDashboardData() {
     setLoading(true);
     getStreakData().then(sd => setStreakData(sd));
@@ -158,7 +202,6 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email, location.key, isLoadingProgress]);
 
-  // Pull-to-refresh using window scroll
   const onTouchStart = useCallback((e) => {
     if (window.scrollY === 0) startY.current = e.touches[0].clientY;
   }, []);
@@ -224,7 +267,6 @@ export default function Dashboard() {
         <div className="absolute bottom-[-5%] right-[-5%] w-[400px] h-[400px] rounded-full bg-purple-600/10 blur-[120px]" />
       </div>
 
-      {/* Pull-to-refresh indicator */}
       <div className="flex items-center justify-center overflow-hidden transition-all duration-200 relative z-10"
         style={{ height: pullY > 0 || refreshing ? `${pullY}px` : 0 }}>
         <RefreshCw className={`w-5 h-5 text-emerald-400 transition-transform ${refreshing ? "animate-spin" : ""}`}
@@ -256,6 +298,35 @@ export default function Dashboard() {
 
         <div className="flex flex-col gap-5 p-4 pt-6 pb-8">
 
+          {/* Interrupted exam banner */}
+          {interruptedExam && (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/8 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-0.5">
+                  <p className="text-sm font-bold text-red-400">Interrupted Exam Detected</p>
+                  <p className="text-xs text-white/60 leading-relaxed">
+                    Your timed exam for <strong>{interruptedExam.paper.label}</strong> was interrupted. View your results now.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDismissInterrupted}
+                  className="flex-1 text-xs font-semibold text-white/40 border border-white/10 py-2 rounded-xl hover:brightness-110 transition-all"
+                >
+                  Dismiss
+                </button>
+                <button
+                  onClick={handleViewInterruptedResults}
+                  className="flex-1 text-xs font-bold text-red-400 bg-red-500/15 border border-red-500/30 py-2 rounded-xl hover:brightness-110 transition-all"
+                >
+                  View Results →
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Today's Focus */}
           <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5 flex items-center gap-4 opacity-60 cursor-not-allowed select-none">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center shrink-0">
@@ -271,11 +342,14 @@ export default function Dashboard() {
           </div>
 
           {/* Past Papers */}
-          <SectionDivider label="Past Papers" sublabel="Timed paper practice" />
+          <SectionDivider label="Past Papers" sublabel="Choose Practice or Timed Exam mode" />
           <div className="space-y-2">
             {P1_PAPERS.map(paper => (
-              <button key={paper.id} onClick={() => navigate("/physics/p1", { state: { paperId: paper.id } })}
-                className="w-full text-left rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 p-4 transition-all active:scale-[0.99]">
+              <button
+                key={paper.id}
+                onClick={() => setSelectedPaper(paper)}
+                className="w-full text-left rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 p-4 transition-all active:scale-[0.99]"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
@@ -283,10 +357,13 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-white">{paper.label}</p>
-                      <p className="text-[11px] text-white/40 mt-0.5">Paper 1 Multiple Choice · 40 questions</p>
+                      <p className="text-[11px] text-white/40 mt-0.5">Paper 1 Multiple Choice · {paper.questions.length} questions</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-emerald-400/50 shrink-0" />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] text-amber-400/70 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-semibold">⏱ Exam</span>
+                    <ChevronRight className="w-4 h-4 text-emerald-400/50" />
+                  </div>
                 </div>
               </button>
             ))}
@@ -432,6 +509,15 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* P1 Mode Modal */}
+      {selectedPaper && (
+        <P1ModeModal
+          paper={selectedPaper}
+          onClose={() => setSelectedPaper(null)}
+          onSelectMode={handleModeSelect}
+        />
+      )}
     </div>
   );
 }

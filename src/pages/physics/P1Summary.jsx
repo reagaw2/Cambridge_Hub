@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { CheckCircle2, XCircle, ArrowLeft, RotateCcw, Home } from "lucide-react";
+import { CheckCircle2, XCircle, Home, RotateCcw, Timer } from "lucide-react";
+import P1TopicBars from "@/components/P1TopicBars";
 
 function TopicRow({ topic, correct, total }) {
   const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -19,11 +20,11 @@ function TopicRow({ topic, correct, total }) {
 
 export default function P1Summary() {
   const navigate = useNavigate();
-  const { state } = useLocation();
-  const { answers = {}, questions = [], paperId } = state ?? {};
+  const location = useLocation();
+  const { answers = {}, questions = [], paperId, examMode } = location.state ?? {};
 
   const totalAnswered = Object.keys(answers).length;
-  const totalCorrect = Object.values(answers).filter(a => a.correct).length;
+  const totalCorrect = Object.values(answers).filter(a => a.correct && !a.flagged_as_guess).length;
   const pct = questions.length > 0 ? Math.round((totalCorrect / questions.length) * 100) : 0;
 
   // Build per-topic stats
@@ -31,7 +32,7 @@ export default function P1Summary() {
   questions.forEach(q => {
     if (!topicMap[q.topic]) topicMap[q.topic] = { correct: 0, total: 0 };
     topicMap[q.topic].total++;
-    if (answers[q.id]?.correct) topicMap[q.topic].correct++;
+    if (answers[q.id]?.correct && !answers[q.id]?.flagged_as_guess) topicMap[q.topic].correct++;
   });
   const topicsSorted = Object.entries(topicMap).sort((a, b) => {
     const pA = a[1].total > 0 ? a[1].correct / a[1].total : 0;
@@ -46,18 +47,23 @@ export default function P1Summary() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[480px] flex flex-col min-h-screen">
 
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <span className="text-base font-bold text-foreground">Paper Complete</span>
-          <div className="w-8" />
+        {/* Top bar */}
+        <div className="flex items-center justify-center gap-3 px-4 py-3 border-b border-border/50">
+          <span className="text-base font-bold tracking-wide text-foreground">Paper Complete</span>
+          {examMode && (
+            <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full">
+              <Timer className="w-3 h-3" /> Timed Exam
+            </span>
+          )}
         </div>
 
         <div className="flex-1 flex flex-col gap-5 p-4 pt-5 pb-8">
 
           {/* Hero score */}
           <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-2">
+            {examMode && (
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1">Timed Exam Result</p>
+            )}
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{paperId}</p>
             <p className="text-5xl font-black tabular-nums text-foreground">
               {totalCorrect}<span className="text-2xl text-muted-foreground">/{questions.length}</span>
@@ -65,6 +71,13 @@ export default function P1Summary() {
             <p className="text-2xl font-bold text-primary">{pct}%</p>
             <p className={`text-sm font-semibold ${gradeColor}`}>{grade}</p>
             <p className="text-xs text-muted-foreground">{totalAnswered} of {questions.length} questions answered</p>
+            {examMode && (
+              <p className="text-[11px] text-amber-400/70 mt-1">
+                {questions.length - totalAnswered > 0
+                  ? `${questions.length - totalAnswered} question${questions.length - totalAnswered !== 1 ? "s" : ""} left blank`
+                  : "All questions answered ✓"}
+              </p>
+            )}
           </div>
 
           {/* Per-topic breakdown */}
@@ -81,7 +94,8 @@ export default function P1Summary() {
             <div className="flex flex-wrap gap-2">
               {questions.map((q, i) => {
                 const a = answers[q.id];
-                const isCorrect = a?.correct;
+                const isCorrect = a?.correct && !a?.flagged_as_guess;
+                const isGuessed = a?.flagged_as_guess;
                 const isAnswered = !!a;
                 return (
                   <div
@@ -90,9 +104,11 @@ export default function P1Summary() {
                     className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold border ${
                       !isAnswered
                         ? "bg-secondary border-border text-muted-foreground/40"
-                        : isCorrect
-                          ? "bg-green-500/20 border-green-500/40 text-green-400"
-                          : "bg-red-500/20 border-red-500/40 text-red-400"
+                        : isGuessed
+                          ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                          : isCorrect
+                            ? "bg-green-500/20 border-green-500/40 text-green-400"
+                            : "bg-red-500/20 border-red-500/40 text-red-400"
                     }`}
                   >
                     {q.number}
@@ -100,16 +116,32 @@ export default function P1Summary() {
                 );
               })}
             </div>
+            <div className="flex gap-4 text-[10px] text-muted-foreground mt-2 flex-wrap">
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-green-500/60 inline-block" />Correct</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-red-500/60 inline-block" />Incorrect</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-500/60 inline-block" />Guess</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-secondary border border-border inline-block" />Blank</span>
+            </div>
           </div>
 
           {/* Actions */}
           <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigate("/physics/p1")}
-              className="flex items-center justify-center gap-2 border border-border text-muted-foreground text-sm font-semibold py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
-            >
-              <RotateCcw className="w-4 h-4" /> Retry
-            </button>
+            {!examMode && (
+              <button
+                onClick={() => navigate("/physics/p1", { state: { paperId } })}
+                className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                <RotateCcw className="w-4 h-4" /> Retry
+              </button>
+            )}
+            {examMode && (
+              <button
+                onClick={() => navigate("/physics")}
+                className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                <RotateCcw className="w-4 h-4" /> Practice Mode
+              </button>
+            )}
             <button
               onClick={() => navigate("/physics")}
               className="flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-semibold py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all"

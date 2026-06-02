@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download, Pencil, NotebookPen, MessageCircleQuestion, PenLine, Trash2, Check } from "lucide-react";
+import { ArrowLeft, BookOpen, X, ChevronLeft, ChevronRight, CheckCircle2, Calculator, Grid3X3, ChevronDown, Zap, Microscope, Loader2, Star, Download, Pencil, NotebookPen, MessageCircleQuestion, PenLine, Trash2, Check, Timer } from "lucide-react";
 import { getP1Paper } from "@/lib/physicsP1Bank";
 import { base44 } from "@/api/base44Client";
 import ScientificCalculator from "@/components/ScientificCalculator";
@@ -21,6 +21,17 @@ import { useAuth } from "@/lib/AuthContext";
 import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
+const EXAM_DURATION_SECS = 70 * 60; // 1 hour 10 minutes
+
+function formatExamTime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
 
 function CorrectBanner() {
   return (
@@ -142,14 +153,36 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
     setTeacherInputs(p => ({ ...p, [questionId]: currentValue ?? "" }));
     setEditingIds(prev => new Set([...prev, questionId]));
   }
-
   function cancelEditing(questionId) {
     setEditingIds(prev => { const n = new Set(prev); n.delete(questionId); return n; });
   }
-
   function handleUnstar(questionId) {
     const updated = unstarQuestion(paperId, questionId);
     setStarredQuestions({ ...updated });
+  }
+  function handleSaveTeacherResponse(questionId, response) {
+    const updated = { ...starredQuestions };
+    if (updated[questionId]) {
+      updated[questionId] = { ...updated[questionId], teacherResponse: response };
+      const localKey = `p1_stars_${(paperId ?? "default").replace(/\//g, "_")}`;
+      try { localStorage.setItem(localKey, JSON.stringify(updated)); } catch {}
+      setStarredQuestions(updated);
+    }
+  }
+  async function handleDownloadStarred() {
+    setDownloading(true);
+    await generateStarredPdf({ paperId, paperLabel, starredQuestions, userEmail });
+    setDownloading(false);
+  }
+  async function handleDownloadNotes() {
+    setDownloadingNotes(true);
+    await generateNotesPdf({ paperId, paperLabel, session: paper.session, variant: paper.id?.split("/")?.[1] ?? "", notes, questions, userEmail });
+    setDownloadingNotes(false);
+  }
+  async function handleDownloadWorkings() {
+    setDownloadingWorkings(true);
+    await generateWorkingsPdf({ paperId, paperLabel, workings, questions, userEmail });
+    setDownloadingWorkings(false);
   }
 
   const starred = Object.entries(starredQuestions).sort((a, b) => a[1].questionNumber - b[1].questionNumber);
@@ -162,36 +195,7 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
   });
   const workingsCount = workingEntries.length;
   const allNotes = Object.entries(notes).sort(([, a], [, b]) => new Date(a.savedAt ?? 0) - new Date(b.savedAt ?? 0));
-
   function getQuestion(questionId) { return questions.find(q => q.id === questionId); }
-
-  function handleSaveTeacherResponse(questionId, response) {
-    const updated = { ...starredQuestions };
-    if (updated[questionId]) {
-      updated[questionId] = { ...updated[questionId], teacherResponse: response };
-      const localKey = `p1_stars_${(paperId ?? "default").replace(/\//g, "_")}`;
-      try { localStorage.setItem(localKey, JSON.stringify(updated)); } catch {}
-      setStarredQuestions(updated);
-    }
-  }
-
-  async function handleDownloadStarred() {
-    setDownloading(true);
-    await generateStarredPdf({ paperId, paperLabel, starredQuestions, userEmail });
-    setDownloading(false);
-  }
-
-  async function handleDownloadNotes() {
-    setDownloadingNotes(true);
-    await generateNotesPdf({ paperId, paperLabel, session: paper.session, variant: paper.id?.split("/")?.[1] ?? "", notes, questions, userEmail });
-    setDownloadingNotes(false);
-  }
-
-  async function handleDownloadWorkings() {
-    setDownloadingWorkings(true);
-    await generateWorkingsPdf({ paperId, paperLabel, workings, questions, userEmail });
-    setDownloadingWorkings(false);
-  }
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex flex-col justify-end items-center">
@@ -200,7 +204,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
           <p className="font-bold text-foreground">Notes, Workings & Starred</p>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
-
         <div className="flex shrink-0 border-b border-border/50">
           <button onClick={() => setActiveTab("notes")} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2 ${activeTab === "notes" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             <Pencil className="w-3 h-3" /> Notes {noteCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "notes" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>{noteCount}</span>}
@@ -212,7 +215,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
             <Star className={`w-3 h-3 ${activeTab === "teacher" ? "fill-amber-400" : ""}`} /> Teacher {starredCount > 0 && <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === "teacher" ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"}`}>{starredCount}</span>}
           </button>
         </div>
-
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
           {activeTab === "notes" && (
             <>
@@ -233,7 +235,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
               })}
             </>
           )}
-
           {activeTab === "workings" && (
             <>
               {workingEntries.length === 0 && <div className="flex flex-col items-center justify-center py-12 gap-3 text-center"><PenLine className="w-8 h-8 text-muted-foreground/30" /><p className="text-sm text-muted-foreground">No workings saved yet.</p></div>}
@@ -264,7 +265,6 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
               })}
             </>
           )}
-
           {activeTab === "teacher" && (
             <>
               {starred.length === 0 && <div className="flex flex-col items-center justify-center py-12 gap-3 text-center"><Star className="w-8 h-8 text-muted-foreground/30" /><p className="text-sm text-muted-foreground">No starred questions yet.</p></div>}
@@ -277,39 +277,33 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button onClick={() => { const idx = questions.findIndex(q => q.id === questionId); if (idx >= 0) { onJump(idx); onClose(); } }} className="text-[11px] font-semibold text-primary px-2 py-1 rounded-lg bg-primary/10 hover:brightness-110 transition-all">Go to →</button>
-                      <button onClick={() => handleUnstar(questionId)} title="Remove from starred" className="p-1.5 rounded-lg text-muted-foreground/30 hover:text-red-400 hover:bg-red-500/10 transition-all"><X className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleUnstar(questionId)} className="p-1.5 rounded-lg text-muted-foreground/30 hover:text-red-400 hover:bg-red-500/10 transition-all"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                   {entry.feedback?.pulse_layer_1 && <div className="mx-4 mb-3 bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2"><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/60 mb-0.5">Exam Takeaway</p><p className="text-[11px] text-foreground/70 leading-relaxed">{entry.feedback.pulse_layer_1}</p></div>}
                   <div className="px-4 pb-3 space-y-1.5 border-b border-amber-500/10">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5"><MessageCircleQuestion className="w-3 h-3" /> Your question for teacher</p>
                     {entry.teacherQuestion && !editingIds.has(questionId) ? (
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-[11px] text-foreground/80 leading-relaxed italic flex-1">"{entry.teacherQuestion}"</p>
-                        <button onClick={() => startEditing(questionId, entry.teacherQuestion)} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-amber-500/10">Edit</button>
-                      </div>
+                      <div className="flex items-start justify-between gap-2"><p className="text-[11px] text-foreground/80 leading-relaxed italic flex-1">"{entry.teacherQuestion}"</p><button onClick={() => startEditing(questionId, entry.teacherQuestion)} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-amber-500/10">Edit</button></div>
                     ) : (
                       <div className="space-y-1.5">
                         <textarea value={teacherInputs[questionId] ?? ""} onChange={e => setTeacherInputs(p => ({ ...p, [questionId]: e.target.value }))} placeholder="What would you like to ask your teacher?" rows={2} className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
                         <div className="flex items-center justify-between">
                           {entry.teacherQuestion && <button onClick={() => cancelEditing(questionId)} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>}
-                          <button onClick={() => { onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? ""); cancelEditing(questionId); }} disabled={!teacherInputs[questionId]?.trim()} className="ml-auto text-xs font-bold text-amber-400 hover:brightness-110 transition-all bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40">Save question →</button>
+                          <button onClick={() => { onTeacherQuestionSave(questionId, teacherInputs[questionId] ?? ""); cancelEditing(questionId); }} disabled={!teacherInputs[questionId]?.trim()} className="ml-auto text-xs font-bold text-amber-400 hover:brightness-110 transition-all bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40">Save →</button>
                         </div>
                       </div>
                     )}
                   </div>
                   <div className="px-4 py-3 space-y-2">
                     <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" /><p className="text-[10px] font-black uppercase tracking-widest text-amber-400">What the teacher said</p></div>
-                    <p className="text-[10px] text-muted-foreground/50 leading-snug">Fill in after your teacher reviews — or leave blank to write by hand when printed.</p>
                     <textarea value={entry.teacherResponse ?? ""} onChange={e => handleSaveTeacherResponse(questionId, e.target.value)} placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…" rows={3} className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all leading-relaxed" />
-                    <p className="text-[10px] text-muted-foreground/40">{(entry.teacherResponse ?? "").trim() ? "Typed response will appear as text in the PDF" : "Blank = 5 ruled lines appear in the PDF for handwriting"}</p>
                   </div>
                 </div>
               ))}
             </>
           )}
         </div>
-
         <div className="shrink-0 px-4 py-4 border-t border-border/50 bg-card">
           {activeTab === "notes" && <button onClick={handleDownloadNotes} disabled={noteCount === 0 || downloadingNotes} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40">{downloadingNotes ? <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Generating…</> : <><NotebookPen className="w-4 h-4" />Download My Notes (PDF)</>}</button>}
           {activeTab === "workings" && <button onClick={handleDownloadWorkings} disabled={workingsCount === 0 || downloadingWorkings} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40">{downloadingWorkings ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating…</> : <><Download className="w-4 h-4" />Download My Workings (PDF)</>}</button>}
@@ -336,7 +330,7 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   );
 }
 
-// ── Memoized OptionRow — only re-renders when its own props change ─────────
+// ── Memoized OptionRow ────────────────────────────────────────────────────────
 const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOption, onSelect, onToggleCrossOut }) {
   const isCorrectOption = optKey === correctOption;
   const isWrongChosen = submitted && optKey === selected && !isCorrectOption;
@@ -376,7 +370,6 @@ const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, 
         <button
           type="button"
           onPointerDown={e => { e.stopPropagation(); onToggleCrossOut(optKey); }}
-          title={crossedOut ? "Restore option" : "Cross out — eliminate this option"}
           className={`shrink-0 flex items-center justify-center rounded-lg transition-colors active:scale-90 ${
             crossedOut
               ? "w-7 h-7 bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
@@ -399,15 +392,36 @@ const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, 
   );
 });
 
+// ── ExamSubmitConfirm ──────────────────────────────────────────────────────────
+function ExamSubmitConfirm({ onConfirm, onCancel, answeredCount, totalCount }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+      <div className="bg-card border border-amber-500/40 rounded-2xl p-6 space-y-4 w-full max-w-sm shadow-2xl">
+        <p className="font-bold text-foreground text-base">Submit your exam?</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          You have answered <span className="font-semibold text-foreground">{answeredCount}</span> of <span className="font-semibold text-foreground">{totalCount}</span> questions. This cannot be undone.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={onCancel} className="border border-border text-muted-foreground font-semibold py-3 rounded-xl hover:brightness-110 transition-all text-sm">Cancel</button>
+          <button onClick={onConfirm} className="bg-amber-500 text-black font-bold py-3 rounded-xl hover:brightness-110 transition-all text-sm">Submit Now</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
 
   const paperId = location.state?.paperId ?? "9702/12/F/M/25";
+  const examMode = location.state?.examMode ?? false;
   const paper = getP1Paper(paperId);
   const questions = paper.questions;
 
+  // Session state
   const [sessionLoading, setSessionLoading] = useState(true);
   const [answers, setAnswers] = useState({});
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -428,11 +442,62 @@ export default function P1Session() {
   const [notes, setNotes] = useState({});
   const [workings, setWorkings] = useState({});
 
-  const autoAdvanceTimer = useRef(null);
+  // Exam mode state
+  const [examTimeLeft, setExamTimeLeft] = useState(EXAM_DURATION_SECS);
+  const [showExamSubmitConfirm, setShowExamSubmitConfirm] = useState(false);
 
+  // Refs
+  const autoAdvanceTimer = useRef(null);
+  const examTimerRef = useRef(null);
+  const examStartTimeRef = useRef(null);
+  const examSubmittedRef = useRef(false);
+  const answersRef = useRef({});
+
+  // Keep answersRef in sync for use in event handlers
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+
+  // ── Exam submit function ──────────────────────────────────────────────────
+  const doExamSubmit = useCallback((finalAnswers) => {
+    if (examSubmittedRef.current) return;
+    examSubmittedRef.current = true;
+    clearInterval(examTimerRef.current);
+    localStorage.removeItem(`p1_exam_${paperId}`);
+    navigate("/physics/p1-summary", {
+      state: { answers: finalAnswers, questions, paperId: paper.id, examMode: true }
+    });
+  }, [paperId, questions, paper.id, navigate]);
+
+  // ── Session loading ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!paper) { navigate("/physics"); return; }
     setSessionLoading(true);
+
+    // Always check for interrupted exam session first
+    try {
+      const savedExam = JSON.parse(localStorage.getItem(`p1_exam_${paperId}`) ?? "null");
+      if (savedExam?.interrupted && savedExam?.paperId === paperId) {
+        localStorage.removeItem(`p1_exam_${paperId}`);
+        setSessionLoading(false);
+        navigate("/physics/p1-summary", {
+          state: { answers: savedExam.answers ?? {}, questions, paperId: paper.id, examMode: true },
+          replace: true
+        });
+        return;
+      }
+    } catch {}
+
+    if (examMode) {
+      // Fresh exam — don't load previous practice session
+      setAnswers({});
+      setCurrentIdx(0);
+      setNotes({});
+      setStarredQuestions({});
+      setWorkings({});
+      setSessionLoading(false);
+      return;
+    }
+
+    // Practice mode — load session
     Promise.all([
       loadP1Session(paperId),
       loadNotes(paperId),
@@ -450,18 +515,87 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
+  // ── Exam timer ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!examMode || sessionLoading) return;
+
+    const startTime = Date.now();
+    examStartTimeRef.current = startTime;
+
+    // Persist start so we can recover time on reload (if not interrupted)
+    localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify({
+      paperId,
+      startTime,
+      answers: {},
+      interrupted: false,
+    }));
+
+    examTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(0, EXAM_DURATION_SECS - elapsed);
+      setExamTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(examTimerRef.current);
+        doExamSubmit(answersRef.current);
+      }
+    }, 1000);
+
+    return () => clearInterval(examTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examMode, sessionLoading]);
+
+  // Update persisted exam answers whenever answers change in exam mode
+  useEffect(() => {
+    if (!examMode || sessionLoading || examSubmittedRef.current) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(`p1_exam_${paperId}`) ?? "{}");
+      if (!saved.interrupted) {
+        saved.answers = answers;
+        localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify(saved));
+      }
+    } catch {}
+  }, [answers, examMode, sessionLoading, paperId]);
+
+  // ── BeforeUnload handler (exam mode) ─────────────────────────────────────
+  useEffect(() => {
+    if (!examMode) return;
+
+    function handleBeforeUnload() {
+      if (examSubmittedRef.current) return;
+      try {
+        const examData = JSON.parse(localStorage.getItem(`p1_exam_${paperId}`) ?? "{}");
+        examData.answers = answersRef.current;
+        examData.interrupted = true;
+        examData.interruptedAt = Date.now();
+        localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify(examData));
+      } catch {}
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [examMode, paperId]);
+
+  // ── Practice session save (not in exam mode) ──────────────────────────────
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
-
   const firstRender = useRef(true);
+
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return; }
     if (sessionLoading) return;
+    if (examMode) return; // Don't save practice session in exam mode
     saveP1Session(paperId, answers, currentIdx);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, currentIdx, sessionLoading]);
 
-  useEffect(() => { return () => { if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current); }; }, []);
+  // ── Cleanup ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      clearInterval(examTimerRef.current);
+      if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -485,7 +619,6 @@ export default function P1Session() {
   const isCurrentStarred = question ? starredIds.has(question.id) : false;
   const totalPanelItems = starredIds.size + notedIds.size + Object.keys(workings).length;
 
-  // ── useCallback handlers so OptionRow doesn't re-render siblings ──
   const handleSelect = useCallback((key) => {
     if (submitted) return;
     setCurrentAnswer(key);
@@ -507,11 +640,6 @@ export default function P1Session() {
     else { const merged = { ...(layer1 ?? {}), ...(layer2 ?? {}) }; const updated = starQuestion(paperId, question, merged); setStarredQuestions({ ...updated }); }
   }
 
-  function handleTeacherQuestionSave(questionId, value) {
-    const updated = saveTeacherQuestion(paperId, questionId, value);
-    setStarredQuestions({ ...updated });
-  }
-
   function handleSaveWorking(side, imageData) {
     if (!question) return;
     const updated = saveWorking(paperId, question.id, side, imageData, { questionNumber: question.number, topic: question.topic, questionText: question.text });
@@ -531,7 +659,13 @@ export default function P1Session() {
 
   function advanceQuestion() {
     if (currentIdx < questions.length - 1) { setCurrentIdx(i => i + 1); }
-    else { navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } }); }
+    else {
+      if (examMode) {
+        doExamSubmit(answersRef.current);
+      } else {
+        navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } });
+      }
+    }
   }
 
   async function handleSubmit() {
@@ -604,28 +738,86 @@ export default function P1Session() {
   const showFeedbackPanel = submitted && layer1 !== null;
   const crossedCount = crossedOut.size;
 
+  // Exam timer color
+  const timerRed = examMode && examTimeLeft < 600;
+  const timerPulse = examMode && examTimeLeft < 300;
+
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
+
+        {/* ── Sticky top bar ── */}
         <div className="sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border/50">
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
-            <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors"><ArrowLeft className="w-4 h-4 text-foreground" /></button>
-            <div className="flex flex-col items-center"><p className="text-xs font-bold text-foreground">{paper.label}</p><p className="text-[10px] text-muted-foreground">Q{currentIdx + 1} / {questions.length}</p></div>
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => setShowCalc(c => !c)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${showCalc ? "bg-primary/20 border-primary/50 text-primary" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><Calculator className="w-3.5 h-3.5" /></button>
-              <button onClick={() => setShowFormulas(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-colors"><BookOpen className="w-3.5 h-3.5" /></button>
-              <button onClick={() => setShowStarred(true)} className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${totalPanelItems > 0 ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><NotebookPen className={`w-3.5 h-3.5 ${totalPanelItems > 0 ? "text-amber-400" : ""}`} />{totalPanelItems > 0 && <span className="font-mono text-[10px]">{totalPanelItems}</span>}</button>
-              <button onClick={() => setShowOverview(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-colors"><Grid3X3 className="w-3.5 h-3.5" /><span className="font-mono text-[10px]">{answeredCount}/{questions.length}</span></button>
+            {!examMode && (
+              <button onClick={() => navigate("/physics")} className="p-1.5 -ml-1.5 rounded-lg hover:bg-secondary transition-colors">
+                <ArrowLeft className="w-4 h-4 text-foreground" />
+              </button>
+            )}
+            {examMode && (
+              <div className="flex items-center gap-2 shrink-0">
+                <Timer className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">EXAM</span>
+              </div>
+            )}
+
+            <div className="flex flex-col items-center flex-1">
+              <p className="text-xs font-bold text-foreground">{paper.label}</p>
+              <p className="text-[10px] text-muted-foreground">Q{currentIdx + 1} / {questions.length}</p>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Exam timer */}
+              {examMode && (
+                <div className={`font-mono text-sm font-black tabular-nums px-2.5 py-1 rounded-lg transition-all ${
+                  timerPulse ? "bg-red-500/20 text-red-400 animate-pulse" : timerRed ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"
+                }`}>
+                  {formatExamTime(examTimeLeft)}
+                </div>
+              )}
+
+              {!examMode && (
+                <>
+                  <button onClick={() => setShowCalc(c => !c)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${showCalc ? "bg-primary/20 border-primary/50 text-primary" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><Calculator className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setShowFormulas(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-colors"><BookOpen className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setShowStarred(true)} className={`relative flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${totalPanelItems > 0 ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><NotebookPen className={`w-3.5 h-3.5 ${totalPanelItems > 0 ? "text-amber-400" : ""}`} />{totalPanelItems > 0 && <span className="font-mono text-[10px]">{totalPanelItems}</span>}</button>
+                  <button onClick={() => setShowOverview(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-colors"><Grid3X3 className="w-3.5 h-3.5" /><span className="font-mono text-[10px]">{answeredCount}/{questions.length}</span></button>
+                </>
+              )}
+
+              {examMode && (
+                <button
+                  onClick={() => setShowExamSubmitConfirm(true)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-xs font-bold hover:brightness-110 active:scale-[0.98] transition-all"
+                >
+                  Finish
+                </button>
+              )}
             </div>
           </div>
           <div className="w-full h-0.5 bg-secondary"><div className="h-0.5 bg-primary transition-all duration-500" style={{ width: `${progress * 100}%` }} /></div>
         </div>
 
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
-          <PaperPdfButton label="Open Question Paper" paperId={paperId} />
-          <p className="text-[11px] text-muted-foreground/60 leading-snug">Open the PDF to see diagrams</p>
-        </div>
+        {/* Paper PDF link (not in exam mode — they should have their own paper) */}
+        {!examMode && (
+          <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
+            <PaperPdfButton label="Open Question Paper" paperId={paperId} />
+            <p className="text-[11px] text-muted-foreground/60 leading-snug">Open the PDF to see diagrams</p>
+          </div>
+        )}
 
+        {/* Exam mode: reminder about having the paper */}
+        {examMode && (
+          <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-amber-500/20 bg-amber-500/5">
+            <Timer className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <p className="text-[11px] text-amber-400/80 leading-snug flex-1">
+              <strong>Timed Exam Mode</strong> · {formatExamTime(examTimeLeft)} remaining · Questions with diagrams require the question paper PDF
+            </p>
+            <PaperPdfButton label="PDF" paperId={paperId} />
+          </div>
+        )}
+
+        {/* Question dots */}
         <div className="flex gap-1 px-4 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-card/40">
           {questions.map((q, i) => {
             const a = answers[q.id];
@@ -636,15 +828,16 @@ export default function P1Session() {
           })}
         </div>
 
+        {/* Content */}
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
-          {showCalc && <ScientificCalculator onClose={() => setShowCalc(false)} />}
+          {showCalc && !examMode && <ScientificCalculator onClose={() => setShowCalc(false)} />}
 
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">Question {question.number}</span>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">{question.topic}</span>
-                {submitted && (
+                {submitted && !examMode && (
                   <button onClick={handleToggleStar} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${isCurrentStarred ? "bg-amber-500/20 border-amber-500/50 text-amber-400" : "bg-secondary border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400"}`}>
                     <Star className={`w-3.5 h-3.5 ${isCurrentStarred ? "fill-amber-400" : ""}`} /><span>{isCurrentStarred ? "Starred" : "Star"}</span>
                   </button>
@@ -654,10 +847,14 @@ export default function P1Session() {
             {question.image_required && (
               <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 flex items-center gap-2.5">
                 <span className="text-base shrink-0">📊</span>
-                <p className="text-[11px] text-primary/80 leading-snug">This question has a diagram — see <strong>Q{question.number}</strong> in the question paper PDF above</p>
+                <p className="text-[11px] text-primary/80 leading-snug">This question has a diagram — see <strong>Q{question.number}</strong> in the question paper PDF</p>
               </div>
             )}
-            <QuestionAnnotator text={question.text} questionId={question.id} />
+            {examMode ? (
+              <p className="text-[15px] leading-relaxed text-foreground/90">{question.text}</p>
+            ) : (
+              <QuestionAnnotator text={question.text} questionId={question.id} />
+            )}
           </div>
 
           {!submitted && crossedCount > 0 && (
@@ -706,14 +903,14 @@ export default function P1Session() {
 
           {showCorrectBanner && <CorrectBanner />}
           {showFeedbackPanel && <Layer1Feedback feedback={layer1} isCorrect={existingAnswer?.correct ?? false} isGuess={existingAnswer?.flagged_as_guess ?? false} />}
-          {submitted && !showCorrectBanner && <MiniNoteWidget questionId={question.id} paperId={paperId} notes={notes} onNoteSaved={updated => setNotes({ ...updated })} />}
-          {showFeedbackPanel && !isCurrentStarred && (
+          {submitted && !showCorrectBanner && !examMode && <MiniNoteWidget questionId={question.id} paperId={paperId} notes={notes} onNoteSaved={updated => setNotes({ ...updated })} />}
+          {showFeedbackPanel && !isCurrentStarred && !examMode && (
             <button onClick={handleToggleStar} className="w-full flex items-center justify-center gap-2 border border-amber-500/25 bg-amber-500/5 text-amber-400/80 text-sm font-semibold py-2.5 rounded-xl hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/50 active:scale-[0.98] transition-colors">
               <Star className="w-4 h-4" /> Star for teacher review
             </button>
           )}
 
-          {showFeedbackPanel && !layer2 && !showCorrectBanner && (
+          {showFeedbackPanel && !layer2 && !showCorrectBanner && !examMode && (
             <button
               onClick={handleRequestLayer2}
               disabled={loadingLayer2}
@@ -727,21 +924,48 @@ export default function P1Session() {
             </button>
           )}
 
-          {layer2 && <Layer2Feedback feedback={layer2} />}
+          {layer2 && !examMode && <Layer2Feedback feedback={layer2} />}
 
           {!showCorrectBanner && (
             <div className="grid grid-cols-2 gap-3 pb-4">
               <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0} className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors disabled:opacity-30"><ChevronLeft className="w-4 h-4" /> Previous</button>
-              <button onClick={() => currentIdx < questions.length - 1 ? setCurrentIdx(i => i + 1) : navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id } })} className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors">{isLast ? "Finish" : "Next"} <ChevronRight className="w-4 h-4" /></button>
+              <button
+                onClick={() => {
+                  if (currentIdx < questions.length - 1) {
+                    setCurrentIdx(i => i + 1);
+                  } else {
+                    if (examMode) {
+                      setShowExamSubmitConfirm(true);
+                    } else {
+                      navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } });
+                    }
+                  }
+                }}
+                className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors"
+              >
+                {isLast ? (examMode ? "Finish Exam" : "Finish") : "Next"} <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      <ScratchpadPanel questionId={question?.id} paperId={paperId} workings={workings} onSaveWorking={handleSaveWorking} />
-      {showFormulas && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
-      {showOverview && <P1OverviewPanel questions={questions} answers={answers} currentIdx={currentIdx} onJump={setCurrentIdx} onClose={() => setShowOverview(false)} onClear={handleClear} starredIds={starredIds} notedIds={notedIds} />}
-      {showStarred && <StarredPanel paperId={paperId} paperLabel={paper.label} paper={paper} starredQuestions={starredQuestions} setStarredQuestions={setStarredQuestions} notes={notes} workings={workings} onClose={() => setShowStarred(false)} onJump={setCurrentIdx} questions={questions} userEmail={user?.email} onTeacherQuestionSave={handleTeacherQuestionSave} onDeleteWorking={handleDeleteWorking} />}
+      {/* Panels / Modals */}
+      {!examMode && (
+        <ScratchpadPanel questionId={question?.id} paperId={paperId} workings={workings} onSaveWorking={handleSaveWorking} />
+      )}
+      {showFormulas && !examMode && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
+      {showOverview && !examMode && <P1OverviewPanel questions={questions} answers={answers} currentIdx={currentIdx} onJump={setCurrentIdx} onClose={() => setShowOverview(false)} onClear={handleClear} starredIds={starredIds} notedIds={notedIds} />}
+      {showStarred && !examMode && <StarredPanel paperId={paperId} paperLabel={paper.label} paper={paper} starredQuestions={starredQuestions} setStarredQuestions={setStarredQuestions} notes={notes} workings={workings} onClose={() => setShowStarred(false)} onJump={setCurrentIdx} questions={questions} userEmail={user?.email} onTeacherQuestionSave={(qId, val) => { const u = saveTeacherQuestion(paperId, qId, val); setStarredQuestions({ ...u }); }} onDeleteWorking={handleDeleteWorking} />}
+
+      {showExamSubmitConfirm && (
+        <ExamSubmitConfirm
+          answeredCount={answeredCount}
+          totalCount={questions.length}
+          onConfirm={() => { setShowExamSubmitConfirm(false); doExamSubmit(answersRef.current); }}
+          onCancel={() => setShowExamSubmitConfirm(false)}
+        />
+      )}
     </div>
   );
 }

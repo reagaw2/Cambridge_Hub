@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { X, Clock, BookOpen, AlertTriangle } from "lucide-react";
+import { X, Clock, BookOpen, AlertTriangle, Lock } from "lucide-react";
+import { isPaperFresh } from "@/lib/p1PaperMode";
 
 export default function P1ModeModal({ paper, onClose, onSelectMode }) {
   const [step, setStep] = useState("select"); // "select" | "warning"
+  const fresh = isPaperFresh(paper.id);
 
   if (step === "warning") {
     return (
@@ -22,7 +24,7 @@ export default function P1ModeModal({ paper, onClose, onSelectMode }) {
             <ul className="space-y-2.5">
               <li className="flex items-start gap-2.5">
                 <span className="text-amber-400 shrink-0 mt-0.5">•</span>
-                <span>Make sure you have a free, uninterrupted block of at least <strong>1 hour 30 minutes</strong>.</span>
+                <span>Make sure you have a free, uninterrupted block of at least <strong>2 hours</strong>.</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="text-amber-400 shrink-0 mt-0.5">•</span>
@@ -34,7 +36,11 @@ export default function P1ModeModal({ paper, onClose, onSelectMode }) {
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="text-amber-400 shrink-0 mt-0.5">•</span>
-                <span>The timer runs for <strong>1 hour 10 minutes</strong>. When it reaches zero, your answers are submitted automatically.</span>
+                <span>The timer runs for <strong>1 hour 30 minutes</strong>. When it reaches zero, your answers are submitted automatically.</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="text-red-400 shrink-0 mt-0.5">•</span>
+                <span>Once you start in Exam Mode, <strong>this paper will only be available in Practice Mode</strong> in the future.</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="text-amber-400 shrink-0 mt-0.5">•</span>
@@ -76,7 +82,7 @@ export default function P1ModeModal({ paper, onClose, onSelectMode }) {
         </div>
 
         <div className="space-y-3">
-          {/* Practice Mode */}
+          {/* Practice Mode — always available */}
           <button
             onClick={() => onSelectMode("practice")}
             className="w-full text-left bg-primary/8 border border-primary/25 rounded-xl p-4 hover:bg-primary/12 active:scale-[0.99] transition-all space-y-2"
@@ -84,6 +90,9 @@ export default function P1ModeModal({ paper, onClose, onSelectMode }) {
             <div className="flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-primary shrink-0" />
               <p className="font-bold text-foreground text-sm">Practice Mode</p>
+              {!fresh && (
+                <span className="ml-auto text-[10px] font-bold text-primary bg-primary/15 px-2 py-0.5 rounded-full">Previously started</span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               No time limit. Pause and resume anytime. Get instant AI feedback on each question at your own pace.
@@ -95,25 +104,49 @@ export default function P1ModeModal({ paper, onClose, onSelectMode }) {
             </div>
           </button>
 
-          {/* Timed Exam Mode */}
-          <button
-            onClick={() => setStep("warning")}
-            className="w-full text-left bg-amber-500/8 border border-amber-500/25 rounded-xl p-4 hover:bg-amber-500/12 active:scale-[0.99] transition-all space-y-2"
-          >
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-              <p className="font-bold text-foreground text-sm">Timed Exam Mode</p>
+          {/* Timed Exam Mode — only for fresh papers */}
+          {fresh ? (
+            <button
+              onClick={() => setStep("warning")}
+              className="w-full text-left bg-amber-500/8 border border-amber-500/25 rounded-xl p-4 hover:bg-amber-500/12 active:scale-[0.99] transition-all space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                <p className="font-bold text-foreground text-sm">Timed Exam Mode</p>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Simulates real Cambridge conditions. 1 hour 30 minute countdown. Auto-submits when time runs out or if you exit.
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">⏱ 1hr 30min</span>
+                <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">✗ No pausing</span>
+                <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">✗ Exit = submit</span>
+              </div>
+            </button>
+          ) : (
+            /* Locked state — paper already attempted */
+            <div className="w-full text-left bg-secondary/40 border border-border/40 rounded-xl p-4 opacity-50 cursor-not-allowed space-y-2">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                <p className="font-bold text-muted-foreground text-sm">Timed Exam Mode</p>
+                <span className="ml-auto text-[10px] font-bold text-muted-foreground/60 bg-secondary border border-border/60 px-2 py-0.5 rounded-full">Locked</span>
+              </div>
+              <p className="text-xs text-muted-foreground/70 leading-relaxed">
+                This paper has already been attempted in Practice Mode. Exam Mode is only available for papers that have never been started before.
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                <span className="text-[10px] font-semibold text-muted-foreground/50 bg-secondary px-2 py-0.5 rounded-full">⏱ 1hr 30min</span>
+                <span className="text-[10px] font-semibold text-muted-foreground/50 bg-secondary px-2 py-0.5 rounded-full">Not available</span>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Simulates real Cambridge conditions. 1 hour 10 minute countdown. Auto-submits when time runs out or if you exit.
-            </p>
-            <div className="flex flex-wrap gap-1.5 pt-0.5">
-              <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">⏱ 1hr 10min</span>
-              <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">✗ No pausing</span>
-              <span className="text-[10px] font-semibold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">✗ Exit = submit</span>
-            </div>
-          </button>
+          )}
         </div>
+
+        {!fresh && (
+          <p className="text-[11px] text-muted-foreground/50 text-center leading-relaxed">
+            💡 Exam Mode is permanently locked once a paper has been started. Use a different paper for exam simulation.
+          </p>
+        )}
       </div>
     </div>
   );

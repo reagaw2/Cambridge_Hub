@@ -19,9 +19,10 @@ import ScratchpadPanel from "@/components/ScratchpadPanel";
 import P1OverviewPanel from "@/pages/physics/P1OverviewPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { FORMULA_SHEET_URL } from "@/lib/physicsP1Bank";
+import { setPaperMode } from "@/lib/p1PaperMode";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
-const EXAM_DURATION_SECS = 70 * 60; // 1 hour 10 minutes
+const EXAM_DURATION_SECS = 90 * 60; // 1 hour 30 minutes
 
 function formatExamTime(secs) {
   const h = Math.floor(secs / 3600);
@@ -330,7 +331,6 @@ function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   );
 }
 
-// ── Memoized OptionRow ────────────────────────────────────────────────────────
 const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, submitted, correctOption, onSelect, onToggleCrossOut }) {
   const isCorrectOption = optKey === correctOption;
   const isWrongChosen = submitted && optKey === selected && !isCorrectOption;
@@ -392,7 +392,6 @@ const OptionRow = memo(function OptionRow({ optKey, text, selected, crossedOut, 
   );
 });
 
-// ── ExamSubmitConfirm ──────────────────────────────────────────────────────────
 function ExamSubmitConfirm({ onConfirm, onCancel, answeredCount, totalCount }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
@@ -410,7 +409,6 @@ function ExamSubmitConfirm({ onConfirm, onCancel, answeredCount, totalCount }) {
   );
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
 export default function P1Session() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -421,7 +419,6 @@ export default function P1Session() {
   const paper = getP1Paper(paperId);
   const questions = paper.questions;
 
-  // Session state
   const [sessionLoading, setSessionLoading] = useState(true);
   const [answers, setAnswers] = useState({});
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -442,41 +439,39 @@ export default function P1Session() {
   const [notes, setNotes] = useState({});
   const [workings, setWorkings] = useState({});
 
-  // Exam mode state
   const [examTimeLeft, setExamTimeLeft] = useState(EXAM_DURATION_SECS);
   const [showExamSubmitConfirm, setShowExamSubmitConfirm] = useState(false);
 
-  // Refs
   const autoAdvanceTimer = useRef(null);
   const examTimerRef = useRef(null);
   const examStartTimeRef = useRef(null);
   const examSubmittedRef = useRef(false);
   const answersRef = useRef({});
 
-  // Keep answersRef in sync for use in event handlers
   useEffect(() => { answersRef.current = answers; }, [answers]);
 
-  // ── Exam submit function ──────────────────────────────────────────────────
   const doExamSubmit = useCallback((finalAnswers) => {
     if (examSubmittedRef.current) return;
     examSubmittedRef.current = true;
     clearInterval(examTimerRef.current);
+    // Mark paper as attempted (locks it to practice mode from now on)
+    setPaperMode(paperId, "practice");
     localStorage.removeItem(`p1_exam_${paperId}`);
     navigate("/physics/p1-summary", {
       state: { answers: finalAnswers, questions, paperId: paper.id, examMode: true }
     });
   }, [paperId, questions, paper.id, navigate]);
 
-  // ── Session loading ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!paper) { navigate("/physics"); return; }
     setSessionLoading(true);
 
-    // Always check for interrupted exam session first
+    // Check for interrupted exam session
     try {
       const savedExam = JSON.parse(localStorage.getItem(`p1_exam_${paperId}`) ?? "null");
       if (savedExam?.interrupted && savedExam?.paperId === paperId) {
         localStorage.removeItem(`p1_exam_${paperId}`);
+        setPaperMode(paperId, "practice"); // lock to practice after interrupted exam
         setSessionLoading(false);
         navigate("/physics/p1-summary", {
           state: { answers: savedExam.answers ?? {}, questions, paperId: paper.id, examMode: true },
@@ -487,7 +482,7 @@ export default function P1Session() {
     } catch {}
 
     if (examMode) {
-      // Fresh exam — don't load previous practice session
+      // Starting fresh exam — do NOT set mode yet (set it on completion)
       setAnswers({});
       setCurrentIdx(0);
       setNotes({});
@@ -497,7 +492,9 @@ export default function P1Session() {
       return;
     }
 
-    // Practice mode — load session
+    // Practice mode — record it immediately so the paper is locked
+    setPaperMode(paperId, "practice");
+
     Promise.all([
       loadP1Session(paperId),
       loadNotes(paperId),
@@ -515,14 +512,13 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperId]);
 
-  // ── Exam timer ────────────────────────────────────────────────────────────
+  // Exam timer
   useEffect(() => {
     if (!examMode || sessionLoading) return;
 
     const startTime = Date.now();
     examStartTimeRef.current = startTime;
 
-    // Persist start so we can recover time on reload (if not interrupted)
     localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify({
       paperId,
       startTime,
@@ -534,7 +530,6 @@ export default function P1Session() {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const remaining = Math.max(0, EXAM_DURATION_SECS - elapsed);
       setExamTimeLeft(remaining);
-
       if (remaining <= 0) {
         clearInterval(examTimerRef.current);
         doExamSubmit(answersRef.current);
@@ -545,7 +540,7 @@ export default function P1Session() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examMode, sessionLoading]);
 
-  // Update persisted exam answers whenever answers change in exam mode
+  // Keep persisted exam answers up to date
   useEffect(() => {
     if (!examMode || sessionLoading || examSubmittedRef.current) return;
     try {
@@ -557,10 +552,9 @@ export default function P1Session() {
     } catch {}
   }, [answers, examMode, sessionLoading, paperId]);
 
-  // ── BeforeUnload handler (exam mode) ─────────────────────────────────────
+  // Beforeunload — mark interrupted
   useEffect(() => {
     if (!examMode) return;
-
     function handleBeforeUnload() {
       if (examSubmittedRef.current) return;
       try {
@@ -571,25 +565,21 @@ export default function P1Session() {
         localStorage.setItem(`p1_exam_${paperId}`, JSON.stringify(examData));
       } catch {}
     }
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [examMode, paperId]);
 
-  // ── Practice session save (not in exam mode) ──────────────────────────────
   const question = questions[currentIdx];
   const existingAnswer = answers[question?.id];
   const firstRender = useRef(true);
 
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return; }
-    if (sessionLoading) return;
-    if (examMode) return; // Don't save practice session in exam mode
+    if (sessionLoading || examMode) return;
     saveP1Session(paperId, answers, currentIdx);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, currentIdx, sessionLoading]);
 
-  // ── Cleanup ───────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       clearInterval(examTimerRef.current);
@@ -619,19 +609,10 @@ export default function P1Session() {
   const isCurrentStarred = question ? starredIds.has(question.id) : false;
   const totalPanelItems = starredIds.size + notedIds.size + Object.keys(workings).length;
 
-  const handleSelect = useCallback((key) => {
-    if (submitted) return;
-    setCurrentAnswer(key);
-  }, [submitted]);
-
+  const handleSelect = useCallback((key) => { if (submitted) return; setCurrentAnswer(key); }, [submitted]);
   const handleToggleCrossOut = useCallback((key) => {
     if (submitted) return;
-    setCrossedOut(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) { next.delete(key); }
-      else { next.add(key); if (currentAnswer === key) setCurrentAnswer(""); }
-      return next;
-    });
+    setCrossedOut(prev => { const next = new Set(prev); if (next.has(key)) { next.delete(key); } else { next.add(key); if (currentAnswer === key) setCurrentAnswer(""); } return next; });
   }, [submitted, currentAnswer]);
 
   function handleToggleStar() {
@@ -660,11 +641,8 @@ export default function P1Session() {
   function advanceQuestion() {
     if (currentIdx < questions.length - 1) { setCurrentIdx(i => i + 1); }
     else {
-      if (examMode) {
-        doExamSubmit(answersRef.current);
-      } else {
-        navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } });
-      }
+      if (examMode) { doExamSubmit(answersRef.current); }
+      else { navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } }); }
     }
   }
 
@@ -673,18 +651,7 @@ export default function P1Session() {
     if (!sel || loading || submitted) return;
     setLoading(true);
     const isCorrect = sel === question.correct;
-
-    await saveMCQAttempt({
-      question_id: question.id,
-      topic: question.topic,
-      source: paper.id,
-      chosen_option: sel,
-      correct_option: question.correct,
-      correct: isCorrect,
-      flagged_as_guess: isGuess,
-      reasoning: null,
-    });
-
+    await saveMCQAttempt({ question_id: question.id, topic: question.topic, source: paper.id, chosen_option: sel, correct_option: question.correct, correct: isCorrect, flagged_as_guess: isGuess, reasoning: null });
     if (isCorrect && !isGuess) {
       const record = { chosen: sel, correct: true, flagged_as_guess: false, layer1: null, layer2: null };
       setAnswers(prev => ({ ...prev, [question.id]: record }));
@@ -692,18 +659,13 @@ export default function P1Session() {
       autoAdvanceTimer.current = setTimeout(() => advanceQuestion(), 1500);
       return;
     }
-
     const optionsList = OPTION_KEYS.map(k => `${k}: ${question.options[k]}`).join("\n");
-    const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${sel}${isGuess ? " — flagged as a GUESS" : " — WRONG"}\nRespond ONLY in JSON:\n{ "marks_earned": 0, "cambridge_insight": "One sentence: why ${question.correct} is the right answer.", "pulse_layer_1": "The reusable exam rule. Max 12 words." }`;
-
+    const l1prompt = `Cambridge A Level Physics MCQ. Q${question.number}: ${question.text}\nOptions: ${optionsList}\nCorrect: ${question.correct} (${question.options[question.correct]})\nStudent chose: ${sel}${isGuess ? " — GUESS" : " — WRONG"}\nRespond ONLY in JSON:\n{ "marks_earned": 0, "cambridge_insight": "One sentence: why ${question.correct} is the right answer.", "pulse_layer_1": "The reusable exam rule. Max 12 words." }`;
     let fb1 = null;
     try {
       const r = await base44.integrations.Core.InvokeLLM({ prompt: l1prompt, model: "claude_sonnet_4_6", response_json_schema: { type: "object", properties: { marks_earned: { type: "number" }, cambridge_insight: { type: "string" }, pulse_layer_1: { type: "string" } }, required: ["marks_earned", "cambridge_insight", "pulse_layer_1"] } });
       fb1 = r?.response ?? r;
-    } catch {
-      fb1 = { marks_earned: 0, cambridge_insight: question.explanation ?? "", pulse_layer_1: question.explanation ?? "" };
-    }
-
+    } catch { fb1 = { marks_earned: 0, cambridge_insight: question.explanation ?? "", pulse_layer_1: question.explanation ?? "" }; }
     const record = { chosen: sel, correct: isCorrect, flagged_as_guess: isGuess, layer1: fb1, layer2: null };
     setAnswers(prev => ({ ...prev, [question.id]: record }));
     setLayer1(fb1); setLayer2(null); setSubmitted(true); setLoading(false);
@@ -737,8 +699,6 @@ export default function P1Session() {
   const isLast = currentIdx === questions.length - 1;
   const showFeedbackPanel = submitted && layer1 !== null;
   const crossedCount = crossedOut.size;
-
-  // Exam timer color
   const timerRed = examMode && examTimeLeft < 600;
   const timerPulse = examMode && examTimeLeft < 300;
 
@@ -746,7 +706,6 @@ export default function P1Session() {
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[540px] flex flex-col min-h-screen">
 
-        {/* ── Sticky top bar ── */}
         <div className="sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border/50">
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
             {!examMode && (
@@ -760,14 +719,11 @@ export default function P1Session() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">EXAM</span>
               </div>
             )}
-
             <div className="flex flex-col items-center flex-1">
               <p className="text-xs font-bold text-foreground">{paper.label}</p>
               <p className="text-[10px] text-muted-foreground">Q{currentIdx + 1} / {questions.length}</p>
             </div>
-
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Exam timer */}
               {examMode && (
                 <div className={`font-mono text-sm font-black tabular-nums px-2.5 py-1 rounded-lg transition-all ${
                   timerPulse ? "bg-red-500/20 text-red-400 animate-pulse" : timerRed ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"
@@ -775,7 +731,6 @@ export default function P1Session() {
                   {formatExamTime(examTimeLeft)}
                 </div>
               )}
-
               {!examMode && (
                 <>
                   <button onClick={() => setShowCalc(c => !c)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${showCalc ? "bg-primary/20 border-primary/50 text-primary" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}><Calculator className="w-3.5 h-3.5" /></button>
@@ -784,12 +739,8 @@ export default function P1Session() {
                   <button onClick={() => setShowOverview(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:brightness-110 transition-colors"><Grid3X3 className="w-3.5 h-3.5" /><span className="font-mono text-[10px]">{answeredCount}/{questions.length}</span></button>
                 </>
               )}
-
               {examMode && (
-                <button
-                  onClick={() => setShowExamSubmitConfirm(true)}
-                  className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-xs font-bold hover:brightness-110 active:scale-[0.98] transition-all"
-                >
+                <button onClick={() => setShowExamSubmitConfirm(true)} className="px-3 py-1.5 rounded-xl bg-amber-500 text-black text-xs font-bold hover:brightness-110 active:scale-[0.98] transition-all">
                   Finish
                 </button>
               )}
@@ -798,7 +749,6 @@ export default function P1Session() {
           <div className="w-full h-0.5 bg-secondary"><div className="h-0.5 bg-primary transition-all duration-500" style={{ width: `${progress * 100}%` }} /></div>
         </div>
 
-        {/* Paper PDF link (not in exam mode — they should have their own paper) */}
         {!examMode && (
           <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 bg-card/40">
             <PaperPdfButton label="Open Question Paper" paperId={paperId} />
@@ -806,7 +756,6 @@ export default function P1Session() {
           </div>
         )}
 
-        {/* Exam mode: reminder about having the paper */}
         {examMode && (
           <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-amber-500/20 bg-amber-500/5">
             <Timer className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -817,7 +766,6 @@ export default function P1Session() {
           </div>
         )}
 
-        {/* Question dots */}
         <div className="flex gap-1 px-4 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-card/40">
           {questions.map((q, i) => {
             const a = answers[q.id];
@@ -828,7 +776,6 @@ export default function P1Session() {
           })}
         </div>
 
-        {/* Content */}
         <div className="flex-1 flex flex-col gap-4 p-4 pb-8">
           {showCalc && !examMode && <ScientificCalculator onClose={() => setShowCalc(false)} />}
 
@@ -858,45 +805,22 @@ export default function P1Session() {
           </div>
 
           {!submitted && crossedCount > 0 && (
-            <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">
-              {crossedCount} option{crossedCount !== 1 ? "s" : ""} crossed out
-            </p>
+            <p className="text-[11px] text-muted-foreground/40 text-center -mt-2">{crossedCount} option{crossedCount !== 1 ? "s" : ""} crossed out</p>
           )}
 
           <div className="flex flex-col gap-2.5">
             {OPTION_KEYS.map(key => (
-              <OptionRow
-                key={key}
-                optKey={key}
-                text={question.options[key]}
-                selected={currentAnswer}
-                crossedOut={crossedOut.has(key)}
-                submitted={submitted}
-                correctOption={question.correct}
-                onSelect={handleSelect}
-                onToggleCrossOut={handleToggleCrossOut}
-              />
+              <OptionRow key={key} optKey={key} text={question.options[key]} selected={currentAnswer} crossedOut={crossedOut.has(key)} submitted={submitted} correctOption={question.correct} onSelect={handleSelect} onToggleCrossOut={handleToggleCrossOut} />
             ))}
           </div>
 
           {!submitted && (
             <div className="flex gap-2 items-center">
-              <button
-                onClick={() => setIsGuess(g => !g)}
-                className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-colors shrink-0 ${
-                  isGuess ? "bg-amber-400 text-amber-900 border-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"
-                }`}
-              >
+              <button onClick={() => setIsGuess(g => !g)} className={`flex items-center gap-1.5 px-3.5 py-3 rounded-xl border text-sm font-semibold transition-colors shrink-0 ${isGuess ? "bg-amber-400 text-amber-900 border-amber-400" : "bg-secondary border-border text-muted-foreground hover:brightness-110"}`}>
                 🎲 {isGuess ? "Guess!" : "Just a guess"}
               </button>
-              <button
-                onClick={handleSubmit}
-                disabled={!currentAnswer || loading}
-                className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {loading
-                  ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span>
-                  : "Submit Answer"}
+              <button onClick={handleSubmit} disabled={!currentAnswer || loading} className="flex-1 bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                {loading ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />Marking…</span> : "Submit Answer"}
               </button>
             </div>
           )}
@@ -909,21 +833,11 @@ export default function P1Session() {
               <Star className="w-4 h-4" /> Star for teacher review
             </button>
           )}
-
           {showFeedbackPanel && !layer2 && !showCorrectBanner && !examMode && (
-            <button
-              onClick={handleRequestLayer2}
-              disabled={loadingLayer2}
-              className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-colors disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {loadingLayer2 ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Loading deeper breakdown…</>
-              ) : (
-                <><ChevronDown className="w-4 h-4" />Show deeper breakdown</>
-              )}
+            <button onClick={handleRequestLayer2} disabled={loadingLayer2} className="w-full flex items-center justify-center gap-2 border border-white/10 bg-white/[0.03] text-muted-foreground text-sm font-semibold py-3 rounded-xl hover:bg-white/[0.06] hover:text-foreground active:scale-[0.98] transition-colors disabled:cursor-not-allowed disabled:opacity-70">
+              {loadingLayer2 ? <><Loader2 className="w-4 h-4 animate-spin" />Loading deeper breakdown…</> : <><ChevronDown className="w-4 h-4" />Show deeper breakdown</>}
             </button>
           )}
-
           {layer2 && !examMode && <Layer2Feedback feedback={layer2} />}
 
           {!showCorrectBanner && (
@@ -931,14 +845,10 @@ export default function P1Session() {
               <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0} className="flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors disabled:opacity-30"><ChevronLeft className="w-4 h-4" /> Previous</button>
               <button
                 onClick={() => {
-                  if (currentIdx < questions.length - 1) {
-                    setCurrentIdx(i => i + 1);
-                  } else {
-                    if (examMode) {
-                      setShowExamSubmitConfirm(true);
-                    } else {
-                      navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } });
-                    }
+                  if (currentIdx < questions.length - 1) { setCurrentIdx(i => i + 1); }
+                  else {
+                    if (examMode) { setShowExamSubmitConfirm(true); }
+                    else { navigate("/physics/p1-summary", { state: { answers, questions, paperId: paper.id, examMode: false } }); }
                   }
                 }}
                 className="flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-semibold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-colors"
@@ -950,10 +860,7 @@ export default function P1Session() {
         </div>
       </div>
 
-      {/* Panels / Modals */}
-      {!examMode && (
-        <ScratchpadPanel questionId={question?.id} paperId={paperId} workings={workings} onSaveWorking={handleSaveWorking} />
-      )}
+      {!examMode && <ScratchpadPanel questionId={question?.id} paperId={paperId} workings={workings} onSaveWorking={handleSaveWorking} />}
       {showFormulas && !examMode && <FormulaSheet onClose={() => setShowFormulas(false)} imageUrl={paper.formulaSheetUrl} />}
       {showOverview && !examMode && <P1OverviewPanel questions={questions} answers={answers} currentIdx={currentIdx} onJump={setCurrentIdx} onClose={() => setShowOverview(false)} onClear={handleClear} starredIds={starredIds} notedIds={notedIds} />}
       {showStarred && !examMode && <StarredPanel paperId={paperId} paperLabel={paper.label} paper={paper} starredQuestions={starredQuestions} setStarredQuestions={setStarredQuestions} notes={notes} workings={workings} onClose={() => setShowStarred(false)} onJump={setCurrentIdx} questions={questions} userEmail={user?.email} onTeacherQuestionSave={(qId, val) => { const u = saveTeacherQuestion(paperId, qId, val); setStarredQuestions({ ...u }); }} onDeleteWorking={handleDeleteWorking} />}

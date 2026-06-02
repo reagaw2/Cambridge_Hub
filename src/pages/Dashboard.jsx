@@ -3,11 +3,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useDisplayName } from "@/lib/useDisplayName";
 import { getTopicData, resetData, getReviewBank, getGuessReviewBank, getMCQOnlyTopicNames } from "../lib/topicStore";
-import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles, FileText, AlertTriangle } from "lucide-react";
+import { ArrowUp, ArrowRight, ArrowDown, Flame, ChevronRight, Bookmark, RefreshCw, ArrowLeft, Lock, Atom, Sparkles, FileText, AlertTriangle, BookOpen, Clock } from "lucide-react";
 import GlobalStreakBadge from "@/components/GlobalStreakBadge";
 import { getStreakData } from "@/lib/topicStore";
 import { P1_PAPERS } from "@/lib/physicsP1Bank";
 import P1ModeModal from "@/components/P1ModeModal";
+import { getPaperMode, isPaperFresh } from "@/lib/p1PaperMode";
 
 function getLockStatus(locked_until) {
   if (!locked_until) return { locked: false, msRemaining: 0 };
@@ -115,6 +116,23 @@ function SectionDivider({ label, sublabel }) {
   );
 }
 
+/** Badge shown on each paper card based on its mode state */
+function PaperModeBadge({ paperId }) {
+  const mode = getPaperMode(paperId);
+  if (!mode) {
+    return (
+      <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400/70 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+        <Clock className="w-2.5 h-2.5" /> Exam available
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 text-[10px] font-bold text-primary/70 bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
+      <BookOpen className="w-2.5 h-2.5" /> Practice
+    </span>
+  );
+}
+
 const PTR_THRESHOLD = 72;
 
 export default function Dashboard() {
@@ -138,7 +156,11 @@ export default function Dashboard() {
   // Interrupted exam detection
   const [interruptedExam, setInterruptedExam] = useState(null);
 
+  // Force re-render when paper modes change (e.g. after navigating back)
+  const [, setModeTick] = useState(0);
+
   useEffect(() => {
+    setModeTick(t => t + 1);
     // Check for interrupted P1 exam sessions
     for (const paper of P1_PAPERS) {
       try {
@@ -149,7 +171,7 @@ export default function Dashboard() {
         }
       } catch {}
     }
-  }, []);
+  }, [location.key]);
 
   function handleViewInterruptedResults() {
     if (!interruptedExam) return;
@@ -165,6 +187,17 @@ export default function Dashboard() {
     if (!interruptedExam) return;
     localStorage.removeItem(`p1_exam_${interruptedExam.paper.id}`);
     setInterruptedExam(null);
+  }
+
+  function handlePaperClick(paper) {
+    const fresh = isPaperFresh(paper.id);
+    if (!fresh) {
+      // Already attempted — go straight to practice, no modal
+      navigate("/physics/p1", { state: { paperId: paper.id, examMode: false } });
+    } else {
+      // Never attempted — show mode selection modal
+      setSelectedPaper(paper);
+    }
   }
 
   function handleModeSelect(mode) {
@@ -311,18 +344,8 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={handleDismissInterrupted}
-                  className="flex-1 text-xs font-semibold text-white/40 border border-white/10 py-2 rounded-xl hover:brightness-110 transition-all"
-                >
-                  Dismiss
-                </button>
-                <button
-                  onClick={handleViewInterruptedResults}
-                  className="flex-1 text-xs font-bold text-red-400 bg-red-500/15 border border-red-500/30 py-2 rounded-xl hover:brightness-110 transition-all"
-                >
-                  View Results →
-                </button>
+                <button onClick={handleDismissInterrupted} className="flex-1 text-xs font-semibold text-white/40 border border-white/10 py-2 rounded-xl hover:brightness-110 transition-all">Dismiss</button>
+                <button onClick={handleViewInterruptedResults} className="flex-1 text-xs font-bold text-red-400 bg-red-500/15 border border-red-500/30 py-2 rounded-xl hover:brightness-110 transition-all">View Results →</button>
               </div>
             </div>
           )}
@@ -336,32 +359,30 @@ export default function Dashboard() {
               <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-0.5">Today's Focus</p>
               <p className="text-sm text-white/30">AI-powered recommendations</p>
             </div>
-            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-400/60 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-              Coming Soon
-            </span>
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-400/60 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">Coming Soon</span>
           </div>
 
           {/* Past Papers */}
-          <SectionDivider label="Past Papers" sublabel="Choose Practice or Timed Exam mode" />
+          <SectionDivider label="Past Papers" sublabel="Tap to choose Practice or Timed Exam mode" />
           <div className="space-y-2">
             {P1_PAPERS.map(paper => (
               <button
                 key={paper.id}
-                onClick={() => setSelectedPaper(paper)}
+                onClick={() => handlePaperClick(paper)}
                 className="w-full text-left rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 p-4 transition-all active:scale-[0.99]"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
                       <FileText className="w-4 h-4 text-emerald-400" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-bold text-white">{paper.label}</p>
-                      <p className="text-[11px] text-white/40 mt-0.5">Paper 1 Multiple Choice · {paper.questions.length} questions</p>
+                      <p className="text-[11px] text-white/40 mt-0.5">Paper 1 · {paper.questions.length} questions</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] text-amber-400/70 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-semibold">⏱ Exam</span>
+                    <PaperModeBadge paperId={paper.id} />
                     <ChevronRight className="w-4 h-4 text-emerald-400/50" />
                   </div>
                 </div>
@@ -374,8 +395,7 @@ export default function Dashboard() {
             <>
               <SectionDivider label="Review Banks" sublabel="Spaced repetition · questions you missed" />
               {reviewBank.length > 0 && (
-                <div onClick={() => navigate("/review-bank")}
-                  className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
+                <div onClick={() => navigate("/review-bank")} className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Bookmark className="w-4 h-4 text-amber-400 shrink-0" />
                     <div className="min-w-0">
@@ -387,8 +407,7 @@ export default function Dashboard() {
                 </div>
               )}
               {guessReviewBank.length > 0 && (
-                <div onClick={() => navigate("/guess-review-bank")}
-                  className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
+                <div onClick={() => navigate("/guess-review-bank")} className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/10 transition-all">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span className="text-base shrink-0">🎲</span>
                     <div className="min-w-0">
@@ -416,8 +435,7 @@ export default function Dashboard() {
                 </div>
               );
               return (
-                <div key={key} onClick={() => navigate(route)}
-                  className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-emerald-500/5 hover:border-emerald-500/25 p-4 cursor-pointer transition-all">
+                <div key={key} onClick={() => navigate(route)} className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-emerald-500/5 hover:border-emerald-500/25 p-4 cursor-pointer transition-all">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1.5 flex-1">
                       <p className="font-semibold text-white text-sm">{label}</p>
@@ -442,8 +460,7 @@ export default function Dashboard() {
             {AS_WRITTEN_TOPICS.map(({ label, key, route }) => {
               const data = topicData[key];
               return (
-                <div key={key} onClick={() => navigate(route)}
-                  className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-emerald-500/5 hover:border-emerald-500/25 p-4 cursor-pointer transition-all">
+                <div key={key} onClick={() => navigate(route)} className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-emerald-500/5 hover:border-emerald-500/25 p-4 cursor-pointer transition-all">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1.5 flex-1">
                       <p className="font-semibold text-white text-sm">{label}</p>
@@ -464,8 +481,7 @@ export default function Dashboard() {
                 {mcqOnlyTopics.map(({ label, key }) => {
                   const data = topicData[key];
                   return (
-                    <div key={key} onClick={() => navigate("/mcq", { state: { topic: label } })}
-                      className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] p-4 cursor-pointer transition-all">
+                    <div key={key} onClick={() => navigate("/mcq", { state: { topic: label } })} className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] p-4 cursor-pointer transition-all">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1.5 flex-1">
                           <p className="font-semibold text-white text-sm">{label}</p>
@@ -483,8 +499,7 @@ export default function Dashboard() {
           <SectionDivider label="Multiple Choice Topics" sublabel="Paper 1 topic practice" />
           <div className="space-y-2">
             {MCQ_ONLY_TOPICS.map((label) => (
-              <div key={label} onClick={() => navigate("/mcq", { state: { topic: label } })}
-                className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] p-4 cursor-pointer transition-all">
+              <div key={label} onClick={() => navigate("/mcq", { state: { topic: label } })} className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] p-4 cursor-pointer transition-all">
                 <div className="flex items-start justify-between">
                   <p className="font-semibold text-white text-sm">{label}</p>
                   <ChevronRight className="w-4 h-4 text-white/20 shrink-0" />
@@ -503,14 +518,12 @@ export default function Dashboard() {
           </div>
 
           <div className="flex justify-center pt-2">
-            <button onClick={handleReset} className="text-[10px] text-white/15 hover:text-white/30 transition-colors">
-              Reset data
-            </button>
+            <button onClick={handleReset} className="text-[10px] text-white/15 hover:text-white/30 transition-colors">Reset data</button>
           </div>
         </div>
       </div>
 
-      {/* P1 Mode Modal */}
+      {/* P1 Mode Modal — only shown for fresh papers */}
       {selectedPaper && (
         <P1ModeModal
           paper={selectedPaper}

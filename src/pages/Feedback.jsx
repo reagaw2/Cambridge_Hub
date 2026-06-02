@@ -6,6 +6,8 @@ import { getAllNotes, saveNote } from "@/lib/questionNotesStore";
 import { isStarred, starQuestion, unstarQuestion, saveTeacherQuestion, saveTeacherResponse, getAllStarred } from "@/lib/writtenStarStore";
 import { loadWorkings as loadTopicWorkings, saveWorking as saveTopicWorking } from "@/lib/p1WorkingsStore";
 import ScratchpadPanel from "@/components/ScratchpadPanel";
+import DownloadQuestionPdf from "@/components/DownloadQuestionPdf";
+import { useAuth } from "@/lib/AuthContext";
 
 const SUBJECT = "physics";
 
@@ -190,6 +192,7 @@ function DeeperBreakdown({ feedback }) {
 export default function Feedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { feedback, answer, isQ3, student_prediction, isReview, isPersistentMisunderstanding, topicKey, questionId, questionText, markScheme, topicLabel, nextFullRoute, nextRetryRoute, backRoute, paperRef } = state || {};
 
   const resolvedTopicKey = topicKey ?? "gravitational_fields";
@@ -237,6 +240,15 @@ export default function Feedback() {
       navigate(nextRetryRoute ?? "/physics");
     }
   }
+
+  // Build question object for PDF
+  const questionForPdf = {
+    text: questionText ?? "",
+    topic: topicLabel ?? resolvedTopicKey,
+    total_marks: maxMarks,
+    paper_ref: paperRef ?? "",
+    label: "",
+  };
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -293,7 +305,6 @@ export default function Feedback() {
             </div>
           )}
 
-          {/* key= forces a fresh mount per question so notes never bleed across */}
           <MyNoteWidget key={questionId} questionId={questionId ?? "unknown"} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} />
           <StarSection key={`star-${questionId}`} questionId={questionId} topic={topicLabel ?? resolvedTopicKey} questionText={questionText ?? ""} markScheme={markScheme ?? ""} feedback={feedback} answer={answer ?? ""} />
 
@@ -306,6 +317,16 @@ export default function Feedback() {
           )}
 
           <DeeperBreakdown feedback={feedback} />
+
+          {/* ── Download Review PDF ── */}
+          <DownloadQuestionPdf
+            question={questionForPdf}
+            answer={answer ?? ""}
+            feedback={feedback}
+            layer2={null}
+            subject="physics"
+            userEmail={user?.email ?? ""}
+          />
 
           <div className="grid grid-cols-2 gap-3 mt-1">
             <button onClick={() => navigate(-1)} className="flex items-center justify-center gap-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">‹ Back</button>

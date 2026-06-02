@@ -5,6 +5,8 @@ import { getAllNotes, saveNote } from "@/lib/questionNotesStore";
 import { isStarred, starQuestion, unstarQuestion, saveTeacherQuestion, saveTeacherResponse, getAllStarred } from "@/lib/writtenStarStore";
 import { loadWorkings as loadTopicWorkings, saveWorking as saveTopicWorking } from "@/lib/p1WorkingsStore";
 import ScratchpadPanel from "@/components/ScratchpadPanel";
+import DownloadQuestionPdf from "@/components/DownloadQuestionPdf";
+import { useAuth } from "@/lib/AuthContext";
 
 const SUBJECT = "cs";
 
@@ -17,10 +19,7 @@ function MyNoteWidget({ questionId, topic, questionText }) {
   if (!editing && existing?.text) {
     return (
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30">
-          <div className="flex items-center gap-2"><span className="text-xs text-blue-400">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div>
-          <button onClick={() => setEditing(true)} className="text-[11px] text-blue-400 hover:brightness-110 transition-all">Edit</button>
-        </div>
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30"><div className="flex items-center gap-2"><span className="text-xs text-blue-400">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div><button onClick={() => setEditing(true)} className="text-[11px] text-blue-400 hover:brightness-110 transition-all">Edit</button></div>
         <div className="px-4 py-3"><p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{existing.text}</p></div>
       </div>
     );
@@ -28,10 +27,7 @@ function MyNoteWidget({ questionId, topic, questionText }) {
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30">
-        <div className="flex items-center gap-2"><span className="text-xs text-blue-400">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div>
-        {existing?.text && <button onClick={() => { setEditing(false); setText(existing.text); }} className="text-[11px] text-muted-foreground hover:text-foreground">Cancel</button>}
-      </div>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/30"><div className="flex items-center gap-2"><span className="text-xs text-blue-400">✎</span><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">My Note</p></div>{existing?.text && <button onClick={() => { setEditing(false); setText(existing.text); }} className="text-[11px] text-muted-foreground hover:text-foreground">Cancel</button>}</div>
       <div className="p-3 space-y-2">
         <textarea value={text} onChange={e => { setText(e.target.value); setSaved(false); }} placeholder="What did you learn? What was the key idea?" rows={3}
           className="w-full bg-secondary/40 border border-border/60 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all leading-relaxed" />
@@ -59,64 +55,31 @@ function StarSection({ questionId, topic, questionText, feedback, answer }) {
   function handleToggleStar() {
     if (!questionId) return;
     if (starred) { unstarQuestion(questionId, SUBJECT); setStarred(false); setShowTeacherQInput(false); }
-    else {
-      starQuestion(questionId, { topic, questionText, markScheme: "", feedback: { pulse_layer_1: feedback?.pulse_layer_1, cambridge_insight: feedback?.cambridge_insight }, answer: answer ?? "" }, SUBJECT);
-      setStarred(true); setShowTeacherQInput(!existingEntry?.teacherQuestion);
-    }
+    else { starQuestion(questionId, { topic, questionText, markScheme: "", feedback: { pulse_layer_1: feedback?.pulse_layer_1, cambridge_insight: feedback?.cambridge_insight }, answer: answer ?? "" }, SUBJECT); setStarred(true); setShowTeacherQInput(!existingEntry?.teacherQuestion); }
   }
+  function handleSaveTeacherQ() { if (!teacherQ.trim()) return; saveTeacherQuestion(questionId, teacherQ, SUBJECT); setTeacherQSaved(true); setShowTeacherQInput(false); setTimeout(() => setTeacherQSaved(false), 2000); }
+  function handleSaveTeacherResponse() { saveTeacherResponse(questionId, teacherResponse, SUBJECT); setTeacherResponseSaved(true); setTimeout(() => setTeacherResponseSaved(false), 2500); }
 
-  function handleSaveTeacherQ() {
-    if (!teacherQ.trim()) return;
-    saveTeacherQuestion(questionId, teacherQ, SUBJECT); setTeacherQSaved(true); setShowTeacherQInput(false);
-    setTimeout(() => setTeacherQSaved(false), 2000);
-  }
-
-  function handleSaveTeacherResponse() {
-    saveTeacherResponse(questionId, teacherResponse, SUBJECT); setTeacherResponseSaved(true);
-    setTimeout(() => setTeacherResponseSaved(false), 2500);
-  }
-
-  if (!starred) {
-    return (
-      <button onClick={handleToggleStar} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border font-semibold text-sm transition-all active:scale-[0.98] bg-card border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5">
-        <Star className="w-4 h-4" /> Star for teacher review
-      </button>
-    );
-  }
+  if (!starred) return <button onClick={handleToggleStar} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border font-semibold text-sm transition-all active:scale-[0.98] bg-card border-border text-muted-foreground hover:border-amber-500/40 hover:text-amber-400 hover:bg-amber-500/5"><Star className="w-4 h-4" /> Star for teacher review</button>;
 
   return (
     <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-amber-500/15">
-        <div className="flex items-center gap-2"><Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" /><p className="text-xs text-amber-400 font-semibold">Starred — will appear in Teacher Review PDF</p></div>
-        <button onClick={handleToggleStar} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Remove</button>
-      </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-amber-500/15"><div className="flex items-center gap-2"><Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" /><p className="text-xs text-amber-400 font-semibold">Starred for teacher review</p></div><button onClick={handleToggleStar} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Remove</button></div>
       <div className="px-4 py-3 space-y-1.5 border-b border-amber-500/10">
         <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 flex items-center gap-1.5"><MessageCircleQuestion className="w-3 h-3" /> Your question for teacher</p>
         {teacherQSaved && !showTeacherQInput && teacherQ.trim() ? (
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[11px] text-foreground/80 leading-relaxed italic flex-1">"{teacherQ}"</p>
-            <button onClick={() => setShowTeacherQInput(true)} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0">Edit</button>
-          </div>
+          <div className="flex items-start justify-between gap-2"><p className="text-[11px] text-foreground/80 leading-relaxed italic flex-1">"{teacherQ}"</p><button onClick={() => setShowTeacherQInput(true)} className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors shrink-0 px-2 py-0.5 rounded hover:bg-amber-500/10">Edit</button></div>
         ) : (
           <div className="space-y-1.5">
-            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }} placeholder="What would you like to ask your teacher about this question?" rows={2} autoFocus className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
-            <div className="flex items-center justify-between">
-              {existingEntry?.teacherQuestion && <button onClick={() => { setShowTeacherQInput(false); setTeacherQ(existingEntry.teacherQuestion); }} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>}
-              <button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()} className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">Save question →</button>
-            </div>
+            <textarea value={teacherQ} onChange={e => { setTeacherQ(e.target.value); setTeacherQSaved(false); }} placeholder="What would you like to ask your teacher?" rows={2} className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all" />
+            <div className="flex items-center justify-between">{existingEntry?.teacherQuestion && <button onClick={() => { setShowTeacherQInput(false); setTeacherQ(existingEntry.teacherQuestion); }} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground">Cancel</button>}<button onClick={handleSaveTeacherQ} disabled={!teacherQ.trim()} className="ml-auto text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">Save →</button></div>
           </div>
         )}
       </div>
       <div className="px-4 py-3 space-y-2">
         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" /><p className="text-[10px] font-black uppercase tracking-widest text-amber-400">What the teacher said</p></div>
-        <p className="text-[10px] text-muted-foreground/50 leading-snug">Fill this in after your teacher reviews — or leave blank to write in by hand when printed.</p>
-        <textarea value={teacherResponse} onChange={e => { setTeacherResponse(e.target.value); setTeacherResponseSaved(false); }} placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…" rows={4} className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/40 transition-all leading-relaxed" />
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] text-muted-foreground/40">{teacherResponse.trim() ? "Saved response will appear as text in the PDF" : "Blank = 5 ruled lines appear in the PDF for handwriting"}</p>
-          <button onClick={handleSaveTeacherResponse} disabled={teacherResponse === (existingEntry?.teacherResponse ?? "")} className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">
-            {teacherResponseSaved ? <><Check className="w-3 h-3" /> Saved</> : "Save"}
-          </button>
-        </div>
+        <textarea value={teacherResponse} onChange={e => { setTeacherResponse(e.target.value); setTeacherResponseSaved(false); }} placeholder="Type the teacher's response here, or leave blank to fill in by hand when printed…" rows={3} className="w-full bg-card border border-amber-500/20 rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/30 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all leading-relaxed" />
+        <div className="flex justify-end"><button onClick={handleSaveTeacherResponse} disabled={teacherResponse === (existingEntry?.teacherResponse ?? "")} className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-lg border border-amber-500/30 disabled:opacity-40 transition-all hover:brightness-110">{teacherResponseSaved ? <><Check className="w-3 h-3" /> Saved</> : "Save"}</button></div>
       </div>
     </div>
   );
@@ -151,6 +114,7 @@ function DeeperBreakdown({ feedback }) {
 export default function CSFeedback() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { feedback, answer, totalMarks, backRoute, dashRoute, paperRef, isReview, topicRoute, topicLabel, isLastQuestion, questionId, topicKey, questionText } = state || {};
 
   const [workings, setWorkings] = useState({});
@@ -174,6 +138,14 @@ export default function CSFeedback() {
     if (fullMarks && topicRoute) { navigate(topicRoute); return; }
     navigate(backRoute ?? "/cs");
   }
+
+  const questionForPdf = {
+    text: questionText ?? "",
+    topic: topicLabel ?? topicKey ?? "",
+    total_marks: maxMarks,
+    paper_ref: paperRef ?? "9618",
+    label: "",
+  };
 
   return (
     <div className="min-h-screen bg-background flex justify-center">
@@ -223,6 +195,16 @@ export default function CSFeedback() {
           <MyNoteWidget questionId={questionId ?? "cs-unknown"} topic={topicLabel ?? topicKey ?? ""} questionText={questionText ?? ""} />
           <StarSection questionId={questionId} topic={topicLabel ?? topicKey ?? ""} questionText={questionText ?? ""} feedback={feedback} answer={answer ?? ""} />
           <DeeperBreakdown feedback={feedback} />
+
+          {/* ── Download Review PDF ── */}
+          <DownloadQuestionPdf
+            question={questionForPdf}
+            answer={answer ?? ""}
+            feedback={feedback}
+            layer2={null}
+            subject="cs"
+            userEmail={user?.email ?? ""}
+          />
 
           <div className="grid grid-cols-2 gap-3 mt-1">
             <button onClick={() => navigate(-1)} className="flex items-center justify-center gap-1 border border-border text-muted-foreground font-semibold text-sm py-3.5 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all">‹ Back</button>

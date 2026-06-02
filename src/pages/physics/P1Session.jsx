@@ -23,7 +23,7 @@ import { setPaperMode } from "@/lib/p1PaperMode";
 import { saveExamResult } from "@/lib/p1ExamResultsStore";
 
 const OPTION_KEYS = ["A", "B", "C", "D"];
-const EXAM_DURATION_SECS = 90 * 60; // 1 hour 30 minutes
+const EXAM_DURATION_SECS = 90 * 60;
 
 function formatExamTime(secs) {
   const h = Math.floor(secs / 3600);
@@ -314,18 +314,80 @@ function StarredPanel({ paperId, paperLabel, paper, starredQuestions, setStarred
   );
 }
 
+// ── MiniNoteWidget — resets when questionId changes ──────────────────────────
 function MiniNoteWidget({ questionId, paperId, notes, onNoteSaved }) {
   const existing = notes[questionId];
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(existing?.text ?? "");
   const [saved, setSaved] = useState(false);
-  function handleSave() { const updated = saveNote(paperId, questionId, text); onNoteSaved(updated); setSaved(true); setTimeout(() => setSaved(false), 2000); if (!text.trim()) setOpen(false); }
-  function handleKeyDown(e) { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave(); }
-  if (!open && !existing?.text) return <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground/60 hover:text-green-400 hover:border-green-500/30 border border-border/40 bg-secondary/40 px-3 py-2 rounded-xl transition-colors w-full"><Pencil className="w-3.5 h-3.5" /> Add a note</button>;
+
+  // Reset state whenever the question changes
+  useEffect(() => {
+    const note = notes[questionId];
+    setText(note?.text ?? "");
+    setOpen(false);
+    setSaved(false);
+  }, [questionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSave() {
+    const updated = saveNote(paperId, questionId, text);
+    onNoteSaved(updated);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    if (!text.trim()) setOpen(false);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave();
+  }
+
+  if (!open && !existing?.text) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground/60 hover:text-green-400 hover:border-green-500/30 border border-border/40 bg-secondary/40 px-3 py-2 rounded-xl transition-colors w-full">
+        <Pencil className="w-3.5 h-3.5" /> Add a note
+      </button>
+    );
+  }
+
   return (
     <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 space-y-2">
-      <div className="flex items-center justify-between"><div className="flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5 text-green-400" /><p className="text-[11px] font-bold uppercase tracking-widest text-green-400/70">My Note</p></div>{existing?.text && !open && <button onClick={() => setOpen(true)} className="text-[10px] text-green-400/60 hover:text-green-400 transition-colors">Edit</button>}</div>
-      {open ? (<><textarea value={text} onChange={e => setText(e.target.value)} onKeyDown={handleKeyDown} placeholder="What did you understand? What confused you?" rows={3} autoFocus className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/30 transition-all" /><div className="flex items-center justify-between gap-2"><button onClick={() => { setOpen(false); setText(existing?.text ?? ""); }} className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button><div className="flex items-center gap-2">{text.trim() && <button onClick={() => { setText(""); saveNote(paperId, questionId, ""); onNoteSaved({}); setOpen(false); }} className="text-[11px] text-red-400/60 hover:text-red-400 transition-colors">Delete note</button>}<button onClick={handleSave} className="text-xs font-bold text-green-400 hover:brightness-110 transition-all bg-green-500/15 px-3 py-1.5 rounded-lg border border-green-500/30">{saved ? "Saved ✓" : "Save note"}</button></div></div><p className="text-[10px] text-muted-foreground/30">Cmd/Ctrl + Enter to save</p></>) : (<p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">{existing?.text}</p>)}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Pencil className="w-3.5 h-3.5 text-green-400" />
+          <p className="text-[11px] font-bold uppercase tracking-widest text-green-400/70">My Note</p>
+        </div>
+        {existing?.text && !open && (
+          <button onClick={() => setOpen(true)} className="text-[10px] text-green-400/60 hover:text-green-400 transition-colors">Edit</button>
+        )}
+      </div>
+      {open ? (
+        <>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What did you understand? What confused you?"
+            rows={3}
+            autoFocus
+            className="w-full bg-card border border-border/60 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/30 transition-all"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <button onClick={() => { setOpen(false); setText(existing?.text ?? ""); }} className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">Cancel</button>
+            <div className="flex items-center gap-2">
+              {text.trim() && (
+                <button onClick={() => { setText(""); saveNote(paperId, questionId, ""); onNoteSaved({}); setOpen(false); }} className="text-[11px] text-red-400/60 hover:text-red-400 transition-colors">Delete note</button>
+              )}
+              <button onClick={handleSave} className="text-xs font-bold text-green-400 hover:brightness-110 transition-all bg-green-500/15 px-3 py-1.5 rounded-lg border border-green-500/30">
+                {saved ? "Saved ✓" : "Save note"}
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground/30">Cmd/Ctrl + Enter to save</p>
+        </>
+      ) : (
+        <p className="text-xs text-foreground/70 leading-relaxed whitespace-pre-wrap">{existing?.text}</p>
+      )}
     </div>
   );
 }
@@ -416,20 +478,11 @@ export default function P1Session() {
 
   useEffect(() => { answersRef.current = answers; }, [answers]);
 
-  // ── doExamSubmit — saves result then navigates ─────────────────────────
   const doExamSubmit = useCallback(async (finalAnswers) => {
     if (examSubmittedRef.current) return;
     examSubmittedRef.current = true;
     clearInterval(examTimerRef.current);
-
-    // Persist the result before navigating
-    await saveExamResult({
-      paperId,
-      paperLabel: paper.label,
-      answers: finalAnswers,
-      questions,
-    });
-
+    await saveExamResult({ paperId, paperLabel: paper.label, answers: finalAnswers, questions });
     setPaperMode(paperId, "practice");
     localStorage.removeItem(`p1_exam_${paperId}`);
     navigate("/physics/p1-summary", {
@@ -446,7 +499,6 @@ export default function P1Session() {
       if (savedExam?.interrupted && savedExam?.paperId === paperId) {
         localStorage.removeItem(`p1_exam_${paperId}`);
         setPaperMode(paperId, "practice");
-        // Save the interrupted result too
         saveExamResult({ paperId, paperLabel: paper.label, answers: savedExam.answers ?? {}, questions });
         setSessionLoading(false);
         navigate("/physics/p1-summary", {
@@ -765,7 +817,18 @@ export default function P1Session() {
 
           {showCorrectBanner && <CorrectBanner />}
           {showFeedbackPanel && <Layer1Feedback feedback={layer1} isCorrect={existingAnswer?.correct ?? false} isGuess={existingAnswer?.flagged_as_guess ?? false} />}
-          {submitted && !showCorrectBanner && !examMode && <MiniNoteWidget questionId={question.id} paperId={paperId} notes={notes} onNoteSaved={updated => setNotes({ ...updated })} />}
+
+          {/* Note widget — key prop ensures full remount on question change */}
+          {submitted && !showCorrectBanner && !examMode && (
+            <MiniNoteWidget
+              key={question.id}
+              questionId={question.id}
+              paperId={paperId}
+              notes={notes}
+              onNoteSaved={updated => setNotes({ ...updated })}
+            />
+          )}
+
           {showFeedbackPanel && !isCurrentStarred && !examMode && (
             <button onClick={handleToggleStar} className="w-full flex items-center justify-center gap-2 border border-amber-500/25 bg-amber-500/5 text-amber-400/80 text-sm font-semibold py-2.5 rounded-xl hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/50 active:scale-[0.98] transition-colors">
               <Star className="w-4 h-4" /> Star for teacher review

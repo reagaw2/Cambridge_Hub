@@ -32,6 +32,7 @@ async function invokeLLM({ prompt, response_json_schema, model }) {
 
   return await response.json();
 }
+
 export const base44 = {
   from: (...args) => supabaseClient.from(...args),
   rpc: (...args) => supabaseClient.rpc(...args),

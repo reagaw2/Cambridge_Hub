@@ -1,4 +1,4 @@
-import { defineEventHandler, readBody, createError } from "h3";
+import { defineEventHandler, readBody, createError } from "nitro/h3";
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<{

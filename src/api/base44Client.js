@@ -12,7 +12,26 @@ export const supabaseClient = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
+async function invokeLLM({ prompt, response_json_schema, model }) {
+  const response = await fetch('/api/llm', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt,
+      response_json_schema,
+      model,
+    }),
+  });
 
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`LLM API error ${response.status}: ${err}`);
+  }
+
+  return await response.json();
+}
 export const base44 = {
   from: (...args) => supabaseClient.from(...args),
   rpc: (...args) => supabaseClient.rpc(...args),

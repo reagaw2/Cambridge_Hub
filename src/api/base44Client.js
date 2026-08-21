@@ -12,48 +12,6 @@ export const supabaseClient = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
-async function invokeLLM({ prompt, response_json_schema, model }) {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('VITE_ANTHROPIC_API_KEY is not configured.');
-  }
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 4000,
-      messages: [
-        {
-          role: 'user',
-          content: `${prompt}\n\nIMPORTANT: Return your response EXACTLY matching this JSON schema: ${JSON.stringify(response_json_schema)}. Do not include any conversational intro/outro text, only valid JSON.`,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${err}`);
-  }
-
-  const data = await response.json();
-  const text = data.content?.[0]?.text;
-  if (!text) throw new Error('No text content in Anthropic response');
-
-  let jsonText = text.trim();
-  const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) jsonText = jsonMatch[1].trim();
-
-  return JSON.parse(jsonText);
-}
 
 export const base44 = {
   from: (...args) => supabaseClient.from(...args),
